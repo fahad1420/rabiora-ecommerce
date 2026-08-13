@@ -1,0 +1,36 @@
+# Project TODO
+
+- [ ] Preserve and faithfully reproduce the existing Rabiora storefront design, responsive layout, Poppins typography, announcement bar, social links, and existing Featured Collection carousel behavior.
+- [x] Import the authoritative 24-product `data/product.js` catalogue into the managed database and upload all current product assets to managed file storage.
+- [x] Define the normalized database schema for products, product images, categories, users, addresses, guest and user carts, wishlist items, orders, order items, payment records, and order-status history.
+- [x] Implement secure customer authentication, profile management, password security, route protection, and admin role authorization compatible with the selected account experience.
+- [x] Build public database-driven catalogue, search, All/Featured filtering, product detail gallery, related products, stock display, and price/discount presentation without changing the established product-card design.
+- [ ] Implement guest cart continuity, logged-in cart persistence, quantity and stock validation, subtotal and total calculations, and safe cart merging after sign-in where practical.
+- [ ] Implement wishlist persistence for signed-in customers while retaining browser-based guest wishlist behavior where appropriate.
+- [ ] Build Bangladesh-focused checkout with customer name, phone, address, allowed payment-method selection, order summary, server-side validation, and delivery-charge calculation.
+- [ ] Create orders with immutable item and price snapshots, allowed order statuses of pending, confirmed, shipped, and delivered, and customer order confirmation and history views.
+- [x] Configure a compliant WhatsApp owner-notification approach for each successfully created order, including required credentials or user handoff where applicable.
+- [ ] Build a protected admin dashboard for product CRUD, image management, featured and stock controls, orders, customer details, and approved order-status transitions.
+- [ ] Add server-side input validation, robust error handling, authorization checks, CORS policy, rate limiting where appropriate, safe secret handling, and no sensitive values in Git or the frontend.
+- [ ] Add automated tests for authentication, product CRUD, carts, checkout, order creation, stock validation, order-status authorization, and WhatsApp-notification failure handling using only test data.
+- [ ] Verify desktop and mobile storefront and administration flows, accessibility fundamentals, database persistence, and production configuration before release.
+- [x] Restrict payment methods to bKash, Nagad, Rocket, and Cash on Delivery, require transaction ID and submitted amount only for the three manual-wallet methods, and never automatically verify a payment.
+- [x] Restrict order labels to pending, confirmed, shipped, and delivered, enforce authorized forward-only transitions, and record each change in order-status history.
+- [x] Use a database transaction to recalculate server-side stock, prices, delivery charge, totals, immutable order snapshots, and payment audit data before creating an order.
+- [x] Ensure all product import runs are idempotent, preserve the original `data/product.js` as the authoritative reference, and do not remove original catalogue data until database verification succeeds.
+- [x] Record the three source gallery references that were absent from the supplied archive (`dress2_1.jpg`, `dress9_1.jpg`, and `dress11_1.jpg`) without inventing replacement imagery.
+- [ ] Preserve guest browsing, local wishlist behavior, anonymous cart continuity, and safe guest-cart merging after customer sign-in.
+- [x] Superseded by the approved credential-free Click-to-WhatsApp customer handoff; no automatic WhatsApp API notification or credentials are used.
+- [x] Implement live `/cart` and `/wishlist` routes so header navigation and product controls never lead to a dead end.
+- [ ] Connect product-card and product-detail wishlist controls to the approved guest-local and signed-in persistent wishlist flows.
+- [ ] Re-verify the public catalogue and product-detail journey after the cart and wishlist routes are live.
+- [ ] Exercise the live browser cart flow: catalogue/detail add, header count, quantity change, removal, subtotal update, and reload persistence.
+- [ ] Add automated coverage for guest-cart merge, stock-limit rejection, cart quantity updates, and cart removal without using customer data.
+- [ ] Exercise and test guest-local and signed-in persistent wishlist toggle, persistence, and wishlist-page rendering.
+- [ ] Document a post-integration browser journey from homepage through product detail, wishlist, and cart once the Phase 4 behavior is verified.
+- [x] Generate a credential-free Click-to-WhatsApp `wa.me` handoff after successful order creation with the order number, customer delivery details, product quantities, payment method, and total; do not require or use WhatsApp API credentials.
+- [x] Keep the WhatsApp implementation behind a replaceable notification-provider boundary so an official API provider can be added later without changing checkout or order creation.
+- [ ] Verify that checkout and order creation complete successfully when no WhatsApp API credentials exist and that the customer-facing handoff opens a correctly populated `wa.me` link.
+- [ ] Role-gate the `/admin` pages on the client and show a clear forbidden state for signed-in users who are not administrators.
+- [ ] Add existing-product image controls for cover selection and removal, then verify the management flows without fabricating product content.
+- [ ] Add automated admin authorization and approved order-status mutation coverage and exercise product CRUD and the order-status pipeline in the live administrator UI.
