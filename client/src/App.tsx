@@ -1,22 +1,24 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch } from "wouter";
+import { lazy, Suspense } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import Home from "./pages/Home";
 import NotFound from "./pages/NotFound";
-import ProductDetail from "./pages/ProductDetail";
-import Cart from "./pages/Cart";
-import Wishlist from "./pages/Wishlist";
-import { AuthPage } from "./pages/Auth";
-import Account from "./pages/Account";
-import Checkout from "./pages/Checkout";
-import OrderConfirmation from "./pages/OrderConfirmation";
-import Admin from "./pages/Admin";
+
+const ProductDetail = lazy(() => import("./pages/ProductDetail"));
+const Cart = lazy(() => import("./pages/Cart"));
+const Wishlist = lazy(() => import("./pages/Wishlist"));
+const AuthPage = lazy(() => import("./pages/Auth").then((module) => ({ default: module.AuthPage })));
+const Account = lazy(() => import("./pages/Account"));
+const Checkout = lazy(() => import("./pages/Checkout"));
+const OrderConfirmation = lazy(() => import("./pages/OrderConfirmation"));
+const Admin = lazy(() => import("./pages/Admin"));
 
 function Router() {
-  return <Switch>
+  return <Suspense fallback={<main className="catalogue-state" aria-live="polite">Loading Rabiora…</main>}><Switch>
     <Route path="/" component={Home} />
     <Route path="/products/:slug" component={ProductDetail} />
     <Route path="/cart" component={Cart} />
@@ -31,7 +33,7 @@ function Router() {
     <Route path="/admin/orders" component={Admin} />
     <Route path="/404" component={NotFound} />
     <Route component={NotFound} />
-  </Switch>;
+  </Switch></Suspense>;
 }
 
 export default function App() {

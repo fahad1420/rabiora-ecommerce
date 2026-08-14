@@ -11,7 +11,7 @@
 - [x] Create orders with immutable item and price snapshots, allowed order statuses of pending, confirmed, shipped, and delivered, and customer order confirmation and history views.
 - [x] Configure a compliant WhatsApp owner-notification approach for each successfully created order, including required credentials or user handoff where applicable.
 - [x] Build a protected admin dashboard for product CRUD, image management, featured and stock controls, orders, customer details, and approved order-status transitions.
-- [ ] Add server-side input validation, robust error handling, authorization checks, CORS policy, rate limiting where appropriate, safe secret handling, and no sensitive values in Git or the frontend.
+- [x] Add server-side input validation, robust error handling, authorization checks, CORS policy, rate limiting where appropriate, safe secret handling, and no sensitive values in Git or the frontend.
 - [ ] Add automated tests for authentication, product CRUD, carts, checkout, order creation, stock validation, order-status authorization, and WhatsApp-notification failure handling using only test data.
 - [ ] Verify desktop and mobile storefront and administration flows, accessibility fundamentals, database persistence, and production configuration before release.
 - [x] Restrict payment methods to bKash, Nagad, Rocket, and Cash on Delivery, require transaction ID and submitted amount only for the three manual-wallet methods, and never automatically verify a payment.
@@ -27,7 +27,7 @@
 - [x] Exercise the live browser cart flow: catalogue/detail add, header count, quantity change, removal, subtotal update, and reload persistence.
 - [x] Add automated coverage for guest-cart merge, stock-limit rejection, cart quantity updates, and cart removal without using customer data.
 - [x] Exercise and test guest-local and signed-in persistent wishlist toggle, persistence, and wishlist-page rendering.
-- [ ] Document a post-integration browser journey from homepage through product detail, wishlist, and cart once the Phase 4 behavior is verified.
+- [x] Document a post-integration browser journey from homepage through product detail, wishlist, and cart once the Phase 4 behavior is verified.
 - [x] Generate a credential-free Click-to-WhatsApp `wa.me` handoff after successful order creation with the order number, customer delivery details, product quantities, payment method, and total; do not require or use WhatsApp API credentials.
 - [x] Keep the WhatsApp implementation behind a replaceable notification-provider boundary so an official API provider can be added later without changing checkout or order creation.
 - [x] Verify that checkout and order creation complete successfully when no WhatsApp API credentials exist and that the customer-facing handoff opens a correctly populated `wa.me` link.
@@ -43,11 +43,11 @@
 - [x] Add optional persisted light/dark theme support with a visible accessible toggle and a premium brand-aligned dark palette.
 - [x] Add persisted Bangla/English customer-facing UI localization without translating database product names, descriptions, or brand content.
 - [x] Polish customer-facing responsive layouts, typography, spacing, product cards, header, hero, product details, cart, wishlist, checkout, and account pages across the required viewports.
-- [ ] Perform customer-facing accessibility and frontend performance refinements without altering existing business behavior.
+- [x] Perform customer-facing accessibility and frontend performance refinements without altering existing business behavior.
 - [x] Implement and document an explicit server-side CORS policy, then re-check the security and infrastructure checklist item.
 - [x] Add focused automated coverage for admin product CRUD, checkout and order-creation transactions, stock rejection during order creation, and provider-boundary failure handling.
 - [ ] Run and document a live administrator image-management verification with approved owner access, without changing business content except through reversible, authorized checks.
-- [ ] Implement or document measurable customer-facing frontend performance refinements beyond the completed accessibility work.
+- [x] Implement or document measurable customer-facing frontend performance refinements beyond the completed accessibility work.
 - [x] Run type checks, existing tests, console review, and responsive visual QA at 320, 360, 375, 390, 414, 768, 1024, 1366, 1440, and 1920-pixel widths; wait for publishing approval after reporting results.
 - [x] Verify, document, and if necessary harden an explicit CORS policy for the existing production and development request paths.
 - [x] Add test coverage for admin product CRUD validation and authorization without mutating production catalogue content.
@@ -58,8 +58,13 @@
 - [x] Run a completely removable end-to-end checkout, order-confirmation, and WhatsApp-handoff acceptance test only when configuration permits safe cleanup.
 - [x] Verify responsive rendering at 320, 360, 375, 390, 414, 768, 1024, 1366, 1440, and 1920 pixels without redesigning the frontend.
 - [x] Complete a frontend performance observation plus fresh console and network failure review, then run production build, type check, and complete test suite.
-- [ ] Consider route-level code splitting to reduce the production JavaScript bundle, which currently triggers the build’s 500 kB chunk-size warning.
+- [x] Consider route-level code splitting to reduce the production JavaScript bundle, which currently triggers the build’s 500 kB chunk-size warning.
 - [x] Create one explicitly labeled, confirmed-recipient checkout acceptance order; verify order creation, confirmation, and its prefilled Click-to-WhatsApp URL without sending a message.
 - [x] Restore the affected product stock and remove all order, item, payment, status-history, cart, and customer records associated with the checkout acceptance test; verify cleanup by label.
 - [x] Fix confirmation-route validation so generated Rabiora order numbers containing underscore characters are accepted.
 - [x] Add a regression test covering confirmation lookup with an underscore-containing generated order number.
+- [x] Complete administrator acceptance through read-only database, protected-route, and server-side authorization evidence; report browser-only visual dashboard interaction separately as blocked because takeover opens a new tab.
+- [ ] Add a database-backed or service-level automated product CRUD test covering persisted effects with removable test data.
+- [ ] Add an automated transaction-level order creation test covering persisted order, items, payment, status history, stock change, and safe rollback with removable test data.
+- [x] Run final no-data-mutation validation for all 32 automated tests, TypeScript, production build, runtime health, and preserved customer-facing features before final handover.
+- [ ] Save a final no-publish checkpoint and provide delivery, deployment, and GitHub handover requirements.
