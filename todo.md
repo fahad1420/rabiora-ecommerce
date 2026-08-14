@@ -67,4 +67,6 @@
 - [ ] Add a database-backed or service-level automated product CRUD test covering persisted effects with removable test data.
 - [ ] Add an automated transaction-level order creation test covering persisted order, items, payment, status history, stock change, and safe rollback with removable test data.
 - [x] Run final no-data-mutation validation for all 32 automated tests, TypeScript, production build, runtime health, and preserved customer-facing features before final handover.
-- [ ] Save a final no-publish checkpoint and provide delivery, deployment, and GitHub handover requirements.
+- [x] Save a final no-publish checkpoint and provide delivery, deployment, and GitHub handover requirements.
+- [x] Add subtle GitHub and LinkedIn links beside or below the existing developer credit, with safe new-tab attributes and no other footer or application changes.
+- [x] Verify the developer-profile links render correctly at desktop and mobile widths, then save a no-publish checkpoint.

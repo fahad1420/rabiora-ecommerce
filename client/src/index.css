@@ -140,6 +140,9 @@ img { display: block; max-width: 100%; }
 .social-links a:hover { transform: translateY(-4px); background: var(--secondary); }
 .rabiora-footer { padding: 35px 0; background: #111827; color: #fff; text-align: center; }
 .rabiora-footer p { margin: 8px 0; }
+.rabiora-footer .developer-links { margin-top: 4px; font-size: 13px; color: rgba(255, 255, 255, .68); }
+.rabiora-footer .developer-links a { color: inherit; text-decoration: none; transition: color .18s ease, text-decoration-color .18s ease; }
+.rabiora-footer .developer-links a:hover, .rabiora-footer .developer-links a:focus-visible { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
 .back-to-top { position: fixed; z-index: 20; right: 25px; bottom: 25px; display: grid; width: 55px; height: 55px; place-items: center; border: 0; border-radius: 50%; background: var(--primary); color: #fff; cursor: pointer; box-shadow: var(--shadow); }
 .drawer-overlay { position: fixed; z-index: 39; inset: 0; border: 0; background: rgba(0, 0, 0, .35); }
 .mobile-drawer { position: fixed; z-index: 40; top: 0; right: 0; display: flex; width: min(320px, 85vw); min-height: 100vh; flex-direction: column; gap: 16px; padding: 22px 18px; background: var(--surface); box-shadow: -12px 0 24px rgba(0, 0, 0, .08); }
