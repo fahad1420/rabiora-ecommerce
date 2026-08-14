@@ -81,3 +81,5 @@
 - [x] Add automated tests for guest denial, cross-customer order denial, own-order access, returned detail fields, and status-history visibility.
 - [ ] Verify the full owned-order customer tracking flow at desktop and mobile widths without creating or modifying business data.
 - [ ] Complete a read-only desktop/mobile visual review of an existing authenticated customer-owned order and My Orders → detail navigation; this is blocked until an eligible existing order/session is available because test orders and customer creation are prohibited.
+- [x] Replace only the Contact/Footer generic Facebook, Instagram, and TikTok glyphs with recognizable brand icons while preserving social URLs, teal button styling, hover behavior, and layout.
+- [x] Verify the corrected Contact/Footer social icons and existing GitHub/LinkedIn developer icons, then run frontend validation without publishing.
