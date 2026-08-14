@@ -70,3 +70,5 @@
 - [x] Save a final no-publish checkpoint and provide delivery, deployment, and GitHub handover requirements.
 - [x] Add subtle GitHub and LinkedIn links beside or below the existing developer credit, with safe new-tab attributes and no other footer or application changes.
 - [x] Verify the developer-profile links render correctly at desktop and mobile widths, then save a no-publish checkpoint.
+- [x] Replace only the developer-profile text links in the footer with small accessible GitHub and LinkedIn icons, retaining safe external-link behavior.
+- [x] Verify the footer icons are balanced and accessible at desktop and mobile widths, then save a no-publish checkpoint.
