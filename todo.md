@@ -102,4 +102,5 @@
 - [x] Complete the approved self-hosted archive strategy by placing all 55 product-gallery and 4 payment files inside the project, removing managed image runtime dependencies, and ensuring the final project ZIP contains those physical files.
 - [ ] Run a reversible administrator image-management acceptance pass for add/upload/replace/remove/gallery behavior using the portable local image adapter, without retaining business-data changes.
 - [x] Verify the portable migration, including physical image files, is committed and synchronized to the existing GitHub repository.
-- [ ] Save a checkpoint for the portable image migration and document remaining non-image Manus dependencies for independent deployment.
+- [x] Document remaining non-image Manus dependencies and independent-host requirements in `PORTABILITY_NOTES.md` and `PORTABILITY_DELIVERY_REPORT.md`.
+- [ ] Save a checkpoint for the portable image migration only after publication is authorized; this project auto-publishes on checkpoint creation and publication remains explicitly prohibited.
