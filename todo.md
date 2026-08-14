@@ -85,3 +85,7 @@
 - [x] Verify the corrected Contact/Footer social icons and existing GitHub/LinkedIn developer icons, then run frontend validation without publishing.
 - [x] Reduce only the mobile Hero-to-Featured Collection vertical gap by approximately 30–40%, preserving existing controls and larger breakpoints.
 - [x] Verify the refined Hero-to-Featured spacing at 320, 360, 375, 390, and 414 pixels without changing any other section.
+- [x] Verify checkpoint 8b413d3b repository integrity and required GitHub handover source files without modifying business data or publishing.
+- [ ] Create a non-secret `.env.example` and complete README GitHub handover documentation covering setup, variables, database, storage, commands, deployment, and Manus-specific replacements. The managed secret policy prevents creating `.env.example` in this workspace; `ENVIRONMENT_TEMPLATE.md` contains the exact non-secret template to copy after export.
+- [x] Audit the repository for committed secrets and required source, package, lockfile, schema, migration, and ignore-file coverage.
+- [x] Run final GitHub-handover validation with `pnpm check`, `pnpm test`, and `pnpm build`, then report readiness without publishing.
