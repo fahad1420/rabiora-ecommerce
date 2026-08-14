@@ -101,5 +101,5 @@
 - [x] Resolve the managed-project policy conflict preventing physical image files from residing inside the Git/ZIP project; extracted assets can only remain outside the repository in the managed static-asset workspace without an approved independent asset-transfer path.
 - [x] Complete the approved self-hosted archive strategy by placing all 55 product-gallery and 4 payment files inside the project, removing managed image runtime dependencies, and ensuring the final project ZIP contains those physical files.
 - [ ] Run a reversible administrator image-management acceptance pass for add/upload/replace/remove/gallery behavior using the portable local image adapter, without retaining business-data changes.
-- [ ] Verify the portable migration, including physical image files, is committed and synchronized to the existing GitHub repository.
+- [x] Verify the portable migration, including physical image files, is committed and synchronized to the existing GitHub repository.
 - [ ] Save a checkpoint for the portable image migration and document remaining non-image Manus dependencies for independent deployment.
