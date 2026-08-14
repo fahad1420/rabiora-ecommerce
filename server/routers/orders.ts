@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { createOrder, getOrderConfirmation, listCustomerOrders, manualPaymentRequired, PAYMENT_METHODS } from "../orderService";
-import { getCustomerFromRequest, normalizeBangladeshPhone } from "../customerSession";
+import { createOrder, getCustomerOrderConfirmation, getCustomerOrderDetail, getOrderConfirmation, listCustomerOrders, manualPaymentRequired, PAYMENT_METHODS } from "../orderService";
+import { getCustomerFromRequest, hasGuestOrderConfirmationAccess, normalizeBangladeshPhone, setGuestOrderConfirmation } from "../customerSession";
 import { resolveCartIdentity } from "../cartService";
 import { clickToWhatsAppProvider, createCustomerHandoffSafely } from "../whatsapp";
 import { publicProcedure, router } from "../_core/trpc";
@@ -22,6 +22,7 @@ export const orderRouter = router({
     const identity = await resolveCartIdentity(ctx.req, ctx.user, input.anonymousToken);
     const normalizedPhone = normalizeBangladeshPhone(input.customerPhone)!;
     const created = await createOrder(identity, { ...input, customerPhone: normalizedPhone });
+    if (!identity.userId) await setGuestOrderConfirmation(ctx.res, created.orderNumber);
     const clickToWhatsApp = createCustomerHandoffSafely(clickToWhatsAppProvider, {
       orderNumber: created.orderNumber,
       customerName: input.customerName,
@@ -34,11 +35,21 @@ export const orderRouter = router({
     });
     return { ...created, clickToWhatsAppUrl: clickToWhatsApp?.url ?? null };
   }),
-  confirmation: publicProcedure.input(z.object({ orderNumber: z.string().trim().regex(/^RAB-[A-Z0-9_-]+$/) })).query(({ input }) => getOrderConfirmation(input.orderNumber)),
+  confirmation: publicProcedure.input(z.object({ orderNumber: z.string().trim().regex(/^RAB-[A-Z0-9_-]+$/) })).query(async ({ ctx, input }) => {
+    const customer = ctx.user ?? await getCustomerFromRequest(ctx.req);
+    if (customer) return getCustomerOrderConfirmation(customer.id, input.orderNumber);
+    if (!(await hasGuestOrderConfirmationAccess(ctx.req, input.orderNumber))) throw new TRPCError({ code: "FORBIDDEN", message: "This order confirmation is not available in the current session." });
+    return getOrderConfirmation(input.orderNumber);
+  }),
   mine: publicProcedure.query(async ({ ctx }) => {
-    const customer = await getCustomerFromRequest(ctx.req);
+    const customer = ctx.user ?? await getCustomerFromRequest(ctx.req);
     if (!customer) throw new TRPCError({ code: "UNAUTHORIZED", message: "Sign in to view order history." });
     return listCustomerOrders(customer.id);
+  }),
+  detail: publicProcedure.input(z.object({ orderNumber: z.string().trim().regex(/^RAB-[A-Z0-9_-]+$/) })).query(async ({ ctx, input }) => {
+    const customer = ctx.user ?? await getCustomerFromRequest(ctx.req);
+    if (!customer) throw new TRPCError({ code: "UNAUTHORIZED", message: "Sign in to view order details." });
+    return getCustomerOrderDetail(customer.id, input.orderNumber);
   }),
   paymentRules: publicProcedure.query(() => ({ methods: PAYMENT_METHODS, manualPaymentRequired })),
 });

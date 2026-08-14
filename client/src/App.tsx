@@ -13,6 +13,7 @@ const Cart = lazy(() => import("./pages/Cart"));
 const Wishlist = lazy(() => import("./pages/Wishlist"));
 const AuthPage = lazy(() => import("./pages/Auth").then((module) => ({ default: module.AuthPage })));
 const Account = lazy(() => import("./pages/Account"));
+const OrderDetail = lazy(() => import("./pages/OrderDetail"));
 const Checkout = lazy(() => import("./pages/Checkout"));
 const OrderConfirmation = lazy(() => import("./pages/OrderConfirmation"));
 const Admin = lazy(() => import("./pages/Admin"));
@@ -26,6 +27,7 @@ function Router() {
     <Route path="/login"><AuthPage mode="login" /></Route>
     <Route path="/register"><AuthPage mode="register" /></Route>
     <Route path="/account" component={Account} />
+    <Route path="/account/orders/:orderNumber" component={OrderDetail} />
     <Route path="/checkout" component={Checkout} />
     <Route path="/order-confirmation/:orderNumber" component={OrderConfirmation} />
     <Route path="/admin" component={Admin} />

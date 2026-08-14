@@ -8,6 +8,7 @@ import { users } from "../drizzle/schema";
 import { getDb } from "./db";
 
 const CUSTOMER_COOKIE = "rabiora_customer_session";
+const ORDER_CONFIRMATION_COOKIE = "rabiora_order_confirmation";
 const encoder = new TextEncoder();
 const sessionKey = () => encoder.encode(process.env.JWT_SECRET ?? "rabiora-development-session-key-change-in-production");
 
@@ -61,6 +62,36 @@ export async function setCustomerSession(res: Response, user: RabioraCustomer) {
 
 export function clearCustomerSession(res: Response) {
   res.clearCookie(CUSTOMER_COOKIE, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
+}
+
+async function signOrderConfirmation(orderNumber: string) {
+  return new SignJWT({ type: "rabiora_order_confirmation", orderNumber })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("6h")
+    .sign(sessionKey());
+}
+
+export async function setGuestOrderConfirmation(res: Response, orderNumber: string) {
+  const token = await signOrderConfirmation(orderNumber);
+  res.cookie(ORDER_CONFIRMATION_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 6 * 60 * 60 * 1000,
+    path: "/",
+  });
+}
+
+export async function hasGuestOrderConfirmationAccess(req: Request, orderNumber: string) {
+  const token = parse(req.headers.cookie ?? "")[ORDER_CONFIRMATION_COOKIE];
+  if (!token) return false;
+  try {
+    const { payload } = await jwtVerify(token, sessionKey());
+    return payload.type === "rabiora_order_confirmation" && payload.orderNumber === orderNumber;
+  } catch {
+    return false;
+  }
 }
 
 export async function getCustomerFromRequest(req: Request): Promise<RabioraCustomer | null> {

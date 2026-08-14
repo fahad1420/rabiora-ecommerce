@@ -38,3 +38,7 @@ The client source contains no direct references to database, JWT, or server Forg
 ## Final post-change customer-surface verification
 
 Desktop checks covered the homepage, product detail, cart, wishlist, checkout, login, register, and account routes after route-level loading was introduced. Empty cart and wishlist states, customer authentication forms, and the developer footer links remained present. On the loaded homepage, the existing language and theme controls were toggled once and confirmed to update the document language, theme class, and their `rabiora-language` and `rabiora-theme` local-storage preferences. No customer, order, product, image, or other business record was modified during this verification.
+
+## Customer order-tracking authorization verification
+
+The new `order.detail` endpoint rejects unauthenticated requests with HTTP 401 and does not accept a customer identifier from the browser. A read-only browser check from an existing non-owner user session returned HTTP 404 for a known order number because the order did not belong to that user. The response contained no order data, confirming that the ownership predicate is enforced on the server before detail fields, payment evidence, address, or status history are returned.

@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { cartItems, carts, orderItems, orderStatusHistory, orders, payments, productImages, products } from "../drizzle/schema";
 import { getDb } from "./db";
 import type { CartIdentity } from "./cartService";
@@ -108,6 +108,35 @@ export async function getOrderConfirmation(orderNumberValue: string) {
   const [order] = await db.select({ orderNumber: orders.orderNumber, totalTaka: orders.totalTaka, deliveryChargeTaka: orders.deliveryChargeTaka, paymentMethod: orders.paymentMethod, status: orders.status, createdAt: orders.createdAt }).from(orders).where(eq(orders.orderNumber, orderNumberValue)).limit(1);
   if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found." });
   return order;
+}
+
+export async function getCustomerOrderConfirmation(userId: number, orderNumberValue: string) {
+  const db = await getDb();
+  if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Order lookup is temporarily unavailable." });
+  const [order] = await db.select({ orderNumber: orders.orderNumber, totalTaka: orders.totalTaka, deliveryChargeTaka: orders.deliveryChargeTaka, paymentMethod: orders.paymentMethod, status: orders.status, createdAt: orders.createdAt })
+    .from(orders)
+    .where(and(eq(orders.userId, userId), eq(orders.orderNumber, orderNumberValue)))
+    .limit(1);
+  if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found." });
+  return order;
+}
+
+export async function getCustomerOrderDetail(userId: number, orderNumberValue: string) {
+  const db = await getDb();
+  if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Order details are temporarily unavailable." });
+  const [order] = await db.select().from(orders)
+    .where(and(eq(orders.userId, userId), eq(orders.orderNumber, orderNumberValue)))
+    .limit(1);
+  if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found." });
+  const [items, paymentRows, statusHistory] = await Promise.all([
+    db.select().from(orderItems).where(eq(orderItems.orderId, order.id)),
+    db.select().from(payments).where(eq(payments.orderId, order.id)).limit(1),
+    db.select({ id: orderStatusHistory.id, nextStatus: orderStatusHistory.nextStatus, adminNote: orderStatusHistory.adminNote, createdAt: orderStatusHistory.createdAt })
+      .from(orderStatusHistory)
+      .where(eq(orderStatusHistory.orderId, order.id))
+      .orderBy(asc(orderStatusHistory.createdAt)),
+  ]);
+  return { ...order, items, payment: paymentRows[0] ?? null, statusHistory };
 }
 
 export async function listCustomerOrders(userId: number) {

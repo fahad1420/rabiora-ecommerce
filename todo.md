@@ -72,3 +72,12 @@
 - [x] Verify the developer-profile links render correctly at desktop and mobile widths, then save a no-publish checkpoint.
 - [x] Replace only the developer-profile text links in the footer with small accessible GitHub and LinkedIn icons, retaining safe external-link behavior.
 - [x] Verify the footer icons are balanced and accessible at desktop and mobile widths, then save a no-publish checkpoint.
+- [x] Audit the existing customer account panel, order-history/detail views, customer-order authorization, admin-status propagation, and mobile support without modifying code or business data.
+- [x] Add a server-authorized customer order-detail query that verifies the active customer owns the requested order.
+- [x] Add a responsive customer order-detail route with order date, items, unit prices, subtotal, delivery charge, total, payment method/evidence, delivery address, and current status.
+- [x] Add customer-visible status progression history and clarify refreshed status availability after administrator updates.
+- [x] Link each My Orders summary card to its protected order-detail route without changing unrelated account behavior.
+- [x] Replace public order-confirmation lookup exposure with a safe customer-aware or session-bound confirmation strategy while preserving guest checkout confirmation.
+- [x] Add automated tests for guest denial, cross-customer order denial, own-order access, returned detail fields, and status-history visibility.
+- [ ] Verify the full owned-order customer tracking flow at desktop and mobile widths without creating or modifying business data.
+- [ ] Complete a read-only desktop/mobile visual review of an existing authenticated customer-owned order and My Orders → detail navigation; this is blocked until an eligible existing order/session is available because test orders and customer creation are prohibited.
