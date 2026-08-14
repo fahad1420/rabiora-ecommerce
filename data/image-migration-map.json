@@ -1,0 +1,429 @@
+{
+  "generatedAt": "2026-08-14T16:14:43.230Z",
+  "sourceBaseUrl": "http://127.0.0.1:3000",
+  "productImageCount": 55,
+  "paymentImageCount": 4,
+  "mappings": [
+    {
+      "oldPath": "/manus-storage/dress1_12d5a335.jpg",
+      "newPath": "/uploads/images/products/dress1_12d5a335.jpg",
+      "key": "dress1_12d5a335.jpg",
+      "fileName": "dress1_12d5a335.jpg",
+      "bytes": 216134
+    },
+    {
+      "oldPath": "/manus-storage/dress1_1_5af351d4.jpg",
+      "newPath": "/uploads/images/products/dress1_1_5af351d4.jpg",
+      "key": "dress1_1_5af351d4.jpg",
+      "fileName": "dress1_1_5af351d4.jpg",
+      "bytes": 344328
+    },
+    {
+      "oldPath": "/manus-storage/dress2_db0cade4.jpg",
+      "newPath": "/uploads/images/products/dress2_db0cade4.jpg",
+      "key": "dress2_db0cade4.jpg",
+      "fileName": "dress2_db0cade4.jpg",
+      "bytes": 273774
+    },
+    {
+      "oldPath": "/manus-storage/dress3_961fc8bf.jpg",
+      "newPath": "/uploads/images/products/dress3_961fc8bf.jpg",
+      "key": "dress3_961fc8bf.jpg",
+      "fileName": "dress3_961fc8bf.jpg",
+      "bytes": 235122
+    },
+    {
+      "oldPath": "/manus-storage/dress4_43c044ed.jpg",
+      "newPath": "/uploads/images/products/dress4_43c044ed.jpg",
+      "key": "dress4_43c044ed.jpg",
+      "fileName": "dress4_43c044ed.jpg",
+      "bytes": 267438
+    },
+    {
+      "oldPath": "/manus-storage/dress4_1_dbbcddab.jpg",
+      "newPath": "/uploads/images/products/dress4_1_dbbcddab.jpg",
+      "key": "dress4_1_dbbcddab.jpg",
+      "fileName": "dress4_1_dbbcddab.jpg",
+      "bytes": 564850
+    },
+    {
+      "oldPath": "/manus-storage/dress4_2_3bd0b13d.jpg",
+      "newPath": "/uploads/images/products/dress4_2_3bd0b13d.jpg",
+      "key": "dress4_2_3bd0b13d.jpg",
+      "fileName": "dress4_2_3bd0b13d.jpg",
+      "bytes": 290373
+    },
+    {
+      "oldPath": "/manus-storage/dress4_3_f6b34d49.jpg",
+      "newPath": "/uploads/images/products/dress4_3_f6b34d49.jpg",
+      "key": "dress4_3_f6b34d49.jpg",
+      "fileName": "dress4_3_f6b34d49.jpg",
+      "bytes": 374313
+    },
+    {
+      "oldPath": "/manus-storage/dress4_4_bab65541.jpg",
+      "newPath": "/uploads/images/products/dress4_4_bab65541.jpg",
+      "key": "dress4_4_bab65541.jpg",
+      "fileName": "dress4_4_bab65541.jpg",
+      "bytes": 92413
+    },
+    {
+      "oldPath": "/manus-storage/dress5_d1de1d0f.jpg",
+      "newPath": "/uploads/images/products/dress5_d1de1d0f.jpg",
+      "key": "dress5_d1de1d0f.jpg",
+      "fileName": "dress5_d1de1d0f.jpg",
+      "bytes": 287280
+    },
+    {
+      "oldPath": "/manus-storage/dress6_83eda5be.jpg",
+      "newPath": "/uploads/images/products/dress6_83eda5be.jpg",
+      "key": "dress6_83eda5be.jpg",
+      "fileName": "dress6_83eda5be.jpg",
+      "bytes": 292392
+    },
+    {
+      "oldPath": "/manus-storage/dress6_1_b4b0b766.jpg",
+      "newPath": "/uploads/images/products/dress6_1_b4b0b766.jpg",
+      "key": "dress6_1_b4b0b766.jpg",
+      "fileName": "dress6_1_b4b0b766.jpg",
+      "bytes": 321682
+    },
+    {
+      "oldPath": "/manus-storage/dress6_2_83c528ab.jpg",
+      "newPath": "/uploads/images/products/dress6_2_83c528ab.jpg",
+      "key": "dress6_2_83c528ab.jpg",
+      "fileName": "dress6_2_83c528ab.jpg",
+      "bytes": 143785
+    },
+    {
+      "oldPath": "/manus-storage/dress6_3_fac33ceb.jpg",
+      "newPath": "/uploads/images/products/dress6_3_fac33ceb.jpg",
+      "key": "dress6_3_fac33ceb.jpg",
+      "fileName": "dress6_3_fac33ceb.jpg",
+      "bytes": 97054
+    },
+    {
+      "oldPath": "/manus-storage/dress6_4_330d04c1.jpg",
+      "newPath": "/uploads/images/products/dress6_4_330d04c1.jpg",
+      "key": "dress6_4_330d04c1.jpg",
+      "fileName": "dress6_4_330d04c1.jpg",
+      "bytes": 100315
+    },
+    {
+      "oldPath": "/manus-storage/dress7_023d8be7.jpg",
+      "newPath": "/uploads/images/products/dress7_023d8be7.jpg",
+      "key": "dress7_023d8be7.jpg",
+      "fileName": "dress7_023d8be7.jpg",
+      "bytes": 214141
+    },
+    {
+      "oldPath": "/manus-storage/dress8_3c3ca261.jpg",
+      "newPath": "/uploads/images/products/dress8_3c3ca261.jpg",
+      "key": "dress8_3c3ca261.jpg",
+      "fileName": "dress8_3c3ca261.jpg",
+      "bytes": 231978
+    },
+    {
+      "oldPath": "/manus-storage/dress8_1_1aa748f5.jpg",
+      "newPath": "/uploads/images/products/dress8_1_1aa748f5.jpg",
+      "key": "dress8_1_1aa748f5.jpg",
+      "fileName": "dress8_1_1aa748f5.jpg",
+      "bytes": 280594
+    },
+    {
+      "oldPath": "/manus-storage/dress8_2_eda0982b.jpg",
+      "newPath": "/uploads/images/products/dress8_2_eda0982b.jpg",
+      "key": "dress8_2_eda0982b.jpg",
+      "fileName": "dress8_2_eda0982b.jpg",
+      "bytes": 131702
+    },
+    {
+      "oldPath": "/manus-storage/dress8_3_940f7387.jpg",
+      "newPath": "/uploads/images/products/dress8_3_940f7387.jpg",
+      "key": "dress8_3_940f7387.jpg",
+      "fileName": "dress8_3_940f7387.jpg",
+      "bytes": 103509
+    },
+    {
+      "oldPath": "/manus-storage/dress8_4_27cff52f.jpg",
+      "newPath": "/uploads/images/products/dress8_4_27cff52f.jpg",
+      "key": "dress8_4_27cff52f.jpg",
+      "fileName": "dress8_4_27cff52f.jpg",
+      "bytes": 113283
+    },
+    {
+      "oldPath": "/manus-storage/dress8_5_5c3b3404.jpg",
+      "newPath": "/uploads/images/products/dress8_5_5c3b3404.jpg",
+      "key": "dress8_5_5c3b3404.jpg",
+      "fileName": "dress8_5_5c3b3404.jpg",
+      "bytes": 138020
+    },
+    {
+      "oldPath": "/manus-storage/dress9_42191bc5.jpg",
+      "newPath": "/uploads/images/products/dress9_42191bc5.jpg",
+      "key": "dress9_42191bc5.jpg",
+      "fileName": "dress9_42191bc5.jpg",
+      "bytes": 225601
+    },
+    {
+      "oldPath": "/manus-storage/dress10_fa0fcdef.jpg",
+      "newPath": "/uploads/images/products/dress10_fa0fcdef.jpg",
+      "key": "dress10_fa0fcdef.jpg",
+      "fileName": "dress10_fa0fcdef.jpg",
+      "bytes": 252579
+    },
+    {
+      "oldPath": "/manus-storage/dress10_1_6c9af178.jpg",
+      "newPath": "/uploads/images/products/dress10_1_6c9af178.jpg",
+      "key": "dress10_1_6c9af178.jpg",
+      "fileName": "dress10_1_6c9af178.jpg",
+      "bytes": 85528
+    },
+    {
+      "oldPath": "/manus-storage/dress11_bdb3ba7c.jpg",
+      "newPath": "/uploads/images/products/dress11_bdb3ba7c.jpg",
+      "key": "dress11_bdb3ba7c.jpg",
+      "fileName": "dress11_bdb3ba7c.jpg",
+      "bytes": 261063
+    },
+    {
+      "oldPath": "/manus-storage/dress12_31c3dbbe.jpg",
+      "newPath": "/uploads/images/products/dress12_31c3dbbe.jpg",
+      "key": "dress12_31c3dbbe.jpg",
+      "fileName": "dress12_31c3dbbe.jpg",
+      "bytes": 62232
+    },
+    {
+      "oldPath": "/manus-storage/dress12_1_6c5f5ddb.jpg",
+      "newPath": "/uploads/images/products/dress12_1_6c5f5ddb.jpg",
+      "key": "dress12_1_6c5f5ddb.jpg",
+      "fileName": "dress12_1_6c5f5ddb.jpg",
+      "bytes": 108004
+    },
+    {
+      "oldPath": "/manus-storage/dress12_2_905c3bdc.jpg",
+      "newPath": "/uploads/images/products/dress12_2_905c3bdc.jpg",
+      "key": "dress12_2_905c3bdc.jpg",
+      "fileName": "dress12_2_905c3bdc.jpg",
+      "bytes": 58359
+    },
+    {
+      "oldPath": "/manus-storage/dress13_646cfd57.jpg",
+      "newPath": "/uploads/images/products/dress13_646cfd57.jpg",
+      "key": "dress13_646cfd57.jpg",
+      "fileName": "dress13_646cfd57.jpg",
+      "bytes": 220988
+    },
+    {
+      "oldPath": "/manus-storage/dress13_1_76f07261.jpg",
+      "newPath": "/uploads/images/products/dress13_1_76f07261.jpg",
+      "key": "dress13_1_76f07261.jpg",
+      "fileName": "dress13_1_76f07261.jpg",
+      "bytes": 583776
+    },
+    {
+      "oldPath": "/manus-storage/dress14_4fe7537f.jpg",
+      "newPath": "/uploads/images/products/dress14_4fe7537f.jpg",
+      "key": "dress14_4fe7537f.jpg",
+      "fileName": "dress14_4fe7537f.jpg",
+      "bytes": 236675
+    },
+    {
+      "oldPath": "/manus-storage/dress14_1_cabdc66b.jpg",
+      "newPath": "/uploads/images/products/dress14_1_cabdc66b.jpg",
+      "key": "dress14_1_cabdc66b.jpg",
+      "fileName": "dress14_1_cabdc66b.jpg",
+      "bytes": 310919
+    },
+    {
+      "oldPath": "/manus-storage/dress15_134ea551.jpg",
+      "newPath": "/uploads/images/products/dress15_134ea551.jpg",
+      "key": "dress15_134ea551.jpg",
+      "fileName": "dress15_134ea551.jpg",
+      "bytes": 241729
+    },
+    {
+      "oldPath": "/manus-storage/dress15_1_f8d0648c.jpg",
+      "newPath": "/uploads/images/products/dress15_1_f8d0648c.jpg",
+      "key": "dress15_1_f8d0648c.jpg",
+      "fileName": "dress15_1_f8d0648c.jpg",
+      "bytes": 315086
+    },
+    {
+      "oldPath": "/manus-storage/dress16_b1f7a7db.jpg",
+      "newPath": "/uploads/images/products/dress16_b1f7a7db.jpg",
+      "key": "dress16_b1f7a7db.jpg",
+      "fileName": "dress16_b1f7a7db.jpg",
+      "bytes": 85141
+    },
+    {
+      "oldPath": "/manus-storage/dress16_1_e021aa93.jpg",
+      "newPath": "/uploads/images/products/dress16_1_e021aa93.jpg",
+      "key": "dress16_1_e021aa93.jpg",
+      "fileName": "dress16_1_e021aa93.jpg",
+      "bytes": 64064
+    },
+    {
+      "oldPath": "/manus-storage/dress17_5249c67a.jpg",
+      "newPath": "/uploads/images/products/dress17_5249c67a.jpg",
+      "key": "dress17_5249c67a.jpg",
+      "fileName": "dress17_5249c67a.jpg",
+      "bytes": 97494
+    },
+    {
+      "oldPath": "/manus-storage/dress17_1_b265640e.jpg",
+      "newPath": "/uploads/images/products/dress17_1_b265640e.jpg",
+      "key": "dress17_1_b265640e.jpg",
+      "fileName": "dress17_1_b265640e.jpg",
+      "bytes": 136813
+    },
+    {
+      "oldPath": "/manus-storage/dress18_6d156bb6.jpg",
+      "newPath": "/uploads/images/products/dress18_6d156bb6.jpg",
+      "key": "dress18_6d156bb6.jpg",
+      "fileName": "dress18_6d156bb6.jpg",
+      "bytes": 73261
+    },
+    {
+      "oldPath": "/manus-storage/dress18_1_1b334562.jpg",
+      "newPath": "/uploads/images/products/dress18_1_1b334562.jpg",
+      "key": "dress18_1_1b334562.jpg",
+      "fileName": "dress18_1_1b334562.jpg",
+      "bytes": 117700
+    },
+    {
+      "oldPath": "/manus-storage/dress19_a0db0484.jpg",
+      "newPath": "/uploads/images/products/dress19_a0db0484.jpg",
+      "key": "dress19_a0db0484.jpg",
+      "fileName": "dress19_a0db0484.jpg",
+      "bytes": 60513
+    },
+    {
+      "oldPath": "/manus-storage/dress19_1_ad49ab00.jpg",
+      "newPath": "/uploads/images/products/dress19_1_ad49ab00.jpg",
+      "key": "dress19_1_ad49ab00.jpg",
+      "fileName": "dress19_1_ad49ab00.jpg",
+      "bytes": 123447
+    },
+    {
+      "oldPath": "/manus-storage/dress20_2af18a78.jpg",
+      "newPath": "/uploads/images/products/dress20_2af18a78.jpg",
+      "key": "dress20_2af18a78.jpg",
+      "fileName": "dress20_2af18a78.jpg",
+      "bytes": 79531
+    },
+    {
+      "oldPath": "/manus-storage/dress20_1_fc5d7861.jpg",
+      "newPath": "/uploads/images/products/dress20_1_fc5d7861.jpg",
+      "key": "dress20_1_fc5d7861.jpg",
+      "fileName": "dress20_1_fc5d7861.jpg",
+      "bytes": 105894
+    },
+    {
+      "oldPath": "/manus-storage/dress21_ad77832b.jpg",
+      "newPath": "/uploads/images/products/dress21_ad77832b.jpg",
+      "key": "dress21_ad77832b.jpg",
+      "fileName": "dress21_ad77832b.jpg",
+      "bytes": 58748
+    },
+    {
+      "oldPath": "/manus-storage/dress21_1_464ea186.jpg",
+      "newPath": "/uploads/images/products/dress21_1_464ea186.jpg",
+      "key": "dress21_1_464ea186.jpg",
+      "fileName": "dress21_1_464ea186.jpg",
+      "bytes": 116951
+    },
+    {
+      "oldPath": "/manus-storage/dress22_ebb889b7.jpg",
+      "newPath": "/uploads/images/products/dress22_ebb889b7.jpg",
+      "key": "dress22_ebb889b7.jpg",
+      "fileName": "dress22_ebb889b7.jpg",
+      "bytes": 63238
+    },
+    {
+      "oldPath": "/manus-storage/dress22_1_17616c28.jpg",
+      "newPath": "/uploads/images/products/dress22_1_17616c28.jpg",
+      "key": "dress22_1_17616c28.jpg",
+      "fileName": "dress22_1_17616c28.jpg",
+      "bytes": 86722
+    },
+    {
+      "oldPath": "/manus-storage/dress23_4d872b8d.jpg",
+      "newPath": "/uploads/images/products/dress23_4d872b8d.jpg",
+      "key": "dress23_4d872b8d.jpg",
+      "fileName": "dress23_4d872b8d.jpg",
+      "bytes": 57712
+    },
+    {
+      "oldPath": "/manus-storage/dress23_1_d85e4277.jpg",
+      "newPath": "/uploads/images/products/dress23_1_d85e4277.jpg",
+      "key": "dress23_1_d85e4277.jpg",
+      "fileName": "dress23_1_d85e4277.jpg",
+      "bytes": 110948
+    },
+    {
+      "oldPath": "/manus-storage/dress24_dcb673ef.jpg",
+      "newPath": "/uploads/images/products/dress24_dcb673ef.jpg",
+      "key": "dress24_dcb673ef.jpg",
+      "fileName": "dress24_dcb673ef.jpg",
+      "bytes": 66517
+    },
+    {
+      "oldPath": "/manus-storage/dress24_1_2c79f93f.jpg",
+      "newPath": "/uploads/images/products/dress24_1_2c79f93f.jpg",
+      "key": "dress24_1_2c79f93f.jpg",
+      "fileName": "dress24_1_2c79f93f.jpg",
+      "bytes": 70045
+    },
+    {
+      "oldPath": "/manus-storage/dress24_2_0ee52de8.jpg",
+      "newPath": "/uploads/images/products/dress24_2_0ee52de8.jpg",
+      "key": "dress24_2_0ee52de8.jpg",
+      "fileName": "dress24_2_0ee52de8.jpg",
+      "bytes": 79152
+    },
+    {
+      "oldPath": "/manus-storage/dress24_3_98f92b68.jpg",
+      "newPath": "/uploads/images/products/dress24_3_98f92b68.jpg",
+      "key": "dress24_3_98f92b68.jpg",
+      "fileName": "dress24_3_98f92b68.jpg",
+      "bytes": 99145
+    },
+    {
+      "oldPath": "/manus-storage/bkash_1a854c02.jpg",
+      "newPath": "/uploads/images/payment/bkash.jpg",
+      "key": "bkash_1a854c02.jpg",
+      "fileName": "bkash.jpg",
+      "bytes": 4104
+    },
+    {
+      "oldPath": "/manus-storage/nagad_60c09914.png",
+      "newPath": "/uploads/images/payment/nagad.png",
+      "key": "nagad_60c09914.png",
+      "fileName": "nagad.png",
+      "bytes": 4291
+    },
+    {
+      "oldPath": "/manus-storage/rocket_d3c48a42.png",
+      "newPath": "/uploads/images/payment/rocket.png",
+      "key": "rocket_d3c48a42.png",
+      "fileName": "rocket.png",
+      "bytes": 5577
+    },
+    {
+      "oldPath": "/manus-storage/cod_f2ee44d0.jpg",
+      "newPath": "/uploads/images/payment/cash-on-delivery.jpg",
+      "key": "cod_f2ee44d0.jpg",
+      "fileName": "cash-on-delivery.jpg",
+      "bytes": 4338
+    },
+    {
+      "oldPath": "/manus-storage/profile_5d5f756e.jpeg",
+      "newPath": "/uploads/images/branding/rabiora-logo.jpeg",
+      "key": "profile_5d5f756e.jpeg",
+      "fileName": "rabiora-logo.jpeg",
+      "bytes": 75421
+    }
+  ],
+  "storageMode": "portable-project-assets"
+}

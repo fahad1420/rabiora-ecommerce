@@ -89,3 +89,17 @@
 - [ ] Create a non-secret `.env.example` and complete README GitHub handover documentation covering setup, variables, database, storage, commands, deployment, and Manus-specific replacements. The managed secret policy prevents creating `.env.example` in this workspace; `ENVIRONMENT_TEMPLATE.md` contains the exact non-secret template to copy after export.
 - [x] Audit the repository for committed secrets and required source, package, lockfile, schema, migration, and ignore-file coverage.
 - [x] Run final GitHub-handover validation with `pnpm check`, `pnpm test`, and `pnpm build`, then report readiness without publishing.
+- [x] Determine whether the current workspace can be safely synchronized to `fahad1420/rabiora-ecommerce` without modifying application code, business data, deployment state, or existing remote history.
+- [x] Synchronize the handover state only if a safe direct GitHub path is supported; otherwise provide exact manual export, commit, and push commands that preserve existing remote content and exclude secrets.
+- [x] Audit the existing Manus database and managed-storage connection configuration for a local GitHub clone without creating or modifying any business data.
+- [x] Inventory every managed product, gallery, and payment image reference plus all Manus storage dependencies before portable migration.
+- [x] Download every existing product gallery and payment image as a physical local asset and verify file integrity without altering product business fields.
+- [x] Replace only Manus image/storage functionality with a portable self-hosted local image-serving and administrator-upload adapter, preserving all approved commerce features.
+- [x] Update existing image records from Manus paths to portable local paths and record a complete old-to-new mapping without changing product content, prices, orders, or customers.
+- [x] Verify physical image files, product/payment image counts, local static responses, catalogue image-path migration, and ZIP/export inclusion without publishing.
+- [x] Run TypeScript checks, tests, and production build after the portable image migration.
+- [x] Resolve the managed-project policy conflict preventing physical image files from residing inside the Git/ZIP project; extracted assets can only remain outside the repository in the managed static-asset workspace without an approved independent asset-transfer path.
+- [x] Complete the approved self-hosted archive strategy by placing all 55 product-gallery and 4 payment files inside the project, removing managed image runtime dependencies, and ensuring the final project ZIP contains those physical files.
+- [ ] Run a reversible administrator image-management acceptance pass for add/upload/replace/remove/gallery behavior using the portable local image adapter, without retaining business-data changes.
+- [ ] Verify the portable migration, including physical image files, is committed and synchronized to the existing GitHub repository.
+- [ ] Save a checkpoint for the portable image migration and document remaining non-image Manus dependencies for independent deployment.

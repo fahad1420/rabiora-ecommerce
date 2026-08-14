@@ -9,10 +9,10 @@ import { trpc } from "@/lib/trpc";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 const paymentMethods = [
-  ["/manus-storage/bkash_1a854c02.jpg", "bKash"],
-  ["/manus-storage/nagad_60c09914.png", "Nagad"],
-  ["/manus-storage/rocket_d3c48a42.png", "Rocket"],
-  ["/manus-storage/cod_f2ee44d0.jpg", "Cash On Delivery"],
+  ["/uploads/images/payment/bkash.jpg", "bKash"],
+  ["/uploads/images/payment/nagad.png", "Nagad"],
+  ["/uploads/images/payment/rocket.png", "Rocket"],
+  ["/uploads/images/payment/cash-on-delivery.jpg", "Cash On Delivery"],
 ] as const;
 
 export default function Home() {

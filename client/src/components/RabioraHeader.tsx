@@ -11,7 +11,7 @@ type RabioraHeaderProps = {
   wishlistCount?: number;
 };
 
-const logoUrl = "/manus-storage/profile_5d5f756e.jpeg";
+const logoUrl = "/uploads/images/branding/rabiora-logo.jpeg";
 
 export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wishlistCount = 0 }: RabioraHeaderProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);

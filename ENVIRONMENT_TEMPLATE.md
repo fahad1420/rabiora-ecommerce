@@ -17,11 +17,9 @@ VITE_OAUTH_PORTAL_URL=https://oauth.manus.im
 OWNER_OPEN_ID=your-owner-open-id
 OWNER_NAME=Your Name
 
-# Manus Forge storage; required only if retaining server/storage.ts unchanged
-BUILT_IN_FORGE_API_URL=https://forge.manus.im
-BUILT_IN_FORGE_API_KEY=replace-with-forge-server-key
-VITE_FRONTEND_FORGE_API_URL=https://forge.manus.im
-VITE_FRONTEND_FORGE_API_KEY=replace-with-forge-frontend-key
+# Portable local image storage; optional. Defaults to ./uploads/images.
+# Mount this path as persistent writable storage in production so future admin uploads survive deployments.
+UPLOADS_DIR=./uploads/images
 
 # Optional presentation and analytics
 VITE_APP_TITLE=Rabiora | Premium Pakistani Three Piece

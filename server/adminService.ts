@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { desc, eq, inArray } from "drizzle-orm";
 import { categories, orderItems, orderStatusHistory, orders, payments, productImages, products } from "../drizzle/schema";
 import { getDb } from "./db";
-import { storagePut } from "./storage";
+import { removeLocalProductImage, saveLocalProductImage } from "./localMedia";
 
 type ProductInput = { categoryId: number; name: string; slug: string; sku?: string; details: string; fabric: string; color: string; priceTaka: number; oldPriceTaka?: number; stockQuantity: number; featured: boolean };
 const transitions: Record<"pending" | "confirmed" | "shipped" | "delivered", Array<"confirmed" | "shipped" | "delivered">> = {
@@ -64,7 +64,7 @@ export async function uploadAdminProductImage(productId: number, input: { dataUr
   const bytes = Buffer.from(dataMatch[2], "base64");
   if (bytes.byteLength > 5 * 1024 * 1024) throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Images must be 5 MB or smaller." });
   const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_") || "product-image";
-  const uploaded = await storagePut(`products/${productId}/${safeName}`, bytes, dataMatch[1]);
+  const uploaded = await saveLocalProductImage(productId, bytes, dataMatch[1], safeName);
   const existing = await db.select().from(productImages).where(eq(productImages.productId, productId));
   const position = existing.length;
   if (input.isCover || existing.length === 0) await db.update(productImages).set({ isCover: false }).where(eq(productImages.productId, productId));
@@ -95,6 +95,7 @@ export async function removeAdminProductImage(productId: number, imageId: number
       if (nextCover) await tx.update(productImages).set({ isCover: true }).where(eq(productImages.id, nextCover.id));
     }
   });
+  await removeLocalProductImage(image.storageKey);
   return { success: true as const };
 }
 
