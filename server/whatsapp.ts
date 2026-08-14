@@ -33,3 +33,12 @@ export const clickToWhatsAppProvider: OrderNotificationProvider = {
     return { url: `https://wa.me/${RABIORA_OWNER_WHATSAPP}?text=${encodeURIComponent(message)}`, message };
   },
 };
+
+export function createCustomerHandoffSafely(provider: OrderNotificationProvider, order: ClickToWhatsAppOrder) {
+  try {
+    return provider.createCustomerHandoff(order);
+  } catch (error) {
+    console.warn("[WhatsApp] Click-to-WhatsApp handoff generation failed after order creation.", error);
+    return null;
+  }
+}

@@ -6,6 +6,7 @@ import { useRabioraCart } from "@/hooks/useRabioraCart";
 import { useRabioraWishlist } from "@/hooks/useRabioraWishlist";
 import { clearGuestWishlist, getGuestCartToken, getGuestWishlist } from "@/lib/guestIdentity";
 import { trpc } from "@/lib/trpc";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export function AuthPage({ mode }: { mode: "login" | "register" }) {
   const [, navigate] = useLocation();
@@ -15,6 +16,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const { t } = useLanguage();
   const register = trpc.customer.register.useMutation();
   const login = trpc.customer.login.useMutation();
   const mergeGuestWishlist = trpc.wishlist.mergeGuest.useMutation();
@@ -32,8 +34,8 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
       await utils.customer.me.invalidate();
       await utils.wishlist.list.invalidate();
       navigate("/account");
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to continue. Please try again."); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t("continueError")); }
   };
   const pending = register.isPending || login.isPending;
-  return <div className="page-shell"><RabioraHeader cartCount={cart.count} wishlistCount={wishlist.count} /><main className="auth-page"><form className="auth-card" onSubmit={submit}><span className="badge">Rabiora Account</span><h1>{mode === "login" ? "Welcome Back" : "Create Your Account"}</h1><p>{mode === "login" ? "Sign in to keep your cart and wishlist across devices." : "Create an account for faster checkout and order history."}</p>{mode === "register" && <label>Name<input required value={name} onChange={(event) => setName(event.target.value)} /></label>}<label>Bangladesh Phone Number<input required inputMode="tel" placeholder="01XXXXXXXXX" value={phone} onChange={(event) => setPhone(event.target.value)} /></label><label>Password<input required type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} /></label>{error && <p className="form-error">{error}</p>}<button className="btn" disabled={pending}>{pending ? "Please wait..." : mode === "login" ? "Login" : "Register"}</button><p className="auth-switch">{mode === "login" ? <>New to Rabiora? <Link href="/register">Create an account</Link></> : <>Already have an account? <Link href="/login">Login</Link></>}</p></form></main><RabioraFooter /></div>;
+  return <div className="page-shell"><RabioraHeader cartCount={cart.count} wishlistCount={wishlist.count} /><main className="auth-page"><form className="auth-card" onSubmit={submit}><span className="badge">{t("account")}</span><h1>{mode === "login" ? t("welcomeBack") : t("createYourAccount")}</h1><p>{mode === "login" ? t("loginCopy") : t("registerCopy")}</p>{mode === "register" && <label>{t("name")}<input required value={name} onChange={(event) => setName(event.target.value)} /></label>}<label>{t("bangladeshPhone")}<input required inputMode="tel" placeholder="01XXXXXXXXX" value={phone} onChange={(event) => setPhone(event.target.value)} /></label><label>{t("password")}<input required type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} /></label>{error && <p className="form-error" role="alert">{error}</p>}<button className="btn" disabled={pending}>{pending ? t("pleaseWait") : mode === "login" ? t("login") : t("register")}</button><p className="auth-switch">{mode === "login" ? <>{t("newToRabiora")} <Link href="/register">{t("register")}</Link></> : <>{t("alreadyMember")} <Link href="/login">{t("login")}</Link></>}</p></form></main><RabioraFooter /></div>;
 }

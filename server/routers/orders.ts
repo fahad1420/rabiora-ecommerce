@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { createOrder, getOrderConfirmation, manualPaymentRequired, PAYMENT_METHODS } from "../orderService";
-import { normalizeBangladeshPhone } from "../customerSession";
+import { TRPCError } from "@trpc/server";
+import { createOrder, getOrderConfirmation, listCustomerOrders, manualPaymentRequired, PAYMENT_METHODS } from "../orderService";
+import { getCustomerFromRequest, normalizeBangladeshPhone } from "../customerSession";
 import { resolveCartIdentity } from "../cartService";
-import { clickToWhatsAppProvider } from "../whatsapp";
+import { clickToWhatsAppProvider, createCustomerHandoffSafely } from "../whatsapp";
 import { publicProcedure, router } from "../_core/trpc";
 
 const guestToken = z.string().regex(/^[a-zA-Z0-9_-]{20,128}$/).optional();
@@ -21,7 +22,7 @@ export const orderRouter = router({
     const identity = await resolveCartIdentity(ctx.req, ctx.user, input.anonymousToken);
     const normalizedPhone = normalizeBangladeshPhone(input.customerPhone)!;
     const created = await createOrder(identity, { ...input, customerPhone: normalizedPhone });
-    const clickToWhatsApp = clickToWhatsAppProvider.createCustomerHandoff({
+    const clickToWhatsApp = createCustomerHandoffSafely(clickToWhatsAppProvider, {
       orderNumber: created.orderNumber,
       customerName: input.customerName,
       customerPhone: normalizedPhone,
@@ -31,8 +32,13 @@ export const orderRouter = router({
       paymentMethod: created.paymentMethod,
       items: created.items,
     });
-    return { ...created, clickToWhatsAppUrl: clickToWhatsApp.url };
+    return { ...created, clickToWhatsAppUrl: clickToWhatsApp?.url ?? null };
   }),
-  confirmation: publicProcedure.input(z.object({ orderNumber: z.string().trim().regex(/^RAB-[A-Z0-9-]+$/) })).query(({ input }) => getOrderConfirmation(input.orderNumber)),
+  confirmation: publicProcedure.input(z.object({ orderNumber: z.string().trim().regex(/^RAB-[A-Z0-9_-]+$/) })).query(({ input }) => getOrderConfirmation(input.orderNumber)),
+  mine: publicProcedure.query(async ({ ctx }) => {
+    const customer = await getCustomerFromRequest(ctx.req);
+    if (!customer) throw new TRPCError({ code: "UNAUTHORIZED", message: "Sign in to view order history." });
+    return listCustomerOrders(customer.id);
+  }),
   paymentRules: publicProcedure.query(() => ({ methods: PAYMENT_METHODS, manualPaymentRequired })),
 });

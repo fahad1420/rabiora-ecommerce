@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { cartItems, carts, productImages, products, users } from "../drizzle/schema";
 import { getDb } from "./db";
 import { getCustomerFromRequest, type RabioraCustomer } from "./customerSession";
+import { assertCartStock, nextCartQuantity, shouldRemoveCartItem } from "./cartRules";
 import type { Request } from "express";
 
 export type CartIdentity = { userId?: number; anonymousToken?: string };
@@ -56,10 +57,9 @@ export async function getCart(identity: CartIdentity) {
 export async function addCartItem(identity: CartIdentity, productId: number, requestedQuantity = 1) {
   const { db, cart } = await getOrCreateCart(identity);
   const [product] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
-  if (!product || !product.isInStock || product.stockQuantity < 1) throw new TRPCError({ code: "BAD_REQUEST", message: "This product is out of stock." });
+  if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found." });
   const [existing] = await db.select().from(cartItems).where(and(eq(cartItems.cartId, cart.id), eq(cartItems.productId, productId))).limit(1);
-  const nextQuantity = (existing?.quantity ?? 0) + requestedQuantity;
-  if (nextQuantity > product.stockQuantity) throw new TRPCError({ code: "BAD_REQUEST", message: "Requested quantity exceeds available stock." });
+  const nextQuantity = nextCartQuantity(existing?.quantity ?? 0, requestedQuantity, product.stockQuantity, product.isInStock);
   if (existing) await db.update(cartItems).set({ quantity: nextQuantity }).where(eq(cartItems.id, existing.id));
   else await db.insert(cartItems).values({ cartId: cart.id, productId, quantity: requestedQuantity });
   return getCart(identity);
@@ -68,10 +68,13 @@ export async function addCartItem(identity: CartIdentity, productId: number, req
 export async function updateCartItem(identity: CartIdentity, productId: number, quantity: number) {
   const { db, cart } = await getOrCreateCart(identity);
   const [product] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
-  if (!product || !product.isInStock || quantity > product.stockQuantity) throw new TRPCError({ code: "BAD_REQUEST", message: "Requested quantity exceeds available stock." });
+  if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found." });
   const condition = and(eq(cartItems.cartId, cart.id), eq(cartItems.productId, productId));
-  if (quantity === 0) await db.delete(cartItems).where(condition);
-  else await db.update(cartItems).set({ quantity }).where(condition);
+  if (shouldRemoveCartItem(quantity)) await db.delete(cartItems).where(condition);
+  else {
+    assertCartStock(product.isInStock, product.stockQuantity, quantity);
+    await db.update(cartItems).set({ quantity }).where(condition);
+  }
   return getCart(identity);
 }
 

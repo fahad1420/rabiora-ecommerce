@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { cartItems, carts, orderItems, orderStatusHistory, orders, payments, productImages, products } from "../drizzle/schema";
 import { getDb } from "./db";
 import type { CartIdentity } from "./cartService";
@@ -14,6 +14,25 @@ export function calculateDeliveryCharge(districtArea: string) {
 
 export function manualPaymentRequired(method: PaymentMethod) {
   return method === "bKash" || method === "Nagad" || method === "Rocket";
+}
+
+export function assertManualPaymentEvidence(method: PaymentMethod, transactionId?: string, submittedAmountTaka?: number) {
+  if (manualPaymentRequired(method) && (!transactionId?.trim() || !submittedAmountTaka || submittedAmountTaka < 1)) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Transaction ID and submitted amount are required for this payment method." });
+  }
+}
+
+export function validateOrderStock(
+  lines: Array<{ productId: number; quantity: number }>,
+  currentProducts: Array<{ id: number; isInStock: boolean; stockQuantity: number }>,
+) {
+  const productsById = new Map(currentProducts.map((product) => [product.id, product]));
+  for (const line of lines) {
+    const product = productsById.get(line.productId);
+    if (!product || !product.isInStock || product.stockQuantity < line.quantity) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "One or more cart items no longer have enough stock." });
+    }
+  }
 }
 
 function orderNumber() {
@@ -34,21 +53,12 @@ export async function createOrder(identity: CartIdentity, input: {
     if (lines.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "Your cart is empty." });
     const productIds = lines.map((line) => line.productId);
     const currentProducts = await tx.select().from(products).where(inArray(products.id, productIds));
+    validateOrderStock(lines, currentProducts);
     const productsById = new Map(currentProducts.map((product) => [product.id, product]));
-    for (const line of lines) {
-      const product = productsById.get(line.productId);
-      if (!product || !product.isInStock || product.stockQuantity < line.quantity) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "One or more cart items no longer have enough stock." });
-      }
-    }
     const subtotalTaka = lines.reduce((sum, line) => sum + (productsById.get(line.productId)?.priceTaka ?? 0) * line.quantity, 0);
     const deliveryChargeTaka = calculateDeliveryCharge(input.districtArea);
     const totalTaka = subtotalTaka + deliveryChargeTaka;
-    if (manualPaymentRequired(input.paymentMethod)) {
-      if (!input.transactionId?.trim() || !input.submittedAmountTaka || input.submittedAmountTaka < 1) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Transaction ID and submitted amount are required for this payment method." });
-      }
-    }
+    assertManualPaymentEvidence(input.paymentMethod, input.transactionId, input.submittedAmountTaka);
     const nextOrderNumber = orderNumber();
     await tx.insert(orders).values({
       orderNumber: nextOrderNumber, userId: identity.userId ?? null, customerName: input.customerName, customerPhone: input.customerPhone,
@@ -98,4 +108,13 @@ export async function getOrderConfirmation(orderNumberValue: string) {
   const [order] = await db.select({ orderNumber: orders.orderNumber, totalTaka: orders.totalTaka, deliveryChargeTaka: orders.deliveryChargeTaka, paymentMethod: orders.paymentMethod, status: orders.status, createdAt: orders.createdAt }).from(orders).where(eq(orders.orderNumber, orderNumberValue)).limit(1);
   if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found." });
   return order;
+}
+
+export async function listCustomerOrders(userId: number) {
+  const db = await getDb();
+  if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Order history is temporarily unavailable." });
+  const customerOrders = await db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.createdAt));
+  if (customerOrders.length === 0) return [];
+  const items = await db.select().from(orderItems).where(inArray(orderItems.orderId, customerOrders.map((order) => order.id)));
+  return customerOrders.map((order) => ({ ...order, items: items.filter((item) => item.orderId === order.id) }));
 }

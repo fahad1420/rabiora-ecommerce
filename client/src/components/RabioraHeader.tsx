@@ -1,6 +1,8 @@
-import { Heart, Menu, Search, ShoppingCart, X } from "lucide-react";
+import { Heart, Menu, Moon, Search, ShoppingCart, Sun, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
+import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type RabioraHeaderProps = {
   searchValue?: string;
@@ -13,6 +15,8 @@ const logoUrl = "/manus-storage/profile_5d5f756e.jpeg";
 
 export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wishlistCount = 0 }: RabioraHeaderProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
+  const { t, toggleLanguage } = useLanguage();
 
   useEffect(() => {
     if (!drawerOpen) return;
@@ -24,7 +28,7 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
   const closeDrawer = () => setDrawerOpen(false);
 
   return <>
-    <div className="announcement">Free Delivery Inside Dhaka <span>|</span> Premium Pakistani Three Piece Collection <span>|</span> Cash On Delivery Available</div>
+    <div className="announcement"><span className="announcement-copy">{t("freeDelivery")}</span><span aria-hidden="true">|</span><span className="announcement-copy">{t("premiumCollection")}</span><span aria-hidden="true">|</span><span className="announcement-copy">{t("codAvailable")}</span></div>
     <header className="rabiora-header">
       <div className="container header-inner">
         <Link href="/" className="rabiora-logo" aria-label="Rabiora home">
@@ -32,40 +36,43 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
           <span>Rabiora</span>
         </Link>
         <nav className="desktop-nav" aria-label="Main navigation">
-          <a href="/#home">Home</a>
-          <a href="/#products">Products</a>
-          <a href="/#reviews">Reviews</a>
-          <a href="/#about">About</a>
-          <a href="/#contact">Contact</a>
+          <a href="/#home">{t("home")}</a>
+          <a href="/#products">{t("products")}</a>
+          <a href="/#reviews">{t("reviews")}</a>
+          <a href="/#about">{t("about")}</a>
+          <a href="/#contact">{t("contact")}</a>
         </nav>
         <div className="header-actions">
           <label className="search-box" aria-label="Search products">
-            <input value={searchValue} onChange={(event) => onSearchChange?.(event.target.value)} placeholder="Search..." />
+            <input value={searchValue} onChange={(event) => onSearchChange?.(event.target.value)} placeholder={t("search")} />
             <Search size={18} aria-hidden="true" />
           </label>
-          <a className="header-icon" href="/wishlist" aria-label="Wishlist">
+          <button type="button" className="header-utility language-toggle" aria-label={t("languageLabel")} onClick={toggleLanguage}>{t("language")}</button>
+          <button type="button" className="header-utility theme-toggle" aria-label={t("themeLabel")} onClick={toggleTheme}>{theme === "dark" ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}<span className="utility-label">{theme === "dark" ? t("lightMode") : t("darkMode")}</span></button>
+          <a className="header-icon" href="/wishlist" aria-label={t("wishlist")}>
             <Heart size={22} />
             <span>{wishlistCount}</span>
           </a>
-          <a className="header-icon" href="/cart" aria-label={`Cart with ${cartCount} items`}>
+          <a className="header-icon" href="/cart" aria-label={t("cart", { count: cartCount })}>
             <ShoppingCart size={22} />
             <span>{cartCount}</span>
           </a>
-          <button className="menu-button" type="button" aria-label="Open navigation" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}><Menu size={25} /></button>
+          <button className="menu-button" type="button" aria-label={t("openNavigation")} aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}><Menu size={25} /></button>
         </div>
       </div>
     </header>
     {drawerOpen && <>
-      <button className="drawer-overlay" onClick={closeDrawer} aria-label="Close navigation" />
+      <button className="drawer-overlay" onClick={closeDrawer} aria-label={t("closeNavigation")} />
       <aside className="mobile-drawer" aria-label="Mobile navigation">
-        <button className="drawer-close" onClick={closeDrawer} aria-label="Close navigation"><X size={30} /></button>
+        <button className="drawer-close" onClick={closeDrawer} aria-label={t("closeNavigation")}><X size={30} /></button>
         <nav>
-          <a href="/#home" onClick={closeDrawer}>Home</a>
-          <a href="/#products" onClick={closeDrawer}>Products</a>
-          <a href="/#reviews" onClick={closeDrawer}>Reviews</a>
-          <a href="/#about" onClick={closeDrawer}>About</a>
-          <a href="/#contact" onClick={closeDrawer}>Contact</a>
+          <a href="/#home" onClick={closeDrawer}>{t("home")}</a>
+          <a href="/#products" onClick={closeDrawer}>{t("products")}</a>
+          <a href="/#reviews" onClick={closeDrawer}>{t("reviews")}</a>
+          <a href="/#about" onClick={closeDrawer}>{t("about")}</a>
+          <a href="/#contact" onClick={closeDrawer}>{t("contact")}</a>
         </nav>
+        <div className="drawer-preferences"><button type="button" onClick={toggleLanguage}>{t("language")}</button><button type="button" onClick={toggleTheme}>{theme === "dark" ? t("lightMode") : t("darkMode")}</button></div>
       </aside>
     </>}
   </>;
