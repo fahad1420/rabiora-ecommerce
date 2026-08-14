@@ -83,3 +83,5 @@
 - [ ] Complete a read-only desktop/mobile visual review of an existing authenticated customer-owned order and My Orders → detail navigation; this is blocked until an eligible existing order/session is available because test orders and customer creation are prohibited.
 - [x] Replace only the Contact/Footer generic Facebook, Instagram, and TikTok glyphs with recognizable brand icons while preserving social URLs, teal button styling, hover behavior, and layout.
 - [x] Verify the corrected Contact/Footer social icons and existing GitHub/LinkedIn developer icons, then run frontend validation without publishing.
+- [x] Reduce only the mobile Hero-to-Featured Collection vertical gap by approximately 30–40%, preserving existing controls and larger breakpoints.
+- [x] Verify the refined Hero-to-Featured spacing at 320, 360, 375, 390, and 414 pixels without changing any other section.
