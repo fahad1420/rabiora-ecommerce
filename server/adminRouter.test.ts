@@ -12,6 +12,8 @@ const adminService = vi.hoisted(() => ({
   removeAdminProductImage: vi.fn(),
   listAdminOrders: vi.fn(),
   advanceOrderStatus: vi.fn(),
+  listAdminCustomers: vi.fn(),
+  getAdminCustomerDetail: vi.fn(),
 }));
 
 vi.mock("./adminService", () => adminService);
@@ -73,5 +75,36 @@ describe("admin product CRUD and order authorization", () => {
     adminService.advanceOrderStatus.mockResolvedValue({ success: true, status: "confirmed" });
     await expect(caller("admin").orders.advanceStatus({ orderId: 45, nextStatus: "confirmed", adminNote: "Validated by acceptance test" })).resolves.toEqual({ success: true, status: "confirmed" });
     expect(adminService.advanceOrderStatus).toHaveBeenCalledWith(45, "confirmed", 7, "Validated by acceptance test");
+  });
+
+  it("allows administrators to list customers and fetch a customer detail record", async () => {
+    adminService.listAdminCustomers.mockResolvedValue([
+      { id: 7, name: "Test Customer", email: "test@example.com", phone: "+8801712345678", role: "user", createdAt: new Date("2024-01-05T00:00:00Z"), totalOrders: 2 },
+    ]);
+    adminService.getAdminCustomerDetail.mockResolvedValue({
+      id: 7,
+      name: "Test Customer",
+      email: "test@example.com",
+      phone: "+8801712345678",
+      role: "user",
+      createdAt: new Date("2024-01-05T00:00:00Z"),
+      orders: [{ id: 1, orderNumber: "RAB-123", totalTaka: 2400, status: "pending", createdAt: new Date("2024-01-06T00:00:00Z") }],
+    });
+
+    await expect(caller("admin").customers.list()).resolves.toEqual([
+      { id: 7, name: "Test Customer", email: "test@example.com", phone: "+8801712345678", role: "user", createdAt: new Date("2024-01-05T00:00:00Z"), totalOrders: 2 },
+    ]);
+    await expect(caller("admin").customers.detail({ id: 7 })).resolves.toEqual({
+      id: 7,
+      name: "Test Customer",
+      email: "test@example.com",
+      phone: "+8801712345678",
+      role: "user",
+      createdAt: new Date("2024-01-05T00:00:00Z"),
+      orders: [{ id: 1, orderNumber: "RAB-123", totalTaka: 2400, status: "pending", createdAt: new Date("2024-01-06T00:00:00Z") }],
+    });
+
+    expect(adminService.listAdminCustomers).toHaveBeenCalledTimes(1);
+    expect(adminService.getAdminCustomerDetail).toHaveBeenCalledWith(7);
   });
 });

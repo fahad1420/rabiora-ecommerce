@@ -1,8 +1,9 @@
-import { Heart, Menu, Moon, Search, ShoppingCart, Sun, X } from "lucide-react";
+import { Heart, LogIn, Menu, Moon, Search, ShieldCheck, ShoppingCart, Sun, UserRound, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { trpc } from "@/lib/trpc";
 
 type RabioraHeaderProps = {
   searchValue?: string;
@@ -17,6 +18,10 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const { t, toggleLanguage } = useLanguage();
+  const customer = trpc.customer.me.useQuery();
+  const isLoggedIn = Boolean(customer.data);
+  const isAdmin = customer.data?.role === "admin";
+  const accountLabel = customer.data?.name?.trim() || (isLoggedIn ? "Account" : "Login");
 
   useEffect(() => {
     if (!drawerOpen) return;
@@ -49,6 +54,11 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
           </label>
           <button type="button" className="header-utility language-toggle" aria-label={t("languageLabel")} onClick={toggleLanguage}>{t("language")}</button>
           <button type="button" className="header-utility theme-toggle" aria-label={t("themeLabel")} onClick={toggleTheme}>{theme === "dark" ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}<span className="utility-label">{theme === "dark" ? t("lightMode") : t("darkMode")}</span></button>
+          <Link href={isLoggedIn ? "/account" : "/login"} className="header-account-button" aria-label={isLoggedIn ? "Account" : "Login"}>
+            {isLoggedIn ? <UserRound size={18} aria-hidden="true" /> : <LogIn size={18} aria-hidden="true" />}
+            <span className="header-account-label">{accountLabel}</span>
+          </Link>
+          {isAdmin && <Link href="/admin" className="header-admin-link" aria-label="Admin dashboard"><ShieldCheck size={15} aria-hidden="true" /><span>Admin</span></Link>}
           <a className="header-icon" href="/wishlist" aria-label={t("wishlist")}>
             <Heart size={22} />
             <span>{wishlistCount}</span>
@@ -71,6 +81,11 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
           <a href="/#reviews" onClick={closeDrawer}>{t("reviews")}</a>
           <a href="/#about" onClick={closeDrawer}>{t("about")}</a>
           <a href="/#contact" onClick={closeDrawer}>{t("contact")}</a>
+          <Link href={isLoggedIn ? "/account" : "/login"} onClick={closeDrawer} className="mobile-account-link">
+            {isLoggedIn ? <UserRound size={18} aria-hidden="true" /> : <LogIn size={18} aria-hidden="true" />}
+            <span>{isLoggedIn ? (customer.data?.name?.trim() || "Account") : "Login"}</span>
+          </Link>
+          {isAdmin && <Link href="/admin" onClick={closeDrawer} className="mobile-admin-link"><ShieldCheck size={17} aria-hidden="true" /><span>Admin</span></Link>}
         </nav>
         <div className="drawer-preferences"><button type="button" onClick={toggleLanguage}>{t("language")}</button><button type="button" onClick={toggleTheme}>{theme === "dark" ? t("lightMode") : t("darkMode")}</button></div>
       </aside>
