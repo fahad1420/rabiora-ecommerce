@@ -24,7 +24,9 @@ export async function getDb() {
         connectionLimit: 10,
       });
 
-      _db = drizzle({ client: pool });
+      const db = drizzle({ client: pool });
+
+      _db = db as unknown as ReturnType<typeof drizzle>;
     } catch (error) {
       console.error("[Database] Failed to initialize:", error);
       _db = null;
