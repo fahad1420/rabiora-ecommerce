@@ -11,8 +11,36 @@ var __export = (target, all) => {
 // server/config/db.ts
 import dns from "node:dns";
 import mongoose from "mongoose";
+function getMongoUri() {
+  const candidates = [
+    process.env.MONGODB_URI,
+    process.env.DATABASE_URL,
+    process.env.MONGO_URI,
+    process.env.MONGODB_URL,
+    process.env.MONGO_URL,
+    process.env.MONGODB_CONNECTION_STRING,
+    process.env.MONGO_CONNECTION_STRING,
+    process.env.VITE_MONGODB_URI,
+    process.env.NEXT_PUBLIC_MONGODB_URI
+  ];
+  for (const c of candidates) {
+    if (c && typeof c === "string" && c.trim()) {
+      return c.trim();
+    }
+  }
+  for (const [key, val] of Object.entries(process.env)) {
+    const cleanKey = key.trim().toUpperCase();
+    if ((cleanKey.includes("MONGO") || cleanKey.includes("DATABASE_URL") || cleanKey.includes("DB_URI")) && typeof val === "string" && val.trim().length > 0) {
+      const trimmedVal = val.trim();
+      if (trimmedVal.startsWith("mongodb://") || trimmedVal.startsWith("mongodb+srv://")) {
+        return trimmedVal;
+      }
+    }
+  }
+  return "";
+}
 async function connectMongo() {
-  const uri = process.env.MONGODB_URI || process.env.DATABASE_URL || "";
+  const uri = getMongoUri();
   if (!uri) {
     throw new Error("[MongoDB] MONGODB_URI environment variable is not configured in environment.");
   }
@@ -22,9 +50,9 @@ async function connectMongo() {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
-      serverSelectionTimeoutMS: 5e3,
-      connectTimeoutMS: 5e3,
-      socketTimeoutMS: 1e4
+      serverSelectionTimeoutMS: 8e3,
+      connectTimeoutMS: 8e3,
+      socketTimeoutMS: 15e3
     };
     cached.promise = mongoose.connect(uri, opts).then((m) => {
       console.log("[MongoDB] Successfully connected to database");
@@ -400,6 +428,30 @@ import crypto2 from "node:crypto";
 import { parse } from "cookie";
 import { SignJWT as SignJWT2, jwtVerify as jwtVerify2 } from "jose";
 import { nanoid } from "nanoid";
+function getJwtSecret() {
+  const candidates = [
+    process.env.JWT_SECRET,
+    process.env.SESSION_SECRET,
+    process.env.COOKIE_SECRET,
+    process.env.AUTH_SECRET,
+    process.env.SECRET_KEY,
+    process.env.NEXTAUTH_SECRET
+  ];
+  for (const c of candidates) {
+    if (c && typeof c === "string" && c.trim()) {
+      return c.trim();
+    }
+  }
+  for (const [key, val] of Object.entries(process.env)) {
+    const cleanKey = key.trim().toUpperCase();
+    if (cleanKey.includes("JWT") || cleanKey.includes("SECRET") || cleanKey.includes("AUTH_KEY")) {
+      if (val && typeof val === "string" && val.trim().length >= 8) {
+        return val.trim();
+      }
+    }
+  }
+  return process.env.NODE_ENV === "production" ? "rabiora-prod-session-key-fallback-sec-2026-auth" : "rabiora-development-session-key-change-in-production";
+}
 function normalizeBangladeshPhone(value) {
   const digits = value.replace(/\D/g, "");
   if (/^8801[3-9]\d{8}$/.test(digits)) {
@@ -680,9 +732,7 @@ var init_customerSession = __esm({
     CUSTOMER_COOKIE = "rabiora_customer_session";
     ORDER_CONFIRMATION_COOKIE = "rabiora_order_confirmation";
     encoder = new TextEncoder();
-    sessionKey = () => encoder.encode(
-      process.env.JWT_SECRET ?? "rabiora-development-session-key-change-in-production"
-    );
+    sessionKey = () => encoder.encode(getJwtSecret());
     findCustomerByPhone = findCustomerByIdentifier;
   }
 });
@@ -2341,7 +2391,7 @@ function safeStem2(fileName) {
   return stem || "product-image";
 }
 function getCloudinaryConfig() {
-  const cloudinaryUrl = process.env.CLOUDINARY_URL;
+  const cloudinaryUrl = process.env.CLOUDINARY_URL?.trim();
   if (cloudinaryUrl) {
     try {
       const match = cloudinaryUrl.match(/^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/);
@@ -2357,9 +2407,9 @@ function getCloudinaryConfig() {
     } catch {
     }
   }
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-  const apiKey = process.env.CLOUDINARY_API_KEY;
-  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  const cloudName = (process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_NAME)?.trim();
+  const apiKey = (process.env.CLOUDINARY_API_KEY || process.env.CLOUDINARY_KEY)?.trim();
+  const apiSecret = (process.env.CLOUDINARY_API_SECRET || process.env.CLOUDINARY_SECRET)?.trim();
   if (cloudName && apiKey && apiSecret) {
     cloudinary.config({
       cloud_name: cloudName,
@@ -3202,6 +3252,7 @@ async function createContext(opts) {
 
 // server/app.ts
 init_db();
+init_customerSession();
 function createExpressApp() {
   const app2 = express();
   app2.set("trust proxy", 1);
@@ -3219,16 +3270,21 @@ function createExpressApp() {
     }
   });
   app2.get(["/api/health", "/health", "/api", "/"], (req, res) => {
+    const detectedKeys = Object.keys(process.env).filter((k) => {
+      const upper = k.toUpperCase();
+      return upper.includes("MONGO") || upper.includes("DATABASE") || upper.includes("JWT") || upper.includes("SECRET") || upper.includes("CLOUDINARY") || upper.includes("CORS") || upper.includes("VERCEL");
+    });
+    const mongoUri = getMongoUri();
     res.status(200).json({
       status: "ok",
       timestamp: (/* @__PURE__ */ new Date()).toISOString(),
       env: {
-        hasMongoUri: Boolean(process.env.MONGODB_URI || process.env.DATABASE_URL),
-        hasJwtSecret: Boolean(process.env.JWT_SECRET),
-        hasCloudinary: Boolean(
-          process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET || process.env.CLOUDINARY_URL
-        ),
-        nodeEnv: process.env.NODE_ENV
+        hasMongoUri: Boolean(mongoUri),
+        mongoUriScheme: mongoUri ? mongoUri.startsWith("mongodb+srv://") ? "mongodb+srv" : "mongodb" : "none",
+        hasJwtSecret: Boolean(getJwtSecret()),
+        hasCloudinary: getCloudinaryConfig(),
+        nodeEnv: process.env.NODE_ENV,
+        detectedKeys
       }
     });
   });

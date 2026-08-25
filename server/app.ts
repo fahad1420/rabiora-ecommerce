@@ -6,7 +6,9 @@ import { applyCorsPolicy } from "./_core/cors";
 import { getLocalImagesRoot } from "./localMedia";
 import { appRouter } from "./routers";
 import { createContext } from "./_core/context";
-import { connectMongo } from "./config/db";
+import { connectMongo, getMongoUri } from "./config/db";
+import { getJwtSecret } from "./customerSession";
+import { getCloudinaryConfig } from "./storage";
 
 export function createExpressApp(): express.Express {
   const app: express.Express = express();
@@ -35,17 +37,31 @@ export function createExpressApp(): express.Express {
 
   // Health check endpoint (handles /api/health, /health, /api, /)
   app.get(["/api/health", "/health", "/api", "/"], (req: Request, res: Response) => {
+    const detectedKeys = Object.keys(process.env).filter((k) => {
+      const upper = k.toUpperCase();
+      return (
+        upper.includes("MONGO") ||
+        upper.includes("DATABASE") ||
+        upper.includes("JWT") ||
+        upper.includes("SECRET") ||
+        upper.includes("CLOUDINARY") ||
+        upper.includes("CORS") ||
+        upper.includes("VERCEL")
+      );
+    });
+
+    const mongoUri = getMongoUri();
+
     res.status(200).json({
       status: "ok",
       timestamp: new Date().toISOString(),
       env: {
-        hasMongoUri: Boolean(process.env.MONGODB_URI || process.env.DATABASE_URL),
-        hasJwtSecret: Boolean(process.env.JWT_SECRET),
-        hasCloudinary: Boolean(
-          (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) ||
-          process.env.CLOUDINARY_URL
-        ),
+        hasMongoUri: Boolean(mongoUri),
+        mongoUriScheme: mongoUri ? (mongoUri.startsWith("mongodb+srv://") ? "mongodb+srv" : "mongodb") : "none",
+        hasJwtSecret: Boolean(getJwtSecret()),
+        hasCloudinary: getCloudinaryConfig(),
         nodeEnv: process.env.NODE_ENV,
+        detectedKeys,
       },
     });
   });

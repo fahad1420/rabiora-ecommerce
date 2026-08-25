@@ -11,6 +11,44 @@ if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
   }
 }
 
+export function getMongoUri(): string {
+  // 1. Check exact candidate names
+  const candidates = [
+    process.env.MONGODB_URI,
+    process.env.DATABASE_URL,
+    process.env.MONGO_URI,
+    process.env.MONGODB_URL,
+    process.env.MONGO_URL,
+    process.env.MONGODB_CONNECTION_STRING,
+    process.env.MONGO_CONNECTION_STRING,
+    process.env.VITE_MONGODB_URI,
+    process.env.NEXT_PUBLIC_MONGODB_URI,
+  ];
+
+  for (const c of candidates) {
+    if (c && typeof c === "string" && c.trim()) {
+      return c.trim();
+    }
+  }
+
+  // 2. Dynamic search across process.env keys (handling potential trailing whitespace or uppercase/lowercase differences)
+  for (const [key, val] of Object.entries(process.env)) {
+    const cleanKey = key.trim().toUpperCase();
+    if (
+      (cleanKey.includes("MONGO") || cleanKey.includes("DATABASE_URL") || cleanKey.includes("DB_URI")) &&
+      typeof val === "string" &&
+      val.trim().length > 0
+    ) {
+      const trimmedVal = val.trim();
+      if (trimmedVal.startsWith("mongodb://") || trimmedVal.startsWith("mongodb+srv://")) {
+        return trimmedVal;
+      }
+    }
+  }
+
+  return "";
+}
+
 interface MongooseCache {
   conn: typeof mongoose | null;
   promise: Promise<typeof mongoose> | null;
@@ -28,7 +66,7 @@ if (!cached) {
 }
 
 export async function connectMongo(): Promise<typeof mongoose> {
-  const uri = process.env.MONGODB_URI || process.env.DATABASE_URL || "";
+  const uri = getMongoUri();
 
   if (!uri) {
     throw new Error("[MongoDB] MONGODB_URI environment variable is not configured in environment.");
@@ -41,9 +79,9 @@ export async function connectMongo(): Promise<typeof mongoose> {
   if (!cached!.promise) {
     const opts = {
       bufferCommands: false,
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 5000,
-      socketTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 8000,
+      connectTimeoutMS: 8000,
+      socketTimeoutMS: 15000,
     };
 
     cached!.promise = mongoose.connect(uri, opts).then((m) => {
