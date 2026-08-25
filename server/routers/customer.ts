@@ -38,7 +38,7 @@ const phoneSchema = z
   .max(20)
   .refine(
     (value) => Boolean(normalizeBangladeshPhone(value)),
-    "Enter a valid Bangladesh phone number.",
+    "Enter a valid Bangladesh phone number."
   );
 
 const guestTokenSchema = z
@@ -46,10 +46,12 @@ const guestTokenSchema = z
   .regex(/^[a-zA-Z0-9_-]{20,128}$/)
   .optional();
 
+const idSchema = z.union([z.number(), z.string()]);
+
 export const customerRouter = router({
   me: publicProcedure.query(
     async ({ ctx }) =>
-      ctx.user ?? getCustomerFromRequest(ctx.req),
+      ctx.user ?? getCustomerFromRequest(ctx.req)
   ),
 
   register: publicProcedure
@@ -61,10 +63,10 @@ export const customerRouter = router({
           .string()
           .refine(
             isValidCustomerPassword,
-            "Password must contain 8–72 characters.",
+            "Password must contain 8–72 characters."
           ),
         anonymousToken: guestTokenSchema,
-      }),
+      })
     )
     .mutation(async ({ ctx, input }) => {
       const rateKey = `register:${ctx.req.ip ?? "unknown"}:${input.phone}`;
@@ -85,10 +87,10 @@ export const customerRouter = router({
 
       await mergeGuestCart(
         customer.id,
-        input.anonymousToken,
+        input.anonymousToken
       );
 
-      await setCustomerSession(ctx.res, customer);
+      await setCustomerSession(ctx.res, customer, ctx.req);
 
       resetAuthRateLimit(rateKey);
 
@@ -101,7 +103,7 @@ export const customerRouter = router({
         phone: phoneSchema,
         password: z.string().min(1).max(72),
         anonymousToken: guestTokenSchema,
-      }),
+      })
     )
     .mutation(async ({ ctx, input }) => {
       const rateKey = `login:${ctx.req.ip ?? "unknown"}:${input.phone}`;
@@ -109,14 +111,14 @@ export const customerRouter = router({
       enforceAuthRateLimit(rateKey);
 
       const customer = await findCustomerByPhone(
-        input.phone,
+        input.phone
       );
 
       if (
         !customer?.passwordHash ||
         !(await verifyPassword(
           input.password,
-          customer.passwordHash,
+          customer.passwordHash
         ))
       ) {
         throw new TRPCError({
@@ -126,23 +128,26 @@ export const customerRouter = router({
         });
       }
 
+      const customerId = customer._id ? customer._id.toString() : customer.openId;
+
       await mergeGuestCart(
-        customer.id,
-        input.anonymousToken,
+        customerId,
+        input.anonymousToken
       );
 
       const sessionCustomer = {
-        id: customer.id,
+        id: customerId,
         openId: customer.openId,
-        name: customer.name,
-        email: customer.email,
-        phone: customer.phone,
+        name: customer.name ?? null,
+        email: customer.email ?? null,
+        phone: customer.phone ?? null,
         role: customer.role,
       };
 
       await setCustomerSession(
         ctx.res,
         sessionCustomer,
+        ctx.req
       );
 
       resetAuthRateLimit(rateKey);
@@ -151,7 +156,7 @@ export const customerRouter = router({
     }),
 
   logout: publicProcedure.mutation(({ ctx }) => {
-    clearCustomerSession(ctx.res);
+    clearCustomerSession(ctx.res, ctx.req);
 
     return {
       success: true as const,
@@ -169,11 +174,11 @@ export const customerRouter = router({
           .max(320)
           .optional()
           .or(z.literal("")),
-      }),
+      })
     )
     .mutation(async ({ ctx, input }) => {
       const customer = await getCustomerFromRequest(
-        ctx.req,
+        ctx.req
       );
 
       if (!customer) {
@@ -186,24 +191,22 @@ export const customerRouter = router({
 
       return updateCustomerProfile(
         customer.id,
-        input,
+        input
       );
     }),
 
-  // Request password reset OTP
   requestPasswordReset: publicProcedure
     .input(
       z.object({
         phone: phoneSchema,
-      }),
+      })
     )
     .mutation(async ({ input }) => {
       return createPasswordResetRequest(
-        input.phone,
+        input.phone
       );
     }),
 
-  // Verify OTP and set a new password
   resetPassword: publicProcedure
     .input(
       z.object({
@@ -212,15 +215,15 @@ export const customerRouter = router({
           .string()
           .regex(
             /^\d{6}$/,
-            "Enter the 6-digit verification code.",
+            "Enter the 6-digit verification code."
           ),
         newPassword: z
           .string()
           .refine(
             isValidCustomerPassword,
-            "Password must contain 8–72 characters.",
+            "Password must contain 8–72 characters."
           ),
-      }),
+      })
     )
     .mutation(async ({ input }) => {
       return resetCustomerPassword({
@@ -230,19 +233,18 @@ export const customerRouter = router({
       });
     }),
 
-  // Customer creates a review for a delivered-order product
   createReview: publicProcedure
     .input(
       z.object({
-        productId: z.number().int().positive(),
-        orderId: z.number().int().positive(),
+        productId: idSchema,
+        orderId: idSchema,
         rating: z.number().int().min(1).max(5),
         review: z.string().trim().min(3).max(2000),
-      }),
+      })
     )
     .mutation(async ({ ctx, input }) => {
       const customer = await getCustomerFromRequest(
-        ctx.req,
+        ctx.req
       );
 
       if (!customer) {
@@ -254,35 +256,32 @@ export const customerRouter = router({
 
       return createProductReview(
         customer.id,
-        input,
+        input as any
       );
     }),
 
-  // Get visible reviews for a product
   productReviews: publicProcedure
     .input(
       z.object({
-        productId: z.number().int().positive(),
-      }),
+        productId: idSchema,
+      })
     )
     .query(({ input }) =>
-      listProductReviews(input.productId),
+      listProductReviews(input.productId)
     ),
 
-  // Get product rating summary
   productRating: publicProcedure
     .input(
       z.object({
-        productId: z.number().int().positive(),
-      }),
+        productId: idSchema,
+      })
     )
     .query(({ input }) =>
-      getProductRatingSummary(input.productId),
+      getProductRatingSummary(input.productId)
     ),
 
-  // Get latest visible reviews for homepage
   homeReviews: publicProcedure.query(() =>
-    listVisibleReviewsForHome(),
+    listVisibleReviewsForHome()
   ),
 });
 
@@ -291,13 +290,13 @@ export const cartRouter = router({
     .input(
       z.object({
         anonymousToken: guestTokenSchema,
-      }),
+      })
     )
     .query(async ({ ctx, input }) => {
       const identity = await resolveCartIdentity(
         ctx.req,
         ctx.user,
-        input.anonymousToken,
+        input.anonymousToken
       );
 
       const { getCart } = await import(
@@ -311,20 +310,20 @@ export const cartRouter = router({
     .input(
       z.object({
         anonymousToken: guestTokenSchema,
-        productId: z.number().int().positive(),
+        productId: idSchema,
         quantity: z
           .number()
           .int()
           .min(1)
           .max(20)
           .default(1),
-      }),
+      })
     )
     .mutation(async ({ ctx, input }) => {
       const identity = await resolveCartIdentity(
         ctx.req,
         ctx.user,
-        input.anonymousToken,
+        input.anonymousToken
       );
 
       const { addCartItem } = await import(
@@ -334,7 +333,7 @@ export const cartRouter = router({
       return addCartItem(
         identity,
         input.productId,
-        input.quantity,
+        input.quantity
       );
     }),
 
@@ -342,19 +341,19 @@ export const cartRouter = router({
     .input(
       z.object({
         anonymousToken: guestTokenSchema,
-        productId: z.number().int().positive(),
+        productId: idSchema,
         quantity: z
           .number()
           .int()
           .min(0)
           .max(20),
-      }),
+      })
     )
     .mutation(async ({ ctx, input }) => {
       const identity = await resolveCartIdentity(
         ctx.req,
         ctx.user,
-        input.anonymousToken,
+        input.anonymousToken
       );
 
       const { updateCartItem } = await import(
@@ -364,7 +363,7 @@ export const cartRouter = router({
       return updateCartItem(
         identity,
         input.productId,
-        input.quantity,
+        input.quantity
       );
     }),
 });

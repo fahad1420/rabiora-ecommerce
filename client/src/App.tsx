@@ -90,6 +90,11 @@ function Router() {
         />
 
         <Route
+          path="/admin/categories"
+          component={Admin}
+        />
+
+        <Route
           path="/admin/orders"
           component={Admin}
         />

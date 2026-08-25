@@ -11,14 +11,16 @@ export function getGuestCartToken() {
   return token;
 }
 
-export function getGuestWishlist() {
+export function getGuestWishlist(): Array<number | string> {
   try {
     const value = JSON.parse(window.localStorage.getItem(GUEST_WISHLIST_KEY) ?? "[]");
-    return Array.isArray(value) ? value.filter((id): id is number => Number.isInteger(id) && id > 0) : [];
-  } catch { return []; }
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
 }
 
-export function toggleGuestWishlist(productId: number) {
+export function toggleGuestWishlist(productId: number | string) {
   const current = getGuestWishlist();
   const next = current.includes(productId) ? current.filter((id) => id !== productId) : [...current, productId];
   window.localStorage.setItem(GUEST_WISHLIST_KEY, JSON.stringify(next));

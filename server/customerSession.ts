@@ -1,15 +1,11 @@
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import { parse } from "cookie";
-import { and, eq, gt, isNull } from "drizzle-orm";
 import { SignJWT, jwtVerify } from "jose";
 import { nanoid } from "nanoid";
 import type { Request, Response } from "express";
-import {
-  users,
-  passwordResetTokens,
-} from "../drizzle/schema";
-import { getDb } from "./db";
+import { connectMongo } from "./config/db";
+import { UserModel, PasswordResetTokenModel, findUserQuery } from "./models";
 
 const CUSTOMER_COOKIE = "rabiora_customer_session";
 const ORDER_CONFIRMATION_COOKIE = "rabiora_order_confirmation";
@@ -19,11 +15,11 @@ const encoder = new TextEncoder();
 const sessionKey = () =>
   encoder.encode(
     process.env.JWT_SECRET ??
-      "rabiora-development-session-key-change-in-production",
+      "rabiora-development-session-key-change-in-production"
   );
 
 export type RabioraCustomer = {
-  id: number;
+  id: string | number;
   openId: string;
   name: string | null;
   email: string | null;
@@ -55,7 +51,7 @@ export async function hashPassword(password: string) {
 
 export async function verifyPassword(
   password: string,
-  passwordHash: string,
+  passwordHash: string
 ) {
   return bcrypt.compare(password, passwordHash);
 }
@@ -72,27 +68,48 @@ async function signCustomerSession(user: RabioraCustomer) {
     .sign(sessionKey());
 }
 
+export function getSessionCookieOptions(req?: Request) {
+  const isProduction = process.env.NODE_ENV === "production";
+  const origin = req?.get("origin");
+  const host = req?.get("host");
+  const isSecure = req?.secure || req?.headers["x-forwarded-proto"] === "https" || isProduction;
+  const isCrossSite = Boolean(origin && host && !origin.includes(host));
+
+  if (isProduction || (isSecure && isCrossSite)) {
+    return {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none" as const,
+      path: "/",
+    };
+  }
+
+  return {
+    httpOnly: true,
+    secure: false,
+    sameSite: "lax" as const,
+    path: "/",
+  };
+}
+
 export async function setCustomerSession(
   res: Response,
   user: RabioraCustomer,
+  req?: Request
 ) {
   const token = await signCustomerSession(user);
+  const cookieOptions = getSessionCookieOptions(req);
 
   res.cookie(CUSTOMER_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    ...cookieOptions,
     maxAge: 14 * 24 * 60 * 60 * 1000,
-    path: "/",
   });
 }
 
-export function clearCustomerSession(res: Response) {
+export function clearCustomerSession(res: Response, req?: Request) {
+  const cookieOptions = getSessionCookieOptions(req);
   res.clearCookie(CUSTOMER_COOKIE, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
+    ...cookieOptions,
   });
 }
 
@@ -110,21 +127,20 @@ async function signOrderConfirmation(orderNumber: string) {
 export async function setGuestOrderConfirmation(
   res: Response,
   orderNumber: string,
+  req?: Request
 ) {
   const token = await signOrderConfirmation(orderNumber);
+  const cookieOptions = getSessionCookieOptions(req);
 
   res.cookie(ORDER_CONFIRMATION_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    ...cookieOptions,
     maxAge: 6 * 60 * 60 * 1000,
-    path: "/",
   });
 }
 
 export async function hasGuestOrderConfirmationAccess(
   req: Request,
-  orderNumber: string,
+  orderNumber: string
 ) {
   const token =
     parse(req.headers.cookie ?? "")[ORDER_CONFIRMATION_COOKIE];
@@ -144,10 +160,17 @@ export async function hasGuestOrderConfirmationAccess(
 }
 
 export async function getCustomerFromRequest(
-  req: Request,
+  req: Request
 ): Promise<RabioraCustomer | null> {
-  const token =
+  let token =
     parse(req.headers.cookie ?? "")[CUSTOMER_COOKIE];
+
+  if (!token) {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.slice(7);
+    }
+  }
 
   if (!token) return null;
 
@@ -161,28 +184,20 @@ export async function getCustomerFromRequest(
       return null;
     }
 
-    const id = Number(payload.sub);
+    await connectMongo();
 
-    if (!Number.isInteger(id)) return null;
+    const user = await UserModel.findOne(findUserQuery(payload.sub)).lean();
 
-    const db = await getDb();
+    if (!user) return null;
 
-    if (!db) return null;
-
-    const [user] = await db
-      .select({
-        id: users.id,
-        openId: users.openId,
-        name: users.name,
-        email: users.email,
-        phone: users.phone,
-        role: users.role,
-      })
-      .from(users)
-      .where(eq(users.id, id))
-      .limit(1);
-
-    return user ?? null;
+    return {
+      id: user._id.toString(),
+      openId: user.openId,
+      name: user.name ?? null,
+      email: user.email ?? null,
+      phone: user.phone ?? null,
+      role: user.role,
+    };
   } catch {
     return null;
   }
@@ -197,23 +212,21 @@ export async function createCustomer({
   phone: string;
   password: string;
 }) {
-  const db = await getDb();
-
-  if (!db) {
-    throw new Error("Database unavailable");
-  }
+  await connectMongo();
 
   const passwordHash = await hashPassword(password);
-
   const normalizedPhone = normalizeBangladeshPhone(phone);
 
   if (!normalizedPhone) {
-    throw new Error(
-      "A valid Bangladesh phone number is required.",
-    );
+    throw new Error("A valid Bangladesh phone number is required.");
   }
 
-  await db.insert(users).values({
+  const existing = await UserModel.findOne({ phone: normalizedPhone });
+  if (existing) {
+    throw new Error("An account with this phone number already exists.");
+  }
+
+  const user = await UserModel.create({
     openId: `customer:${nanoid(24)}`,
     name,
     phone: normalizedPhone,
@@ -223,166 +236,95 @@ export async function createCustomer({
     lastSignedIn: new Date(),
   });
 
-  const [customer] = await db
-    .select({
-      id: users.id,
-      openId: users.openId,
-      name: users.name,
-      email: users.email,
-      phone: users.phone,
-      role: users.role,
-    })
-    .from(users)
-    .where(eq(users.phone, normalizedPhone))
-    .limit(1);
-
-  if (!customer) {
-    throw new Error("Customer account creation failed.");
-  }
-
-  return customer;
+  return {
+    id: user._id.toString(),
+    openId: user.openId,
+    name: user.name ?? null,
+    email: user.email ?? null,
+    phone: user.phone ?? null,
+    role: user.role,
+  };
 }
 
 export async function findCustomerByPhone(phone: string) {
   const normalizedPhone = normalizeBangladeshPhone(phone);
-
   if (!normalizedPhone) return null;
 
-  const db = await getDb();
-
-  if (!db) return null;
-
-  const [customer] = await db
-    .select()
-    .from(users)
-    .where(eq(users.phone, normalizedPhone))
-    .limit(1);
-
+  await connectMongo();
+  const customer = await UserModel.findOne({ phone: normalizedPhone }).lean();
   return customer ?? null;
 }
 
 export async function updateCustomerProfile(
-  userId: number,
+  userId: string | number,
   {
     name,
     email,
   }: {
     name: string;
     email?: string;
-  },
-) {
-  const db = await getDb();
-
-  if (!db) {
-    throw new Error("Database unavailable");
   }
+) {
+  await connectMongo();
 
-  await db
-    .update(users)
-    .set({
-      name,
-      email: email || null,
-    })
-    .where(eq(users.id, userId));
-
-  const [customer] = await db
-    .select({
-      id: users.id,
-      openId: users.openId,
-      name: users.name,
-      email: users.email,
-      phone: users.phone,
-      role: users.role,
-    })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
+  const customer = await UserModel.findOneAndUpdate(
+    findUserQuery(userId),
+    {
+      $set: {
+        name,
+        email: email || undefined,
+      },
+    },
+    { new: true }
+  ).lean();
 
   if (!customer) {
     throw new Error("Customer profile update failed.");
   }
 
-  return customer;
+  return {
+    id: customer._id.toString(),
+    openId: customer.openId,
+    name: customer.name ?? null,
+    email: customer.email ?? null,
+    phone: customer.phone ?? null,
+    role: customer.role,
+  };
 }
 
-/* =========================================================
-   PASSWORD RESET
-   ========================================================= */
-
-export async function createPasswordResetRequest(
-  phone: string,
-) {
-  const db = await getDb();
-
-  if (!db) {
-    throw new Error("Database unavailable");
-  }
+export async function createPasswordResetRequest(phone: string) {
+  await connectMongo();
 
   const normalizedPhone = normalizeBangladeshPhone(phone);
 
-  // Do not reveal whether an account exists.
   if (!normalizedPhone) {
-    return {
-      success: true as const,
-    };
+    return { success: true as const };
   }
 
-  const [user] = await db
-    .select({
-      id: users.id,
-      phone: users.phone,
-    })
-    .from(users)
-    .where(eq(users.phone, normalizedPhone))
-    .limit(1);
+  const user = await UserModel.findOne({ phone: normalizedPhone });
 
   if (!user) {
-    return {
-      success: true as const,
-    };
+    return { success: true as const };
   }
 
-  const otpCode = String(
-    crypto.randomInt(100000, 1000000),
-  );
-
+  const otpCode = String(crypto.randomInt(100000, 1000000));
   const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-  const tokenHash = crypto
-    .createHash("sha256")
-    .update(rawToken)
-    .digest("hex");
-
-  const expiresAt = new Date(
-    Date.now() + 10 * 60 * 1000,
+  await PasswordResetTokenModel.updateMany(
+    { userId: user._id, usedAt: { $exists: false } },
+    { $set: { usedAt: new Date() } }
   );
 
-  // Invalidate previous unused reset requests.
-  await db
-    .update(passwordResetTokens)
-    .set({
-      usedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(passwordResetTokens.userId, user.id),
-        isNull(passwordResetTokens.usedAt),
-      ),
-    );
-
-  await db.insert(passwordResetTokens).values({
-    userId: user.id,
+  await PasswordResetTokenModel.create({
+    userId: user._id,
     tokenHash,
     otpCode,
     purpose: "password_reset",
     expiresAt,
   });
 
-  /*
-   * Development helper:
-   * Until an SMS provider is connected, the OTP is returned
-   * only outside production so we can test the complete flow.
-   */
   if (process.env.NODE_ENV !== "production") {
     return {
       success: true as const,
@@ -405,14 +347,9 @@ export async function resetCustomerPassword({
   otpCode: string;
   newPassword: string;
 }) {
-  const db = await getDb();
+  await connectMongo();
 
-  if (!db) {
-    throw new Error("Database unavailable");
-  }
-
-  const normalizedPhone =
-    normalizeBangladeshPhone(phone);
+  const normalizedPhone = normalizeBangladeshPhone(phone);
 
   if (!normalizedPhone) {
     throw new Error("Invalid phone number.");
@@ -423,74 +360,35 @@ export async function resetCustomerPassword({
   }
 
   if (!isValidCustomerPassword(newPassword)) {
-    throw new Error(
-      "Password must contain 8–72 characters.",
-    );
+    throw new Error("Password must contain 8–72 characters.");
   }
 
-  const [user] = await db
-    .select({
-      id: users.id,
-    })
-    .from(users)
-    .where(eq(users.phone, normalizedPhone))
-    .limit(1);
+  const user = await UserModel.findOne({ phone: normalizedPhone });
 
   if (!user) {
-    throw new Error(
-      "Invalid or expired reset code.",
-    );
+    throw new Error("Invalid or expired reset code.");
   }
 
-  const now = new Date();
-
-  const [reset] = await db
-    .select({
-      id: passwordResetTokens.id,
-    })
-    .from(passwordResetTokens)
-    .where(
-      and(
-        eq(passwordResetTokens.userId, user.id),
-        eq(passwordResetTokens.otpCode, otpCode),
-        eq(
-          passwordResetTokens.purpose,
-          "password_reset",
-        ),
-        isNull(passwordResetTokens.usedAt),
-        gt(passwordResetTokens.expiresAt, now),
-      ),
-    )
-    .limit(1);
+  const reset = await PasswordResetTokenModel.findOne({
+    userId: user._id,
+    otpCode,
+    purpose: "password_reset",
+    usedAt: { $exists: false },
+    expiresAt: { $gt: new Date() },
+  });
 
   if (!reset) {
-    throw new Error(
-      "Invalid or expired reset code.",
-    );
+    throw new Error("Invalid or expired reset code.");
   }
 
-  const passwordHash =
-    await hashPassword(newPassword);
+  const passwordHash = await hashPassword(newPassword);
 
-  await db.transaction(async (tx) => {
-    await tx
-      .update(users)
-      .set({
-        passwordHash,
-        loginMethod: "password",
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, user.id));
+  user.passwordHash = passwordHash;
+  user.loginMethod = "password";
+  await user.save();
 
-    await tx
-      .update(passwordResetTokens)
-      .set({
-        usedAt: new Date(),
-      })
-      .where(
-        eq(passwordResetTokens.id, reset.id),
-      );
-  });
+  reset.usedAt = new Date();
+  await reset.save();
 
   return {
     success: true as const,

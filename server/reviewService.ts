@@ -1,13 +1,6 @@
 import { TRPCError } from "@trpc/server";
-import { desc, eq, and, sql } from "drizzle-orm";
-import {
-  orderItems,
-  orders,
-  productReviews,
-  products,
-  users,
-} from "../drizzle/schema";
-import { getDb } from "./db";
+import { connectMongo } from "./config/db";
+import { OrderModel, ProductModel, ReviewModel, UserModel, findOrderQuery, findProductQuery, findUserQuery } from "./models";
 
 function failUnavailable(): never {
   throw new TRPCError({
@@ -20,72 +13,46 @@ function normalizeReview(value: string) {
   return value.trim().replace(/\s+/g, " ");
 }
 
-/**
- * Check whether a customer actually purchased the product
- * and the order has been delivered.
- */
 export async function canCustomerReviewProduct(
-  userId: number,
-  productId: number,
-  orderId: number,
+  userId: string | number,
+  productId: string | number,
+  orderId: string | number
 ) {
-  const db = await getDb();
-  if (!db) failUnavailable();
+  await connectMongo();
 
-  const [order] = await db
-    .select({
-      id: orders.id,
-      userId: orders.userId,
-      status: orders.status,
-    })
-    .from(orders)
-    .where(
-      and(
-        eq(orders.id, orderId),
-        eq(orders.userId, userId),
-        eq(orders.status, "delivered"),
-      ),
-    )
-    .limit(1);
+  const user = await UserModel.findOne(findUserQuery(userId));
+  if (!user) return false;
+
+  const product = await ProductModel.findOne(findProductQuery(productId));
+  if (!product) return false;
+
+  const order = await OrderModel.findOne({
+    ...findOrderQuery(orderId),
+    userId: user._id,
+    status: "delivered",
+  });
 
   if (!order) return false;
 
-  const [item] = await db
-    .select({
-      id: orderItems.id,
-    })
-    .from(orderItems)
-    .where(
-      and(
-        eq(orderItems.orderId, orderId),
-        eq(orderItems.productId, productId),
-      ),
-    )
-    .limit(1);
+  const hasItem = (order.items || []).some(
+    (item) => item.productId?.toString() === product._id.toString() || item.productName === product.name
+  );
 
-  return Boolean(item);
+  return hasItem;
 }
 
-/**
- * Create a product review.
- */
 export async function createProductReview(
-  userId: number,
+  userId: string | number,
   input: {
-    productId: number;
-    orderId: number;
+    productId: string | number;
+    orderId: string | number;
     rating: number;
     review: string;
-  },
+  }
 ) {
-  const db = await getDb();
-  if (!db) failUnavailable();
+  await connectMongo();
 
-  if (
-    !Number.isInteger(input.rating) ||
-    input.rating < 1 ||
-    input.rating > 5
-  ) {
+  if (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "Rating must be between 1 and 5.",
@@ -108,13 +75,10 @@ export async function createProductReview(
     });
   }
 
-  const [product] = await db
-    .select({
-      id: products.id,
-    })
-    .from(products)
-    .where(eq(products.id, input.productId))
-    .limit(1);
+  const user = await UserModel.findOne(findUserQuery(userId));
+  if (!user) failUnavailable();
+
+  const product = await ProductModel.findOne(findProductQuery(input.productId));
 
   if (!product) {
     throw new TRPCError({
@@ -123,154 +87,118 @@ export async function createProductReview(
     });
   }
 
-  const eligible = await canCustomerReviewProduct(
-    userId,
-    input.productId,
-    input.orderId,
-  );
+  const eligible = await canCustomerReviewProduct(userId, input.productId, input.orderId);
 
   if (!eligible) {
     throw new TRPCError({
       code: "FORBIDDEN",
-      message:
-        "You can review a product only after purchasing and receiving it.",
+      message: "You can review a product only after purchasing and receiving it.",
     });
   }
 
-  const [existing] = await db
-    .select({
-      id: productReviews.id,
-    })
-    .from(productReviews)
-    .where(
-      and(
-        eq(productReviews.productId, input.productId),
-        eq(productReviews.userId, userId),
-        eq(productReviews.orderId, input.orderId),
-      ),
-    )
-    .limit(1);
+  const existing = await ReviewModel.findOne({
+    productId: product._id,
+    userId: user._id,
+  });
 
   if (existing) {
     throw new TRPCError({
       code: "CONFLICT",
-      message:
-        "You have already reviewed this product for this order.",
+      message: "You have already reviewed this product for this order.",
     });
   }
 
-  const [created] = await db
-    .insert(productReviews)
-    .values({
-      productId: input.productId,
-      userId,
-      orderId: input.orderId,
-      rating: input.rating,
-      review: reviewText,
-      isVisible: true,
-    })
-    .$returningId();
-
-  if (!created?.id) {
-    throw new Error("Review creation failed.");
+  let orderDoc = null;
+  if (input.orderId) {
+    orderDoc = await OrderModel.findOne(findOrderQuery(input.orderId));
   }
 
-  const [result] = await db
-    .select()
-    .from(productReviews)
-    .where(eq(productReviews.id, created.id))
-    .limit(1);
+  const created = await ReviewModel.create({
+    productId: product._id,
+    userId: user._id,
+    orderId: orderDoc ? orderDoc._id : undefined,
+    rating: input.rating,
+    review: reviewText,
+    isVisible: true,
+  });
 
-  if (!result) {
-    throw new Error("Review creation failed.");
-  }
-
-  return result;
+  return {
+    id: created._id.toString(),
+    productId: product.legacyId ?? product._id.toString(),
+    userId: user._id.toString(),
+    orderId: orderDoc ? orderDoc.orderNumber : String(input.orderId),
+    rating: created.rating,
+    review: created.review,
+    isVisible: created.isVisible,
+    createdAt: created.createdAt,
+  };
 }
 
-/**
- * Get visible reviews for a product.
- */
-export async function listProductReviews(productId: number) {
-  const db = await getDb();
-  if (!db) failUnavailable();
+export async function listProductReviews(productId: string | number) {
+  await connectMongo();
 
-  return db
-    .select({
-      id: productReviews.id,
-      productId: productReviews.productId,
-      userId: productReviews.userId,
-      orderId: productReviews.orderId,
-      rating: productReviews.rating,
-      review: productReviews.review,
-      isVisible: productReviews.isVisible,
-      createdAt: productReviews.createdAt,
-      updatedAt: productReviews.updatedAt,
-      customerName: users.name,
-    })
-    .from(productReviews)
-    .leftJoin(users, eq(productReviews.userId, users.id))
-    .where(
-      and(
-        eq(productReviews.productId, productId),
-        eq(productReviews.isVisible, true),
-      ),
-    )
-    .orderBy(desc(productReviews.createdAt));
+  const product = await ProductModel.findOne(findProductQuery(productId));
+
+  if (!product) return [];
+
+  const reviews = await ReviewModel.find({
+    productId: product._id,
+    isVisible: true,
+  })
+    .populate("userId", "name")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return reviews.map((r) => {
+    const u: any = r.userId;
+    return {
+      id: r._id.toString(),
+      orderId: r.orderId?.toString() || "",
+      productId: product.legacyId ?? product._id.toString(),
+      userId: u?._id?.toString(),
+      rating: r.rating,
+      review: r.review,
+      isVisible: r.isVisible,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      customerName: u?.name || "Customer",
+    };
+  });
 }
 
-/**
- * Get all reviews for admin.
- */
 export async function listAdminReviews() {
-  const db = await getDb();
-  if (!db) failUnavailable();
+  await connectMongo();
 
-  return db
-    .select({
-      id: productReviews.id,
-      productId: productReviews.productId,
-      productName: products.name,
-      userId: productReviews.userId,
-      customerName: users.name,
-      customerPhone: users.phone,
-      orderId: productReviews.orderId,
-      rating: productReviews.rating,
-      review: productReviews.review,
-      isVisible: productReviews.isVisible,
-      createdAt: productReviews.createdAt,
-      updatedAt: productReviews.updatedAt,
-    })
-    .from(productReviews)
-    .innerJoin(
-      products,
-      eq(productReviews.productId, products.id),
-    )
-    .innerJoin(
-      users,
-      eq(productReviews.userId, users.id),
-    )
-    .orderBy(desc(productReviews.createdAt));
+  const reviews = await ReviewModel.find()
+    .populate("productId", "name legacyId")
+    .populate("userId", "name phone")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return reviews.map((r) => {
+    const p: any = r.productId;
+    const u: any = r.userId;
+    return {
+      id: r._id.toString(),
+      orderId: r.orderId?.toString() || "",
+      productId: p?.legacyId ?? p?._id?.toString(),
+      productName: p?.name || "Product",
+      userId: u?._id?.toString(),
+      customerName: u?.name || "Customer",
+      customerPhone: u?.phone || "",
+      rating: r.rating,
+      review: r.review,
+      isVisible: r.isVisible,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    };
+  });
 }
 
-/**
- * Show or hide a review from the storefront.
- */
-export async function setReviewVisibility(
-  reviewId: number,
-  isVisible: boolean,
-) {
-  const db = await getDb();
-  if (!db) failUnavailable();
+export async function setReviewVisibility(reviewId: string | number, isVisible: boolean) {
+  await connectMongo();
 
-  const [review] = await db
-    .select({
-      id: productReviews.id,
-    })
-    .from(productReviews)
-    .where(eq(productReviews.id, reviewId))
-    .limit(1);
-
+  const review = await ReviewModel.findById(reviewId);
   if (!review) {
     throw new TRPCError({
       code: "NOT_FOUND",
@@ -278,12 +206,8 @@ export async function setReviewVisibility(
     });
   }
 
-  await db
-    .update(productReviews)
-    .set({
-      isVisible,
-    })
-    .where(eq(productReviews.id, reviewId));
+  review.isVisible = isVisible;
+  await review.save();
 
   return {
     success: true as const,
@@ -291,93 +215,65 @@ export async function setReviewVisibility(
   };
 }
 
-/**
- * Delete a review permanently.
- */
-export async function deleteProductReview(reviewId: number) {
-  const db = await getDb();
-  if (!db) failUnavailable();
+export async function deleteProductReview(reviewId: string | number) {
+  await connectMongo();
 
-  const [review] = await db
-    .select({
-      id: productReviews.id,
-    })
-    .from(productReviews)
-    .where(eq(productReviews.id, reviewId))
-    .limit(1);
-
-  if (!review) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Review not found.",
-    });
-  }
-
-  await db
-    .delete(productReviews)
-    .where(eq(productReviews.id, reviewId));
+  await ReviewModel.findByIdAndDelete(reviewId);
 
   return {
     success: true as const,
   };
 }
 
-/**
- * Get rating summary for a product.
- */
-export async function getProductRatingSummary(
-  productId: number,
-) {
-  const db = await getDb();
-  if (!db) failUnavailable();
+export async function getProductRatingSummary(productId: string | number) {
+  await connectMongo();
 
-  const [summary] = await db
-    .select({
-      averageRating: sql<number>`COALESCE(AVG(${productReviews.rating}), 0)`,
-      totalReviews: sql<number>`COUNT(${productReviews.id})`,
-    })
-    .from(productReviews)
-    .where(
-      and(
-        eq(productReviews.productId, productId),
-        eq(productReviews.isVisible, true),
-      ),
-    );
+  const product = await ProductModel.findOne(findProductQuery(productId));
+
+  if (!product) {
+    return { averageRating: 0, totalReviews: 0 };
+  }
+
+  const reviews = await ReviewModel.find({
+    productId: product._id,
+    isVisible: true,
+  }).lean();
+
+  if (reviews.length === 0) {
+    return { averageRating: 0, totalReviews: 0 };
+  }
+
+  const totalReviews = reviews.length;
+  const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews;
 
   return {
-    averageRating: Number(summary?.averageRating ?? 0),
-    totalReviews: Number(summary?.totalReviews ?? 0),
+    averageRating: Math.round(avg * 10) / 10,
+    totalReviews,
   };
 }
 
-/**
- * Get latest visible reviews for homepage.
- */
 export async function listVisibleReviewsForHome() {
-  const db = await getDb();
-  if (!db) failUnavailable();
+  await connectMongo();
 
-  return db
-    .select({
-      id: productReviews.id,
-      productId: productReviews.productId,
-      productName: products.name,
-      customerName: users.name,
-      rating: productReviews.rating,
-      review: productReviews.review,
-      createdAt: productReviews.createdAt,
-      isVisible: productReviews.isVisible,
-    })
-    .from(productReviews)
-    .innerJoin(
-      products,
-      eq(productReviews.productId, products.id),
-    )
-    .leftJoin(
-      users,
-      eq(productReviews.userId, users.id),
-    )
-    .where(eq(productReviews.isVisible, true))
-    .orderBy(desc(productReviews.createdAt))
-    .limit(6);
+  const reviews = await ReviewModel.find({ isVisible: true })
+    .populate("productId", "name legacyId")
+    .populate("userId", "name")
+    .sort({ createdAt: -1 })
+    .limit(6)
+    .lean();
+
+  return reviews.map((r) => {
+    const p: any = r.productId;
+    const u: any = r.userId;
+    return {
+      id: r._id.toString(),
+      productId: p?.legacyId ?? p?._id?.toString(),
+      productName: p?.name || "Product",
+      customerName: u?.name || "Verified Buyer",
+      rating: r.rating,
+      review: r.review,
+      createdAt: r.createdAt,
+      isVisible: r.isVisible,
+    };
+  });
 }

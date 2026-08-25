@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { orderStatusValues, paymentMethodValues } from "../drizzle/schema";
+import { orderStatusValues, paymentMethodValues } from "./models/Order";
 
 describe("Rabiora commerce foundation", () => {
   it("keeps the approved payment-method allow-list exact", () => {

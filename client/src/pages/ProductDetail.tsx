@@ -56,7 +56,7 @@ export default function ProductDetail() {
     [allProductsQuery.data, product?.id],
   );
 
-  const addCart = (productId: number) =>
+  const addCart = (productId: number | string) =>
     cart.add(productId);
 
   const reviews = reviewsQuery.data ?? [];

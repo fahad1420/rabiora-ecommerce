@@ -24,9 +24,9 @@ function ProductReviewBox({
   orderId,
   customerId,
 }: {
-  productId: number;
-  orderId: number;
-  customerId: number;
+  productId: number | string;
+  orderId: number | string;
+  customerId: number | string;
 }) {
   const [rating, setRating] = useState(5);
   const [review, setReview] = useState("");

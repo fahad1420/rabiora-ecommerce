@@ -7,7 +7,7 @@ export function useRabioraWishlist() {
   const authenticated = Boolean(customer.data);
   const remote = trpc.wishlist.list.useQuery(undefined, { enabled: authenticated });
   const utils = trpc.useUtils();
-  const [guestIds, setGuestIds] = useState<number[]>(() => getGuestWishlist());
+  const [guestIds, setGuestIds] = useState<Array<number | string>>(() => getGuestWishlist());
   useEffect(() => subscribeGuestWishlist(() => setGuestIds(getGuestWishlist())), []);
   const add = trpc.wishlist.add.useMutation({ onSuccess: () => utils.wishlist.list.invalidate() });
   const remove = trpc.wishlist.remove.useMutation({ onSuccess: () => utils.wishlist.list.invalidate() });
@@ -18,8 +18,11 @@ export function useRabioraWishlist() {
     ids,
     count: ids.length,
     remoteItems: remote.data ?? [],
-    toggle: async (productId: number) => {
-      if (!authenticated) { toggleGuestWishlist(productId); return; }
+    toggle: async (productId: number | string) => {
+      if (!authenticated) {
+        toggleGuestWishlist(productId);
+        return;
+      }
       if (ids.includes(productId)) await remove.mutateAsync({ productId });
       else await add.mutateAsync({ productId });
     },

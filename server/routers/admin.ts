@@ -2,7 +2,9 @@ import { z } from "zod";
 import { adminProcedure, router } from "../_core/trpc";
 import {
   advanceOrderStatus,
+  createAdminCategory,
   createAdminProduct,
+  deleteAdminCategory,
   deleteAdminProduct,
   getAdminCustomerDetail,
   listAdminCategories,
@@ -11,6 +13,7 @@ import {
   listAdminProducts,
   removeAdminProductImage,
   setAdminProductCover,
+  updateAdminCategory,
   updateAdminProduct,
   uploadAdminProductImage,
 } from "../adminService";
@@ -21,8 +24,10 @@ import {
   deleteProductReview,
 } from "../reviewService";
 
+const idSchema = z.union([z.number(), z.string()]);
+
 const productInput = z.object({
-  categoryId: z.number().int().positive(),
+  categoryId: idSchema,
   name: z.string().trim().min(2).max(220),
   slug: z.string().trim().max(240),
   sku: z.string().trim().max(80).optional(),
@@ -35,69 +40,99 @@ const productInput = z.object({
   featured: z.boolean(),
 });
 
+const categoryInput = z.object({
+  name: z.string().trim().min(2).max(120),
+  slug: z.string().trim().max(140).optional(),
+});
+
 export const adminRouter = router({
-  categories: adminProcedure.query(() => listAdminCategories()),
+  categories: router({
+    list: adminProcedure.query(() => listAdminCategories()),
+
+    create: adminProcedure
+      .input(categoryInput)
+      .mutation(({ input }) => createAdminCategory(input)),
+
+    update: adminProcedure
+      .input(
+        z.object({
+          id: idSchema,
+          category: categoryInput,
+        })
+      )
+      .mutation(({ input }) =>
+        updateAdminCategory(input.id, input.category)
+      ),
+
+    remove: adminProcedure
+      .input(
+        z.object({
+          id: idSchema,
+        })
+      )
+      .mutation(({ input }) => deleteAdminCategory(input.id)),
+  }),
 
   products: router({
     list: adminProcedure.query(() => listAdminProducts()),
 
     create: adminProcedure
       .input(productInput)
-      .mutation(({ input }) => createAdminProduct(input)),
+      .mutation(({ input }) => createAdminProduct(input as any)),
 
     update: adminProcedure
       .input(
         z.object({
-          id: z.number().int().positive(),
+          id: idSchema,
           product: productInput,
-        }),
+        })
       )
       .mutation(({ input }) =>
-        updateAdminProduct(input.id, input.product),
+        updateAdminProduct(input.id, input.product as any)
       ),
 
     remove: adminProcedure
       .input(
         z.object({
-          id: z.number().int().positive(),
-        }),
+          id: idSchema,
+        })
       )
       .mutation(({ input }) => deleteAdminProduct(input.id)),
 
     uploadImage: adminProcedure
       .input(
         z.object({
-          productId: z.number().int().positive(),
+          productId: idSchema,
           dataUrl: z.string().max(7_100_000),
           fileName: z.string().max(240),
           altText: z.string().trim().max(280),
           isCover: z.boolean(),
-        }),
+        })
       )
       .mutation(({ input }) =>
-        uploadAdminProductImage(input.productId, input),
+        uploadAdminProductImage(input.productId, input)
       ),
 
     setCover: adminProcedure
       .input(
         z.object({
-          productId: z.number().int().positive(),
-          imageId: z.number().int().positive(),
-        }),
+          productId: idSchema,
+          imageId: idSchema,
+        })
       )
       .mutation(({ input }) =>
-        setAdminProductCover(input.productId, input.imageId),
+        setAdminProductCover(input.productId, input.imageId)
       ),
 
     removeImage: adminProcedure
       .input(
         z.object({
-          productId: z.number().int().positive(),
-          imageId: z.number().int().positive(),
-        }),
+          productId: idSchema,
+          imageId: idSchema,
+        })
       )
       .mutation(({ input }) =>
-        removeAdminProductImage(input.productId, input.imageId),
+        removeAdminProductImage(input.productId, input.imageId)
       ),
   }),
 
@@ -107,22 +142,22 @@ export const adminRouter = router({
     advanceStatus: adminProcedure
       .input(
         z.object({
-          orderId: z.number().int().positive(),
+          orderId: idSchema,
           nextStatus: z.enum([
             "confirmed",
             "shipped",
             "delivered",
           ]),
           adminNote: z.string().trim().max(1000).optional(),
-        }),
+        })
       )
       .mutation(({ ctx, input }) =>
         advanceOrderStatus(
           input.orderId,
           input.nextStatus,
           ctx.user.id,
-          input.adminNote,
-        ),
+          input.adminNote
+        )
       ),
   }),
 
@@ -132,8 +167,8 @@ export const adminRouter = router({
     detail: adminProcedure
       .input(
         z.object({
-          id: z.number().int().positive(),
-        }),
+          id: idSchema,
+        })
       )
       .query(({ input }) => getAdminCustomerDetail(input.id)),
   }),
@@ -144,25 +179,25 @@ export const adminRouter = router({
     setVisibility: adminProcedure
       .input(
         z.object({
-          reviewId: z.number().int().positive(),
+          reviewId: idSchema,
           isVisible: z.boolean(),
-        }),
+        })
       )
       .mutation(({ input }) =>
         setReviewVisibility(
           input.reviewId,
-          input.isVisible,
-        ),
+          input.isVisible
+        )
       ),
 
     remove: adminProcedure
       .input(
         z.object({
-          reviewId: z.number().int().positive(),
-        }),
+          reviewId: idSchema,
+        })
       )
       .mutation(({ input }) =>
-        deleteProductReview(input.reviewId),
+        deleteProductReview(input.reviewId)
       ),
   }),
 });

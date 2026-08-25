@@ -1,23 +1,10 @@
 import { TRPCError } from "@trpc/server";
-import { desc, eq, inArray, sql } from "drizzle-orm";
-import {
-  categories,
-  orderItems,
-  orderStatusHistory,
-  orders,
-  payments,
-  productImages,
-  products,
-  users,
-} from "../drizzle/schema";
-import { getDb } from "./db";
-import {
-  removeLocalProductImage,
-  saveLocalProductImage,
-} from "./localMedia";
+import { connectMongo } from "./config/db";
+import { CategoryModel, OrderModel, ProductModel, UserModel, findOrderQuery, findProductQuery, findUserQuery, toObjectId, isValidObjectId } from "./models";
+import { removeProductImage, saveProductImage } from "./storage";
 
 type ProductInput = {
-  categoryId: number;
+  categoryId: string | number;
   name: string;
   slug: string;
   sku?: string;
@@ -42,7 +29,7 @@ const transitions: Record<
 
 export function canAdvanceOrderStatus(
   current: "pending" | "confirmed" | "shipped" | "delivered",
-  next: "confirmed" | "shipped" | "delivered",
+  next: "confirmed" | "shipped" | "delivered"
 ) {
   return transitions[current].includes(next);
 }
@@ -69,69 +56,177 @@ function discount(priceTaka: number, oldPriceTaka?: number) {
 }
 
 export async function listAdminCategories() {
-  const db = await getDb();
-
-  if (!db) {
-    failUnavailable();
-  }
-
-  return db.select().from(categories);
-}
-
-export async function listAdminProducts() {
-  const db = await getDb();
-
-  if (!db) {
-    failUnavailable();
-  }
-
-  const rows = await db
-    .select({
-      product: products,
-      categoryName: categories.name,
-      categorySlug: categories.slug,
-    })
-    .from(products)
-    .innerJoin(categories, eq(products.categoryId, categories.id))
-    .orderBy(desc(products.updatedAt));
-
-  const imageRows = await db.select().from(productImages);
-
-  const imagesByProduct = new Map<number, typeof imageRows>();
-
-  imageRows.forEach((image) => {
-    imagesByProduct.set(image.productId, [
-      ...(imagesByProduct.get(image.productId) ?? []),
-      image,
-    ]);
-  });
-
-  return rows.map((row) => ({
-    ...row.product,
-    categoryName: row.categoryName,
-    categorySlug: row.categorySlug,
-    images: (imagesByProduct.get(row.product.id) ?? []).sort(
-      (a, b) => a.position - b.position,
-    ),
+  await connectMongo();
+  const cats = await CategoryModel.find().sort({ name: 1 }).lean();
+  return cats.map((c) => ({
+    id: c._id.toString(),
+    _id: c._id.toString(),
+    name: c.name,
+    slug: c.slug,
+    createdAt: c.createdAt,
+    updatedAt: c.updatedAt,
   }));
 }
 
-export async function createAdminProduct(input: ProductInput) {
-  const db = await getDb();
+export async function createAdminCategory(input: { name: string; slug?: string }) {
+  await connectMongo();
+  const name = input.name.trim();
+  const slug = normalizedSlug(input.slug || name);
 
-  if (!db) {
-    failUnavailable();
+  if (!name || !slug) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Category name and slug are required.",
+    });
   }
 
-  const current = await db
-    .select({
-      legacyId: products.legacyId,
-    })
-    .from(products);
+  const existing = await CategoryModel.findOne({ slug });
+  if (existing) {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: "A category with this URL slug already exists.",
+    });
+  }
 
-  const legacyId =
-    Math.max(0, ...current.map((product) => product.legacyId)) + 1;
+  const category = await CategoryModel.create({ name, slug });
+  return {
+    id: category._id.toString(),
+    _id: category._id.toString(),
+    name: category.name,
+    slug: category.slug,
+    createdAt: category.createdAt,
+    updatedAt: category.updatedAt,
+  };
+}
 
+export async function updateAdminCategory(
+  categoryId: string | number,
+  input: { name: string; slug?: string }
+) {
+  await connectMongo();
+  const query = isValidObjectId(categoryId) ? { _id: toObjectId(String(categoryId)) } : { slug: String(categoryId) };
+  const category = await CategoryModel.findOne(query);
+
+  if (!category) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Category not found." });
+  }
+
+  const name = input.name.trim();
+  const slug = normalizedSlug(input.slug || name);
+
+  if (!name || !slug) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Category name and slug are required." });
+  }
+
+  const existingSlug = await CategoryModel.findOne({ slug });
+  if (existingSlug && existingSlug._id.toString() !== category._id.toString()) {
+    throw new TRPCError({ code: "CONFLICT", message: "Another category already uses this slug." });
+  }
+
+  category.name = name;
+  category.slug = slug;
+  await category.save();
+
+  // Update associated product category snapshots
+  await ProductModel.updateMany(
+    { categoryId: category._id },
+    { $set: { categoryName: name, categorySlug: slug } }
+  );
+
+  return {
+    id: category._id.toString(),
+    _id: category._id.toString(),
+    name: category.name,
+    slug: category.slug,
+    createdAt: category.createdAt,
+    updatedAt: category.updatedAt,
+  };
+}
+
+export async function deleteAdminCategory(categoryId: string | number) {
+  await connectMongo();
+  const query = isValidObjectId(categoryId) ? { _id: toObjectId(String(categoryId)) } : { slug: String(categoryId) };
+  const category = await CategoryModel.findOne(query);
+
+  if (!category) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Category not found." });
+  }
+
+  // Find a fallback category so products are not orphaned
+  let fallbackCategory = await CategoryModel.findOne({ _id: { $ne: category._id } });
+  if (!fallbackCategory) {
+    fallbackCategory = await CategoryModel.create({
+      name: "General Collection",
+      slug: "general-collection",
+    });
+  }
+
+  // Reassign products to fallback
+  await ProductModel.updateMany(
+    { categoryId: category._id },
+    {
+      $set: {
+        categoryId: fallbackCategory._id,
+        categoryName: fallbackCategory.name,
+        categorySlug: fallbackCategory.slug,
+      },
+    }
+  );
+
+  await CategoryModel.deleteOne({ _id: category._id });
+
+  return { success: true as const };
+}
+
+export async function listAdminProducts() {
+  await connectMongo();
+  const products = await ProductModel.find()
+    .populate("categoryId")
+    .sort({ updatedAt: -1 })
+    .lean();
+
+  return products.map((p) => {
+    const cat: any = p.categoryId;
+    return {
+      id: p.legacyId ?? p._id.toString(),
+      _id: p._id.toString(),
+      legacyId: p.legacyId ?? 0,
+      categoryId: cat ? cat._id.toString() : p.categoryId?.toString(),
+      categoryName: cat?.name || p.categoryName || "",
+      categorySlug: cat?.slug || p.categorySlug || "",
+      name: p.name,
+      slug: p.slug,
+      sku: p.sku,
+      details: p.details,
+      fabric: p.fabric,
+      color: p.color,
+      priceTaka: p.priceTaka,
+      oldPriceTaka: p.oldPriceTaka,
+      discountPercent: p.discountPercent,
+      stockQuantity: p.stockQuantity,
+      isInStock: p.isInStock,
+      featured: p.featured,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+      images: (p.images || []).map((img, idx) => ({
+        id: idx + 1,
+        _id: img._id?.toString(),
+        productId: p.legacyId ?? p._id.toString(),
+        storageKey: img.storageKey,
+        storageUrl: img.storageUrl,
+        altText: img.altText,
+        position: img.position,
+        isCover: img.isCover,
+      })),
+    };
+  });
+}
+
+export async function createAdminProduct(input: ProductInput) {
+  await connectMongo();
+
+  const currentCount = await ProductModel.countDocuments();
+  const legacyId = currentCount + 1;
   const slug = normalizedSlug(input.slug || input.name);
 
   if (!slug) {
@@ -141,14 +236,7 @@ export async function createAdminProduct(input: ProductInput) {
     });
   }
 
-  const [existingSlug] = await db
-    .select({
-      id: products.id,
-    })
-    .from(products)
-    .where(eq(products.slug, slug))
-    .limit(1);
-
+  const existingSlug = await ProductModel.findOne({ slug });
   if (existingSlug) {
     throw new TRPCError({
       code: "CONFLICT",
@@ -156,60 +244,57 @@ export async function createAdminProduct(input: ProductInput) {
     });
   }
 
-  await db.insert(products).values({
-    categoryId: input.categoryId,
+  let categoryDoc = null;
+  if (isValidObjectId(input.categoryId)) {
+    categoryDoc = await CategoryModel.findById(input.categoryId);
+  }
+  if (!categoryDoc) {
+    categoryDoc = await CategoryModel.findOne();
+  }
+  if (!categoryDoc) {
+    categoryDoc = await CategoryModel.create({
+      name: "General",
+      slug: "general",
+    });
+  }
+
+  const product = await ProductModel.create({
+    legacyId,
+    categoryId: categoryDoc._id,
+    categoryName: categoryDoc.name,
+    categorySlug: categoryDoc.slug,
     name: input.name.trim(),
     slug,
-    sku: input.sku?.trim() || null,
+    sku: input.sku?.trim() || undefined,
     details: input.details.trim(),
     fabric: input.fabric.trim(),
     color: input.color.trim(),
     priceTaka: input.priceTaka,
-    oldPriceTaka: input.oldPriceTaka ?? null,
+    oldPriceTaka: input.oldPriceTaka || undefined,
     stockQuantity: input.stockQuantity,
     isInStock: input.stockQuantity > 0,
     featured: input.featured,
-    legacyId,
-    discountPercent: discount(
-      input.priceTaka,
-      input.oldPriceTaka,
-    ),
+    discountPercent: discount(input.priceTaka, input.oldPriceTaka),
+    images: [],
   });
 
-  const [product] = await db
-    .select()
-    .from(products)
-    .where(eq(products.slug, slug))
-    .limit(1);
-
-  if (!product) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "Product creation did not return a record.",
-    });
-  }
-
-  return product;
+  const obj = product.toObject();
+  return {
+    ...obj,
+    id: product.legacyId ?? product._id.toString(),
+    _id: product._id.toString(),
+  };
 }
 
 export async function updateAdminProduct(
-  productId: number,
-  input: ProductInput,
+  productId: string | number,
+  input: ProductInput
 ) {
-  const db = await getDb();
+  await connectMongo();
 
-  if (!db) {
-    failUnavailable();
-  }
+  const product = await ProductModel.findOne(findProductQuery(productId));
 
-  // Make sure the product actually exists.
-  const [existingProduct] = await db
-    .select()
-    .from(products)
-    .where(eq(products.id, productId))
-    .limit(1);
-
-  if (!existingProduct) {
+  if (!product) {
     throw new TRPCError({
       code: "NOT_FOUND",
       message: "Product not found.",
@@ -217,7 +302,6 @@ export async function updateAdminProduct(
   }
 
   const slug = normalizedSlug(input.slug || input.name);
-
   if (!slug) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -225,84 +309,54 @@ export async function updateAdminProduct(
     });
   }
 
-  // Check whether another product already owns this slug.
-  const [slugOwner] = await db
-    .select({
-      id: products.id,
-    })
-    .from(products)
-    .where(eq(products.slug, slug))
-    .limit(1);
-
-  if (slugOwner && slugOwner.id !== productId) {
+  const slugOwner = await ProductModel.findOne({ slug });
+  if (slugOwner && slugOwner._id.toString() !== product._id.toString()) {
     throw new TRPCError({
       code: "CONFLICT",
       message: "Another product already uses this URL slug.",
     });
   }
 
-  /*
-   * Important stock logic:
-   *
-   * stockQuantity > 0  => in stock
-   * stockQuantity === 0 => out of stock
-   *
-   * This also fixes restocking an old out-of-stock product.
-   */
-  const stockQuantity = Math.max(
-    0,
-    Math.floor(input.stockQuantity),
-  );
-
-  await db
-    .update(products)
-    .set({
-      categoryId: input.categoryId,
-      name: input.name.trim(),
-      slug,
-      sku: input.sku?.trim() || null,
-      details: input.details.trim(),
-      fabric: input.fabric.trim(),
-      color: input.color.trim(),
-      priceTaka: input.priceTaka,
-      oldPriceTaka: input.oldPriceTaka ?? null,
-      stockQuantity,
-      isInStock: stockQuantity > 0,
-      featured: input.featured,
-      discountPercent: discount(
-        input.priceTaka,
-        input.oldPriceTaka,
-      ),
-    })
-    .where(eq(products.id, productId));
-
-  // Fetch the updated product and return the real DB record.
-  const [updatedProduct] = await db
-    .select()
-    .from(products)
-    .where(eq(products.id, productId))
-    .limit(1);
-
-  if (!updatedProduct) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "Product update failed.",
-    });
+  let categoryDoc = null;
+  if (isValidObjectId(input.categoryId)) {
+    categoryDoc = await CategoryModel.findById(input.categoryId);
   }
 
-  return updatedProduct;
+  const stockQuantity = Math.max(0, Math.floor(input.stockQuantity));
+
+  product.name = input.name.trim();
+  product.slug = slug;
+  product.sku = input.sku?.trim() || undefined;
+  product.details = input.details.trim();
+  product.fabric = input.fabric.trim();
+  product.color = input.color.trim();
+  product.priceTaka = input.priceTaka;
+  product.oldPriceTaka = input.oldPriceTaka || undefined;
+  product.stockQuantity = stockQuantity;
+  product.isInStock = stockQuantity > 0;
+  product.featured = input.featured;
+  product.discountPercent = discount(input.priceTaka, input.oldPriceTaka);
+
+  if (categoryDoc) {
+    product.categoryId = categoryDoc._id as any;
+    product.categoryName = categoryDoc.name;
+    product.categorySlug = categoryDoc.slug;
+  }
+
+  await product.save();
+
+  const obj = product.toObject();
+  return {
+    ...obj,
+    id: product.legacyId ?? product._id.toString(),
+    _id: product._id.toString(),
+  };
 }
 
-export async function deleteAdminProduct(productId: number) {
-  const db = await getDb();
+export async function deleteAdminProduct(productId: string | number) {
+  await connectMongo();
 
-  if (!db) {
-    failUnavailable();
-  }
-
-  await db
-    .delete(products)
-    .where(eq(products.id, productId));
+  await ProductModel.deleteOne(findProductQuery(productId));
 
   return {
     success: true as const,
@@ -310,22 +364,27 @@ export async function deleteAdminProduct(productId: number) {
 }
 
 export async function uploadAdminProductImage(
-  productId: number,
+  productId: string | number,
   input: {
     dataUrl: string;
     fileName: string;
     altText: string;
     isCover: boolean;
-  },
+  }
 ) {
-  const db = await getDb();
+  await connectMongo();
 
-  if (!db) {
-    failUnavailable();
+  const product = await ProductModel.findOne(findProductQuery(productId));
+
+  if (!product) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Product not found.",
+    });
   }
 
   const dataMatch = input.dataUrl.match(
-    /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/,
+    /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/
   );
 
   if (!dataMatch) {
@@ -345,226 +404,142 @@ export async function uploadAdminProductImage(
   }
 
   const safeName =
-    input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_") ||
-    "product-image";
+    input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_") || "product-image";
 
-  const uploaded = await saveLocalProductImage(
-    productId,
+  const uploaded = await saveProductImage(
+    product.legacyId ?? product._id.toString(),
     bytes,
     dataMatch[1],
-    safeName,
+    safeName
   );
 
-  const existing = await db
-    .select()
-    .from(productImages)
-    .where(eq(productImages.productId, productId));
-
-  const position = existing.length;
-
-  if (input.isCover || existing.length === 0) {
-    await db
-      .update(productImages)
-      .set({ isCover: false })
-      .where(eq(productImages.productId, productId));
+  if (input.isCover || product.images.length === 0) {
+    product.images.forEach((img) => {
+      img.isCover = false;
+    });
   }
 
-  await db.insert(productImages).values({
-    productId,
+  product.images.push({
     storageKey: uploaded.key,
     storageUrl: uploaded.url,
     altText: input.altText || "Rabiora product image",
-    position,
-    isCover: input.isCover || existing.length === 0,
+    position: product.images.length,
+    isCover: input.isCover || product.images.length === 0,
   });
+
+  await product.save();
 
   return uploaded;
 }
 
 export async function setAdminProductCover(
-  productId: number,
-  imageId: number,
+  productId: string | number,
+  imageId: string | number
 ) {
-  const db = await getDb();
+  await connectMongo();
 
-  if (!db) {
-    failUnavailable();
+  const product = await ProductModel.findOne(findProductQuery(productId));
+
+  if (!product) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Product not found." });
   }
 
-  const [image] = await db
-    .select()
-    .from(productImages)
-    .where(eq(productImages.id, imageId))
-    .limit(1);
+  const targetIdx = typeof imageId === "number" ? imageId - 1 : product.images.findIndex((img) => img._id?.toString() === String(imageId));
 
-  if (!image || image.productId !== productId) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Product image not found.",
+  if (targetIdx >= 0 && targetIdx < product.images.length) {
+    product.images.forEach((img, idx) => {
+      img.isCover = idx === targetIdx;
     });
+    await product.save();
   }
 
-  await db.transaction(async (tx) => {
-    await tx
-      .update(productImages)
-      .set({ isCover: false })
-      .where(eq(productImages.productId, productId));
-
-    await tx
-      .update(productImages)
-      .set({ isCover: true })
-      .where(eq(productImages.id, imageId));
-  });
-
-  return {
-    success: true as const,
-  };
+  return { success: true as const };
 }
 
 export async function removeAdminProductImage(
-  productId: number,
-  imageId: number,
+  productId: string | number,
+  imageId: string | number
 ) {
-  const db = await getDb();
+  await connectMongo();
 
-  if (!db) {
-    failUnavailable();
+  const product = await ProductModel.findOne(findProductQuery(productId));
+
+  if (!product) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Product not found." });
   }
 
-  const [image] = await db
-    .select()
-    .from(productImages)
-    .where(eq(productImages.id, imageId))
-    .limit(1);
+  const targetIdx = typeof imageId === "number" ? imageId - 1 : product.images.findIndex((img) => img._id?.toString() === String(imageId));
 
-  if (!image || image.productId !== productId) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Product image not found.",
-    });
-  }
-
-  await db.transaction(async (tx) => {
-    await tx
-      .delete(productImages)
-      .where(eq(productImages.id, imageId));
-
-    if (image.isCover) {
-      const remaining = await tx
-        .select()
-        .from(productImages)
-        .where(eq(productImages.productId, productId));
-
-      const nextCover = remaining.sort(
-        (a, b) => a.position - b.position,
-      )[0];
-
-      if (nextCover) {
-        await tx
-          .update(productImages)
-          .set({ isCover: true })
-          .where(eq(productImages.id, nextCover.id));
-      }
+  if (targetIdx >= 0 && targetIdx < product.images.length) {
+    const [removed] = product.images.splice(targetIdx, 1);
+    if (removed.isCover && product.images.length > 0) {
+      product.images[0].isCover = true;
     }
-  });
+    await product.save();
+    await removeProductImage(removed.storageKey);
+  }
 
-  await removeLocalProductImage(image.storageKey);
-
-  return {
-    success: true as const,
-  };
+  return { success: true as const };
 }
 
 export async function listAdminOrders() {
-  const db = await getDb();
+  await connectMongo();
+  const orders = await OrderModel.find().sort({ createdAt: -1 }).lean();
 
-  if (!db) {
-    failUnavailable();
-  }
-
-  const orderRows = await db
-    .select()
-    .from(orders)
-    .orderBy(desc(orders.createdAt));
-
-  if (orderRows.length === 0) {
-    return [];
-  }
-
-  const ids = orderRows.map((order) => order.id);
-
-  const itemRows = await db
-    .select()
-    .from(orderItems)
-    .where(inArray(orderItems.orderId, ids));
-
-  const paymentRows = await db
-    .select()
-    .from(payments)
-    .where(inArray(payments.orderId, ids));
-
-  return orderRows.map((order) => ({
-    ...order,
-    items: itemRows.filter(
-      (item) => item.orderId === order.id,
-    ),
-    payment:
-      paymentRows.find(
-        (payment) => payment.orderId === order.id,
-      ) ?? null,
+  return orders.map((o) => ({
+    id: o._id.toString(),
+    orderNumber: o.orderNumber,
+    customerName: o.customerName,
+    customerPhone: o.customerPhone,
+    districtArea: o.districtArea,
+    fullAddress: o.fullAddress,
+    subtotalTaka: o.subtotalTaka,
+    deliveryChargeTaka: o.deliveryChargeTaka,
+    totalTaka: o.totalTaka,
+    paymentMethod: o.paymentMethod,
+    status: o.status,
+    adminNote: o.adminNote,
+    createdAt: o.createdAt,
+    items: (o.items || []).map((i, idx) => ({
+      id: i._id ? i._id.toString() : idx + 1,
+      orderId: o._id.toString(),
+      productName: i.productName,
+      sku: i.sku,
+      imageUrl: i.imageUrl,
+      unitPriceTaka: i.unitPriceTaka,
+      quantity: i.quantity,
+      lineTotalTaka: i.lineTotalTaka,
+    })),
+    payment: o.payments && o.payments[0] ? o.payments[0] : null,
   }));
 }
 
 export async function listAdminCustomers() {
-  const db = await getDb();
+  await connectMongo();
+  const users = await UserModel.find().sort({ createdAt: -1 }).lean();
 
-  if (!db) {
-    failUnavailable();
-  }
-
-  const rows = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      phone: users.phone,
-      role: users.role,
-      createdAt: users.createdAt,
-      totalOrders: sql<number>`COALESCE(COUNT(${orders.id}), 0)`,
+  const customerList = await Promise.all(
+    users.map(async (u) => {
+      const orderCount = await OrderModel.countDocuments({ userId: u._id });
+      return {
+        id: u._id.toString(),
+        name: u.name,
+        email: u.email,
+        phone: u.phone,
+        role: u.role,
+        createdAt: u.createdAt,
+        totalOrders: orderCount,
+      };
     })
-    .from(users)
-    .leftJoin(orders, eq(users.id, orders.userId))
-    .groupBy(users.id)
-    .orderBy(desc(users.createdAt));
+  );
 
-  return rows.map((row) => ({
-    ...row,
-    totalOrders: Number(row.totalOrders),
-  }));
+  return customerList;
 }
 
-export async function getAdminCustomerDetail(
-  customerId: number,
-) {
-  const db = await getDb();
+export async function getAdminCustomerDetail(customerId: string | number) {
+  await connectMongo();
 
-  if (!db) {
-    failUnavailable();
-  }
-
-  const [customer] = await db
-    .select({
-      id: users.id,
-      openId: users.openId,
-      name: users.name,
-      email: users.email,
-      phone: users.phone,
-      role: users.role,
-      createdAt: users.createdAt,
-    })
-    .from(users)
-    .where(eq(users.id, customerId))
-    .limit(1);
+  const customer = await UserModel.findOne(findUserQuery(customerId)).lean();
 
   if (!customer) {
     throw new TRPCError({
@@ -573,35 +548,42 @@ export async function getAdminCustomerDetail(
     });
   }
 
-  const customerOrders = await db
-    .select()
-    .from(orders)
-    .where(eq(orders.userId, customerId))
-    .orderBy(desc(orders.createdAt));
+  const customerOrders = await OrderModel.find({ userId: customer._id })
+    .sort({ createdAt: -1 })
+    .lean();
 
   return {
-    ...customer,
-    orders: customerOrders,
+    id: customer._id.toString(),
+    openId: customer.openId,
+    name: customer.name,
+    email: customer.email,
+    phone: customer.phone,
+    role: customer.role,
+    createdAt: customer.createdAt,
+    orders: customerOrders.map((o) => ({
+      id: o._id.toString(),
+      orderNumber: o.orderNumber,
+      customerName: o.customerName,
+      customerPhone: o.customerPhone,
+      districtArea: o.districtArea,
+      fullAddress: o.fullAddress,
+      paymentMethod: o.paymentMethod,
+      totalTaka: o.totalTaka,
+      status: o.status,
+      createdAt: o.createdAt,
+    })),
   };
 }
 
 export async function advanceOrderStatus(
-  orderId: number,
+  orderId: string | number,
   nextStatus: "confirmed" | "shipped" | "delivered",
-  actorUserId: number,
-  adminNote?: string,
+  actorUserId?: string | number,
+  adminNote?: string
 ) {
-  const db = await getDb();
+  await connectMongo();
 
-  if (!db) {
-    failUnavailable();
-  }
-
-  const [order] = await db
-    .select()
-    .from(orders)
-    .where(eq(orders.id, orderId))
-    .limit(1);
+  const order = await OrderModel.findOne(findOrderQuery(orderId));
 
   if (!order) {
     throw new TRPCError({
@@ -618,23 +600,23 @@ export async function advanceOrderStatus(
     });
   }
 
-  await db.transaction(async (tx) => {
-    await tx
-      .update(orders)
-      .set({
-        status: nextStatus,
-        adminNote: adminNote?.trim() || null,
-      })
-      .where(eq(orders.id, orderId));
+  order.status = nextStatus;
+  if (adminNote) order.adminNote = adminNote.trim();
 
-    await tx.insert(orderStatusHistory).values({
-      orderId,
-      previousStatus: order.status,
-      nextStatus,
-      actorUserId,
-      adminNote: adminNote?.trim() || null,
-    });
+  let actorDoc = null;
+  if (actorUserId) {
+    actorDoc = await UserModel.findOne(findUserQuery(actorUserId));
+  }
+
+  order.statusHistory.push({
+    previousStatus: order.status,
+    nextStatus,
+    actorUserId: actorDoc ? actorDoc._id : undefined,
+    adminNote: adminNote?.trim(),
+    createdAt: new Date(),
   });
+
+  await order.save();
 
   return {
     success: true as const,

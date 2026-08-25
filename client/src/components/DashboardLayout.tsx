@@ -28,6 +28,7 @@ import {
   Package,
   PanelLeft,
   ShoppingBag,
+  Tags,
   Users,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -45,6 +46,11 @@ const menuItems = [
     icon: Package,
     label: "Products",
     path: "/admin/products",
+  },
+  {
+    icon: Tags,
+    label: "Categories",
+    path: "/admin/categories",
   },
   {
     icon: ShoppingBag,

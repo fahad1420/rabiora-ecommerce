@@ -58,7 +58,7 @@ export default function Home() {
     return [...images, ...images];
   }, [featuredQuery.data]);
 
-  const addCart = (productId: number) => cart.add(productId);
+  const addCart = (productId: number | string) => cart.add(productId);
 
   return (
     <div className="page-shell">

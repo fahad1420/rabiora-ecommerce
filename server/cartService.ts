@@ -1,21 +1,24 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
-import { cartItems, carts, productImages, products, users } from "../drizzle/schema";
-import { getDb } from "./db";
-import { getCustomerFromRequest, type RabioraCustomer } from "./customerSession";
+import { connectMongo } from "./config/db";
+import { CartModel, ProductModel, UserModel, findProductQuery, findUserQuery } from "./models";
+import { getCustomerFromRequest } from "./customerSession";
 import { assertCartStock, nextCartQuantity, shouldRemoveCartItem } from "./cartRules";
 import type { Request } from "express";
 
-export type CartIdentity = { userId?: number; anonymousToken?: string };
+export type CartIdentity = { userId?: string; anonymousToken?: string };
 
 function unavailable() {
   return new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Cart is temporarily unavailable." });
 }
 
-export async function resolveCartIdentity(req: Request, manuscriptUser: { id: number; openId: string; name: string | null; email: string | null; phone: string | null; role: "user" | "admin" } | null, anonymousToken?: string): Promise<CartIdentity> {
-  if (manuscriptUser) return { userId: manuscriptUser.id };
+export async function resolveCartIdentity(
+  req: Request,
+  manuscriptUser: { id?: string | number; openId: string; name?: string | null; role: "user" | "admin" } | null,
+  anonymousToken?: string
+): Promise<CartIdentity> {
+  if (manuscriptUser) return { userId: String(manuscriptUser.id || manuscriptUser.openId) };
   const customer = await getCustomerFromRequest(req);
-  if (customer) return { userId: customer.id };
+  if (customer) return { userId: String(customer.id) };
   if (!anonymousToken || !/^[a-zA-Z0-9_-]{20,128}$/.test(anonymousToken)) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "A valid guest-cart token is required." });
   }
@@ -23,73 +26,148 @@ export async function resolveCartIdentity(req: Request, manuscriptUser: { id: nu
 }
 
 async function getOrCreateCart(identity: CartIdentity) {
-  const db = await getDb();
-  if (!db) throw unavailable();
-  const condition = identity.userId ? eq(carts.userId, identity.userId) : eq(carts.anonymousToken, identity.anonymousToken!);
-  const [existing] = await db.select().from(carts).where(condition).limit(1);
-  if (existing) return { db, cart: existing };
-  await db.insert(carts).values(identity.userId ? { userId: identity.userId } : { anonymousToken: identity.anonymousToken! });
-  const [created] = await db.select().from(carts).where(condition).limit(1);
-  if (!created) throw unavailable();
-  return { db, cart: created };
+  await connectMongo();
+  let query: Record<string, unknown> = {};
+
+  if (identity.userId) {
+    const userDoc = await UserModel.findOne(findUserQuery(identity.userId));
+    if (userDoc) {
+      query = { userId: userDoc._id };
+    } else {
+      query = { userId: identity.userId };
+    }
+  } else if (identity.anonymousToken) {
+    query = { anonymousToken: identity.anonymousToken };
+  } else {
+    throw unavailable();
+  }
+
+  let cart = await CartModel.findOne(query);
+  if (!cart) {
+    cart = await CartModel.create({
+      ...query,
+      items: [],
+    });
+  }
+
+  return cart;
 }
 
 export async function getCart(identity: CartIdentity) {
-  const { db, cart } = await getOrCreateCart(identity);
-  const rows = await db.select({
-    itemId: cartItems.id,
-    quantity: cartItems.quantity,
-    productId: products.id,
-    slug: products.slug,
-    name: products.name,
-    priceTaka: products.priceTaka,
-    stockQuantity: products.stockQuantity,
-    isInStock: products.isInStock,
-    imageUrl: productImages.storageUrl,
-  }).from(cartItems)
-    .innerJoin(products, eq(cartItems.productId, products.id))
-    .leftJoin(productImages, and(eq(productImages.productId, products.id), eq(productImages.isCover, true)))
-    .where(eq(cartItems.cartId, cart.id));
-  const items = rows.map((item) => ({ ...item, lineTotalTaka: item.priceTaka * item.quantity }));
-  return { id: cart.id, items, subtotalTaka: items.reduce((sum, item) => sum + item.lineTotalTaka, 0) };
+  const cart = await getOrCreateCart(identity);
+  await cart.populate({
+    path: "items.productId",
+    model: "Product",
+  });
+
+  const items = (cart.items || [])
+    .filter((item) => item.productId != null)
+    .map((item) => {
+      const product: any = item.productId;
+      const coverImage = (product.images || []).find((img: any) => img.isCover) || (product.images || [])[0];
+      const priceTaka = product.priceTaka || 0;
+      const quantity = item.quantity || 1;
+      return {
+        itemId: item._id ? item._id.toString() : product._id.toString(),
+        productId: product.legacyId ?? product._id.toString(),
+        slug: product.slug,
+        name: product.name,
+        priceTaka,
+        stockQuantity: product.stockQuantity || 0,
+        isInStock: product.isInStock ?? true,
+        imageUrl: coverImage ? coverImage.storageUrl : "",
+        quantity,
+        lineTotalTaka: priceTaka * quantity,
+      };
+    });
+
+  const subtotalTaka = items.reduce((sum, item) => sum + item.lineTotalTaka, 0);
+
+  return {
+    id: cart._id.toString(),
+    items,
+    subtotalTaka,
+  };
 }
 
-export async function addCartItem(identity: CartIdentity, productId: number, requestedQuantity = 1) {
-  const { db, cart } = await getOrCreateCart(identity);
-  const [product] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
-  if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found." });
-  const [existing] = await db.select().from(cartItems).where(and(eq(cartItems.cartId, cart.id), eq(cartItems.productId, productId))).limit(1);
-  const nextQuantity = nextCartQuantity(existing?.quantity ?? 0, requestedQuantity, product.stockQuantity, product.isInStock);
-  if (existing) await db.update(cartItems).set({ quantity: nextQuantity }).where(eq(cartItems.id, existing.id));
-  else await db.insert(cartItems).values({ cartId: cart.id, productId, quantity: requestedQuantity });
-  return getCart(identity);
-}
+export async function addCartItem(identity: CartIdentity, productId: string | number, requestedQuantity = 1) {
+  await connectMongo();
+  const cart = await getOrCreateCart(identity);
 
-export async function updateCartItem(identity: CartIdentity, productId: number, quantity: number) {
-  const { db, cart } = await getOrCreateCart(identity);
-  const [product] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
-  if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found." });
-  const condition = and(eq(cartItems.cartId, cart.id), eq(cartItems.productId, productId));
-  if (shouldRemoveCartItem(quantity)) await db.delete(cartItems).where(condition);
-  else {
-    assertCartStock(product.isInStock, product.stockQuantity, quantity);
-    await db.update(cartItems).set({ quantity }).where(condition);
+  const product = await ProductModel.findOne(findProductQuery(productId));
+
+  if (!product) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Product not found." });
   }
+
+  const existingItemIndex = cart.items.findIndex(
+    (item) => item.productId.toString() === product._id.toString()
+  );
+
+  const currentQty = existingItemIndex >= 0 ? cart.items[existingItemIndex].quantity : 0;
+  const nextQuantity = nextCartQuantity(currentQty, requestedQuantity, product.stockQuantity, product.isInStock);
+
+  if (existingItemIndex >= 0) {
+    cart.items[existingItemIndex].quantity = nextQuantity;
+  } else {
+    cart.items.push({
+      productId: product._id as any,
+      quantity: requestedQuantity,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+
+  await cart.save();
   return getCart(identity);
 }
 
-export async function mergeGuestCart(userId: number, anonymousToken?: string) {
+export async function updateCartItem(identity: CartIdentity, productId: string | number, quantity: number) {
+  await connectMongo();
+  const cart = await getOrCreateCart(identity);
+
+  const product = await ProductModel.findOne(findProductQuery(productId));
+
+  if (!product) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Product not found." });
+  }
+
+  const existingItemIndex = cart.items.findIndex(
+    (item) => item.productId.toString() === product._id.toString()
+  );
+
+  if (existingItemIndex >= 0) {
+    if (shouldRemoveCartItem(quantity)) {
+      cart.items.splice(existingItemIndex, 1);
+    } else {
+      assertCartStock(product.isInStock, product.stockQuantity, quantity);
+      cart.items[existingItemIndex].quantity = quantity;
+    }
+    await cart.save();
+  }
+
+  return getCart(identity);
+}
+
+export async function mergeGuestCart(userId: string | number, anonymousToken?: string) {
   if (!anonymousToken || !/^[a-zA-Z0-9_-]{20,128}$/.test(anonymousToken)) return;
-  const db = await getDb();
-  if (!db) throw unavailable();
-  const [guestCart] = await db.select().from(carts).where(eq(carts.anonymousToken, anonymousToken)).limit(1);
-  if (!guestCart) return;
-  const userIdentity = { userId };
-  const userCart = await getOrCreateCart(userIdentity);
-  const guestItems = await db.select().from(cartItems).where(eq(cartItems.cartId, guestCart.id));
-  for (const item of guestItems) {
-    try { await addCartItem(userIdentity, item.productId, item.quantity); } catch { /* Skip unavailable items rather than lose the remaining guest cart. */ }
+  await connectMongo();
+
+  const guestCart = await CartModel.findOne({ anonymousToken }).populate("items.productId");
+  if (!guestCart || guestCart.items.length === 0) return;
+
+  const userIdentity = { userId: String(userId) };
+
+  for (const item of guestCart.items) {
+    if (item.productId) {
+      try {
+        const prod: any = item.productId;
+        await addCartItem(userIdentity, prod.legacyId ?? prod._id.toString(), item.quantity);
+      } catch {
+        // Skip unavailable items
+      }
+    }
   }
-  await db.delete(carts).where(eq(carts.id, guestCart.id));
-  await db.update(carts).set({ updatedAt: new Date() }).where(eq(carts.id, userCart.cart.id));
+
+  await CartModel.deleteOne({ _id: guestCart._id });
 }

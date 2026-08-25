@@ -36,8 +36,12 @@ const taka = (value: number) =>
   `৳${value.toLocaleString("en-BD")}`;
 
 function toProductInput(form: ProductForm) {
+  const catId = form.categoryId.trim();
+  const numCatId = Number(catId);
+  const finalCategoryId = !isNaN(numCatId) && String(numCatId) === catId ? numCatId : catId;
+
   return {
-    categoryId: Number(form.categoryId),
+    categoryId: finalCategoryId,
     name: form.name,
     slug: form.slug,
     sku: form.sku || undefined,
@@ -56,7 +60,7 @@ function toProductInput(form: ProductForm) {
 function ProductManager() {
   const utils = trpc.useUtils();
   const products = trpc.admin.products.list.useQuery();
-  const categories = trpc.admin.categories.useQuery();
+  const categories = trpc.admin.categories.list.useQuery();
 
   const create = trpc.admin.products.create.useMutation({
     onSuccess: () => utils.admin.products.list.invalidate(),
@@ -92,7 +96,7 @@ function ProductManager() {
     useState<ProductForm>(emptyProduct);
 
   const [editingId, setEditingId] =
-    useState<number | null>(null);
+    useState<number | string | null>(null);
 
   const [error, setError] = useState("");
   const [selectedImage, setSelectedImage] =
@@ -569,6 +573,168 @@ function ProductManager() {
                           remove.mutate({
                             id: product.id,
                           });
+                        }
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function CategoryManager() {
+  const utils = trpc.useUtils();
+  const categories = trpc.admin.categories.list.useQuery();
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [editingId, setEditingId] = useState<string | number | null>(null);
+  const [error, setError] = useState("");
+
+  const create = trpc.admin.categories.create.useMutation({
+    onSuccess: () => {
+      utils.admin.categories.list.invalidate();
+      setName("");
+      setSlug("");
+      setError("");
+    },
+    onError: (err) => setError(err.message),
+  });
+
+  const update = trpc.admin.categories.update.useMutation({
+    onSuccess: () => {
+      utils.admin.categories.list.invalidate();
+      setName("");
+      setSlug("");
+      setEditingId(null);
+      setError("");
+    },
+    onError: (err) => setError(err.message),
+  });
+
+  const remove = trpc.admin.categories.remove.useMutation({
+    onSuccess: () => {
+      utils.admin.categories.list.invalidate();
+      setError("");
+    },
+    onError: (err) => setError(err.message),
+  });
+
+  const startEdit = (cat: { id: string | number; name: string; slug: string }) => {
+    setEditingId(cat.id);
+    setName(cat.name);
+    setSlug(cat.slug);
+    setError("");
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setName("");
+    setSlug("");
+    setError("");
+  };
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (!name.trim()) {
+      setError("Category name is required.");
+      return;
+    }
+    if (editingId) {
+      update.mutate({ id: editingId, category: { name: name.trim(), slug: slug.trim() || undefined } });
+    } else {
+      create.mutate({ name: name.trim(), slug: slug.trim() || undefined });
+    }
+  };
+
+  return (
+    <div className="admin-stack">
+      <section className="admin-heading">
+        <div>
+          <p>Product Structure</p>
+          <h1>Categories</h1>
+        </div>
+      </section>
+
+      <div className="admin-grid">
+        <form className="admin-card" onSubmit={submit}>
+          <h3>{editingId ? "Edit Category" : "Add New Category"}</h3>
+
+          {error && <div className="admin-error">{error}</div>}
+
+          <div className="admin-field">
+            <label>Category Name</label>
+            <input
+              type="text"
+              className="admin-input"
+              placeholder="e.g. Silk Collection"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (!editingId) {
+                  setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""));
+                }
+              }}
+              required
+            />
+          </div>
+
+          <div className="admin-field">
+            <label>URL Slug</label>
+            <input
+              type="text"
+              className="admin-input"
+              placeholder="e.g. silk-collection"
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+            />
+          </div>
+
+          <div className="admin-actions">
+            <button type="submit" className="btn" disabled={create.isPending || update.isPending}>
+              {create.isPending || update.isPending ? "Saving..." : editingId ? "Update Category" : "Create Category"}
+            </button>
+            {editingId && (
+              <button type="button" className="btn btn-secondary" onClick={cancelEdit}>
+                Cancel
+              </button>
+            )}
+          </div>
+        </form>
+
+        <section className="admin-card">
+          <h3>Existing Categories ({categories.data?.length || 0})</h3>
+          {categories.isLoading ? (
+            <p>Loading categories...</p>
+          ) : categories.data?.length === 0 ? (
+            <p>No categories found.</p>
+          ) : (
+            <div className="admin-product-list">
+              {categories.data?.map((cat) => (
+                <article key={cat.id} className="admin-product-item">
+                  <div className="admin-product-item-details">
+                    <h4>{cat.name}</h4>
+                    <p className="slug">/{cat.slug}</p>
+                  </div>
+                  <div className="admin-product-item-actions">
+                    <button type="button" className="btn btn-secondary" onClick={() => startEdit(cat)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ background: "#dc2626", color: "#fff" }}
+                      disabled={remove.isPending}
+                      onClick={() => {
+                        if (window.confirm(`Delete category "${cat.name}"? Products will be reassigned.`)) {
+                          remove.mutate({ id: cat.id });
                         }
                       }}
                     >
@@ -1334,15 +1500,18 @@ export default function Admin() {
         "/admin/products"
         ? <ProductManager />
         : location ===
+          "/admin/categories"
+          ? <CategoryManager />
+        : location ===
           "/admin/orders"
           ? <OrderManager />
-          : location ===
-            "/admin/customers"
-            ? <CustomerManager />
-            : location ===
-              "/admin/reviews"
-              ? <ReviewManager />
-              : <AdminOverview />;
+        : location ===
+          "/admin/customers"
+          ? <CustomerManager />
+        : location ===
+          "/admin/reviews"
+          ? <ReviewManager />
+        : <AdminOverview />;
 
   return (
   <DashboardLayout>

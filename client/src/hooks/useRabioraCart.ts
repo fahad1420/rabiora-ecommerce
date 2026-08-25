@@ -14,8 +14,8 @@ export function useRabioraCart() {
     subtotalTaka: cart.data?.subtotalTaka ?? 0,
     count: (cart.data?.items ?? []).reduce((total, item) => total + item.quantity, 0),
     isLoading: cart.isLoading,
-    add: (productId: number, quantity = 1) => add.mutateAsync({ anonymousToken: token, productId, quantity }),
-    update: (productId: number, quantity: number) => update.mutateAsync({ anonymousToken: token, productId, quantity }),
+    add: (productId: number | string, quantity = 1) => add.mutateAsync({ anonymousToken: token, productId, quantity }),
+    update: (productId: number | string, quantity: number) => update.mutateAsync({ anonymousToken: token, productId, quantity }),
     isMutating: add.isPending || update.isPending,
   };
 }

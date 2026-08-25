@@ -1,7 +1,6 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { cartItems, carts, orderItems, orderStatusHistory, orders, payments, productImages, products } from "../drizzle/schema";
-import { getDb } from "./db";
+import { connectMongo } from "./config/db";
+import { CartModel, OrderModel, ProductModel, UserModel, findOrderQuery, findProductQuery, findUserQuery } from "./models";
 import type { CartIdentity } from "./cartService";
 import { nanoid } from "nanoid";
 
@@ -16,134 +15,300 @@ export function manualPaymentRequired(method: PaymentMethod) {
   return method === "bKash" || method === "Nagad" || method === "Rocket";
 }
 
-export function assertManualPaymentEvidence(method: PaymentMethod, transactionId?: string, submittedAmountTaka?: number) {
+export function assertManualPaymentEvidence(
+  method: PaymentMethod,
+  transactionId?: string,
+  submittedAmountTaka?: number
+) {
   if (manualPaymentRequired(method) && (!transactionId?.trim() || !submittedAmountTaka || submittedAmountTaka < 1)) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: "Transaction ID and submitted amount are required for this payment method." });
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Transaction ID and submitted amount are required for this payment method.",
+    });
   }
 }
 
 export function validateOrderStock(
-  lines: Array<{ productId: number; quantity: number }>,
-  currentProducts: Array<{ id: number; isInStock: boolean; stockQuantity: number }>,
+  lines: Array<{ productId: number | string; quantity: number }>,
+  currentProducts: Array<{ id?: number | string; _id?: any; legacyId?: number; isInStock: boolean; stockQuantity: number }>
 ) {
-  const productsById = new Map(currentProducts.map((product) => [product.id, product]));
+  const productsById = new Map(
+    currentProducts.flatMap((product) => {
+      const entries: [string, typeof product][] = [];
+      if (product.id !== undefined) entries.push([String(product.id), product]);
+      if (product.legacyId !== undefined) entries.push([String(product.legacyId), product]);
+      if (product._id !== undefined) entries.push([String(product._id), product]);
+      return entries;
+    })
+  );
+
   for (const line of lines) {
-    const product = productsById.get(line.productId);
+    const product = productsById.get(String(line.productId));
     if (!product || !product.isInStock || product.stockQuantity < line.quantity) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "One or more cart items no longer have enough stock." });
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "One or more cart items no longer have enough stock.",
+      });
     }
   }
 }
 
-function orderNumber() {
+function generateOrderNumber() {
   return `RAB-${Date.now().toString(36).toUpperCase()}-${nanoid(5).toUpperCase()}`;
 }
 
-export async function createOrder(identity: CartIdentity, input: {
-  customerName: string; customerPhone: string; districtArea: string; fullAddress: string;
-  paymentMethod: PaymentMethod; transactionId?: string; submittedAmountTaka?: number;
-}) {
-  const db = await getDb();
-  if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Checkout is temporarily unavailable." });
-  const [cart] = await db.select().from(carts).where(identity.userId ? eq(carts.userId, identity.userId) : eq(carts.anonymousToken, identity.anonymousToken!)).limit(1);
-  if (!cart) throw new TRPCError({ code: "BAD_REQUEST", message: "Your cart is empty." });
+export async function createOrder(
+  identity: CartIdentity,
+  input: {
+    customerName: string;
+    customerPhone: string;
+    districtArea: string;
+    fullAddress: string;
+    paymentMethod: PaymentMethod;
+    transactionId?: string;
+    submittedAmountTaka?: number;
+  }
+) {
+  await connectMongo();
 
-  const result = await db.transaction(async (tx) => {
-    const lines = await tx.select({ productId: cartItems.productId, quantity: cartItems.quantity }).from(cartItems).where(eq(cartItems.cartId, cart.id));
-    if (lines.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "Your cart is empty." });
-    const productIds = lines.map((line) => line.productId);
-    const currentProducts = await tx.select().from(products).where(inArray(products.id, productIds));
-    validateOrderStock(lines, currentProducts);
-    const productsById = new Map(currentProducts.map((product) => [product.id, product]));
-    const subtotalTaka = lines.reduce((sum, line) => sum + (productsById.get(line.productId)?.priceTaka ?? 0) * line.quantity, 0);
-    const deliveryChargeTaka = calculateDeliveryCharge(input.districtArea);
-    const totalTaka = subtotalTaka + deliveryChargeTaka;
-    assertManualPaymentEvidence(input.paymentMethod, input.transactionId, input.submittedAmountTaka);
-    const nextOrderNumber = orderNumber();
-    await tx.insert(orders).values({
-      orderNumber: nextOrderNumber, userId: identity.userId ?? null, customerName: input.customerName, customerPhone: input.customerPhone,
-      districtArea: input.districtArea, fullAddress: input.fullAddress, subtotalTaka, deliveryChargeTaka, totalTaka,
-      paymentMethod: input.paymentMethod, status: "pending",
-    });
-    const [order] = await tx.select().from(orders).where(eq(orders.orderNumber, nextOrderNumber)).limit(1);
-    if (!order) throw new Error("Order creation did not return a record.");
-    const imageRows = await tx.select({ productId: productImages.productId, imageUrl: productImages.storageUrl }).from(productImages)
-      .where(and(inArray(productImages.productId, productIds), eq(productImages.isCover, true)));
-    const coverByProduct = new Map(imageRows.map((image) => [image.productId, image.imageUrl]));
-    await tx.insert(orderItems).values(lines.map((line) => {
-      const product = productsById.get(line.productId)!;
-      return { orderId: order.id, productId: product.id, productName: product.name, sku: product.sku, imageUrl: coverByProduct.get(product.id) ?? null, unitPriceTaka: product.priceTaka, quantity: line.quantity, lineTotalTaka: product.priceTaka * line.quantity };
-    }));
-    await tx.insert(payments).values({ orderId: order.id, method: input.paymentMethod, expectedAmountTaka: totalTaka, submittedAmountTaka: manualPaymentRequired(input.paymentMethod) ? input.submittedAmountTaka ?? null : null, transactionId: manualPaymentRequired(input.paymentMethod) ? input.transactionId?.trim() ?? null : null });
-    await tx.insert(orderStatusHistory).values({ orderId: order.id, previousStatus: null, nextStatus: "pending", actorUserId: identity.userId ?? null, adminNote: "Order placed" });
-    for (const line of lines) {
-      const product = productsById.get(line.productId)!;
-      const nextStock = product.stockQuantity - line.quantity;
-      await tx.update(products).set({ stockQuantity: nextStock, isInStock: nextStock > 0 }).where(eq(products.id, product.id));
+  let userDoc = null;
+  let cartQuery: Record<string, unknown> = {};
+
+  if (identity.userId) {
+    userDoc = await UserModel.findOne(findUserQuery(identity.userId));
+    cartQuery = userDoc ? { userId: userDoc._id } : { userId: identity.userId };
+  } else if (identity.anonymousToken) {
+    cartQuery = { anonymousToken: identity.anonymousToken };
+  } else {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Your cart is empty." });
+  }
+
+  const cart = await CartModel.findOne(cartQuery).populate("items.productId");
+  if (!cart || !cart.items || cart.items.length === 0) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Your cart is empty." });
+  }
+
+  const orderItems = [];
+  let subtotalTaka = 0;
+
+  for (const item of cart.items) {
+    const product: any = item.productId;
+    if (!product || !product.isInStock || (product.stockQuantity || 0) < item.quantity) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Product ${product?.name || "in cart"} is out of stock.`,
+      });
     }
-    await tx.delete(cartItems).where(eq(cartItems.cartId, cart.id));
-    return {
-      order,
-      lines: lines.map((line) => ({
-        ...line,
-        name: productsById.get(line.productId)!.name,
-        lineTotalTaka: productsById.get(line.productId)!.priceTaka * line.quantity,
-      })),
-      totalTaka,
-      deliveryChargeTaka,
-    };
-  });
-  return {
-    orderNumber: result.order.orderNumber,
-    totalTaka: result.totalTaka,
-    deliveryChargeTaka: result.deliveryChargeTaka,
+
+    const coverImage = (product.images || []).find((img: any) => img.isCover) || (product.images || [])[0];
+    const unitPrice = product.priceTaka || 0;
+    const lineTotal = unitPrice * item.quantity;
+    subtotalTaka += lineTotal;
+
+    orderItems.push({
+      productId: product._id,
+      productName: product.name,
+      sku: product.sku,
+      imageUrl: coverImage ? coverImage.storageUrl : "",
+      unitPriceTaka: unitPrice,
+      quantity: item.quantity,
+      lineTotalTaka: lineTotal,
+    });
+  }
+
+  const deliveryChargeTaka = calculateDeliveryCharge(input.districtArea);
+  const totalTaka = subtotalTaka + deliveryChargeTaka;
+
+  assertManualPaymentEvidence(input.paymentMethod, input.transactionId, input.submittedAmountTaka);
+
+  const orderNum = generateOrderNumber();
+
+  const paymentRecord = {
+    method: input.paymentMethod,
+    expectedAmountTaka: totalTaka,
+    submittedAmountTaka: manualPaymentRequired(input.paymentMethod) ? input.submittedAmountTaka : undefined,
+    transactionId: manualPaymentRequired(input.paymentMethod) ? input.transactionId?.trim() : undefined,
+    createdAt: new Date(),
+  };
+
+  const statusHistoryRecord = {
+    previousStatus: undefined,
+    nextStatus: "pending" as const,
+    actorUserId: userDoc ? userDoc._id : undefined,
+    adminNote: "Order placed",
+    createdAt: new Date(),
+  };
+
+  const order = await OrderModel.create({
+    orderNumber: orderNum,
+    userId: userDoc ? userDoc._id : undefined,
+    customerName: input.customerName,
+    customerPhone: input.customerPhone,
+    districtArea: input.districtArea,
+    fullAddress: input.fullAddress,
+    subtotalTaka,
+    deliveryChargeTaka,
+    totalTaka,
     paymentMethod: input.paymentMethod,
-    items: result.lines.map((line) => ({ name: line.name, quantity: line.quantity, lineTotalTaka: line.lineTotalTaka })),
+    status: "pending",
+    items: orderItems,
+    payments: [paymentRecord],
+    statusHistory: [statusHistoryRecord],
+  });
+
+  // Decrement product stocks
+  for (const item of cart.items) {
+    const product: any = item.productId;
+    const nextStock = Math.max(0, (product.stockQuantity || 0) - item.quantity);
+    await ProductModel.updateOne(
+      { _id: product._id },
+      {
+        $set: {
+          stockQuantity: nextStock,
+          isInStock: nextStock > 0,
+        },
+      }
+    );
+  }
+
+  // Clear cart items
+  cart.items = [];
+  await cart.save();
+
+  return {
+    orderNumber: order.orderNumber,
+    totalTaka: order.totalTaka,
+    deliveryChargeTaka: order.deliveryChargeTaka,
+    paymentMethod: input.paymentMethod,
+    items: orderItems.map((line) => ({
+      name: line.productName,
+      quantity: line.quantity,
+      lineTotalTaka: line.lineTotalTaka,
+    })),
   };
 }
 
 export async function getOrderConfirmation(orderNumberValue: string) {
-  const db = await getDb();
-  if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Order lookup is temporarily unavailable." });
-  const [order] = await db.select({ orderNumber: orders.orderNumber, totalTaka: orders.totalTaka, deliveryChargeTaka: orders.deliveryChargeTaka, paymentMethod: orders.paymentMethod, status: orders.status, createdAt: orders.createdAt }).from(orders).where(eq(orders.orderNumber, orderNumberValue)).limit(1);
-  if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found." });
-  return order;
+  await connectMongo();
+  const order = await OrderModel.findOne(findOrderQuery(orderNumberValue)).lean();
+  if (!order) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Order not found." });
+  }
+
+  return {
+    orderNumber: order.orderNumber,
+    totalTaka: order.totalTaka,
+    deliveryChargeTaka: order.deliveryChargeTaka,
+    paymentMethod: order.paymentMethod,
+    status: order.status,
+    createdAt: order.createdAt,
+  };
 }
 
-export async function getCustomerOrderConfirmation(userId: number, orderNumberValue: string) {
-  const db = await getDb();
-  if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Order lookup is temporarily unavailable." });
-  const [order] = await db.select({ orderNumber: orders.orderNumber, totalTaka: orders.totalTaka, deliveryChargeTaka: orders.deliveryChargeTaka, paymentMethod: orders.paymentMethod, status: orders.status, createdAt: orders.createdAt })
-    .from(orders)
-    .where(and(eq(orders.userId, userId), eq(orders.orderNumber, orderNumberValue)))
-    .limit(1);
-  if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found." });
-  return order;
+export async function getCustomerOrderConfirmation(userId: string | number, orderNumberValue: string) {
+  await connectMongo();
+  const user = await UserModel.findOne(findUserQuery(userId));
+
+  const order = await OrderModel.findOne({
+    orderNumber: orderNumberValue,
+    ...(user ? { userId: user._id } : {}),
+  }).lean();
+
+  if (!order) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Order not found." });
+  }
+
+  return {
+    orderNumber: order.orderNumber,
+    totalTaka: order.totalTaka,
+    deliveryChargeTaka: order.deliveryChargeTaka,
+    paymentMethod: order.paymentMethod,
+    status: order.status,
+    createdAt: order.createdAt,
+  };
 }
 
-export async function getCustomerOrderDetail(userId: number, orderNumberValue: string) {
-  const db = await getDb();
-  if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Order details are temporarily unavailable." });
-  const [order] = await db.select().from(orders)
-    .where(and(eq(orders.userId, userId), eq(orders.orderNumber, orderNumberValue)))
-    .limit(1);
-  if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found." });
-  const [items, paymentRows, statusHistory] = await Promise.all([
-    db.select().from(orderItems).where(eq(orderItems.orderId, order.id)),
-    db.select().from(payments).where(eq(payments.orderId, order.id)).limit(1),
-    db.select({ id: orderStatusHistory.id, nextStatus: orderStatusHistory.nextStatus, adminNote: orderStatusHistory.adminNote, createdAt: orderStatusHistory.createdAt })
-      .from(orderStatusHistory)
-      .where(eq(orderStatusHistory.orderId, order.id))
-      .orderBy(asc(orderStatusHistory.createdAt)),
-  ]);
-  return { ...order, items, payment: paymentRows[0] ?? null, statusHistory };
+export async function getCustomerOrderDetail(userId: string | number, orderNumberValue: string) {
+  await connectMongo();
+  const user = await UserModel.findOne(findUserQuery(userId));
+
+  const order = await OrderModel.findOne({
+    orderNumber: orderNumberValue,
+    ...(user ? { userId: user._id } : {}),
+  }).lean();
+
+  if (!order) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Order not found." });
+  }
+
+  return {
+    id: order._id.toString(),
+    orderNumber: order.orderNumber,
+    customerName: order.customerName,
+    customerPhone: order.customerPhone,
+    districtArea: order.districtArea,
+    fullAddress: order.fullAddress,
+    subtotalTaka: order.subtotalTaka,
+    deliveryChargeTaka: order.deliveryChargeTaka,
+    totalTaka: order.totalTaka,
+    paymentMethod: order.paymentMethod,
+    status: order.status,
+    adminNote: order.adminNote,
+    createdAt: order.createdAt,
+    items: (order.items || []).map((item, idx) => ({
+      id: item._id ? item._id.toString() : idx + 1,
+      productId: item.productId?.toString(),
+      productName: item.productName,
+      sku: item.sku,
+      imageUrl: item.imageUrl,
+      unitPriceTaka: item.unitPriceTaka,
+      quantity: item.quantity,
+      lineTotalTaka: item.lineTotalTaka,
+    })),
+    payment: order.payments && order.payments[0] ? order.payments[0] : null,
+    statusHistory: (order.statusHistory || []).map((sh, idx) => ({
+      id: sh._id ? sh._id.toString() : idx + 1,
+      nextStatus: sh.nextStatus,
+      adminNote: sh.adminNote,
+      createdAt: sh.createdAt,
+    })),
+  };
 }
 
-export async function listCustomerOrders(userId: number) {
-  const db = await getDb();
-  if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Order history is temporarily unavailable." });
-  const customerOrders = await db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.createdAt));
-  if (customerOrders.length === 0) return [];
-  const items = await db.select().from(orderItems).where(inArray(orderItems.orderId, customerOrders.map((order) => order.id)));
-  return customerOrders.map((order) => ({ ...order, items: items.filter((item) => item.orderId === order.id) }));
+export async function listCustomerOrders(userId: string | number) {
+  await connectMongo();
+  const user = await UserModel.findOne(findUserQuery(userId));
+
+  if (!user) return [];
+
+  const customerOrders = await OrderModel.find({ userId: user._id })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return customerOrders.map((order) => ({
+    id: order._id.toString(),
+    orderNumber: order.orderNumber,
+    customerName: order.customerName,
+    customerPhone: order.customerPhone,
+    districtArea: order.districtArea,
+    fullAddress: order.fullAddress,
+    subtotalTaka: order.subtotalTaka,
+    deliveryChargeTaka: order.deliveryChargeTaka,
+    totalTaka: order.totalTaka,
+    paymentMethod: order.paymentMethod,
+    status: order.status,
+    adminNote: order.adminNote,
+    createdAt: order.createdAt,
+    items: (order.items || []).map((item, idx) => ({
+      id: item._id ? item._id.toString() : idx + 1,
+      orderId: order._id.toString(),
+      productId: item.productId?.toString(),
+      productName: item.productName,
+      sku: item.sku,
+      imageUrl: item.imageUrl,
+      unitPriceTaka: item.unitPriceTaka,
+      quantity: item.quantity,
+      lineTotalTaka: item.lineTotalTaka,
+    })),
+  }));
 }
