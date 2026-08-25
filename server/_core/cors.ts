@@ -22,8 +22,10 @@ export function isAllowedCorsOrigin(origin: string | undefined, requestOrigin: s
  * Express CORS middleware supporting decoupled Frontend on Vercel or localhost.
  */
 export function applyCorsPolicy(req: Request, res: Response, next: NextFunction) {
-  const origin = req.get("origin");
-  const requestOrigin = `${req.protocol}://${req.get("host")}`;
+  const origin = req.get ? req.get("origin") : (req.headers?.origin as string | undefined);
+  const host = req.get ? req.get("host") : (req.headers?.host as string | undefined) || "localhost";
+  const protocol = (req.headers && req.headers["x-forwarded-proto"]) || req.protocol || "https";
+  const requestOrigin = `${protocol}://${host}`;
 
   if (origin && isAllowedCorsOrigin(origin, requestOrigin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
