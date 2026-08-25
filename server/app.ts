@@ -35,8 +35,8 @@ export function createExpressApp(): express.Express {
     }
   });
 
-  // Health check endpoint (handles /api/health, /health, /api, /)
-  app.get(["/api/health", "/health", "/api", "/"], (req: Request, res: Response) => {
+  // Health check endpoint (handles /api/health, /health, /api)
+  app.get(["/api/health", "/health", "/api"], (req: Request, res: Response) => {
     const detectedKeys = Object.keys(process.env).filter((k) => {
       const upper = k.toUpperCase();
       return (

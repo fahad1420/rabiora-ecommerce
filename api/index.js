@@ -3269,7 +3269,7 @@ function createExpressApp() {
       next();
     }
   });
-  app2.get(["/api/health", "/health", "/api", "/"], (req, res) => {
+  app2.get(["/api/health", "/health", "/api"], (req, res) => {
     const detectedKeys = Object.keys(process.env).filter((k) => {
       const upper = k.toUpperCase();
       return upper.includes("MONGO") || upper.includes("DATABASE") || upper.includes("JWT") || upper.includes("SECRET") || upper.includes("CLOUDINARY") || upper.includes("CORS") || upper.includes("VERCEL");

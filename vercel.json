@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "outputDirectory": "dist/public",
   "rewrites": [
     {
       "source": "/api/(.*)",
@@ -10,7 +11,7 @@
       "destination": "/api/index.js"
     },
     {
-      "source": "/((?!api|uploads|assets|favicon.ico).*)",
+      "source": "/((?!api|uploads).*)",
       "destination": "/index.html"
     }
   ]
