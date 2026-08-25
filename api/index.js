@@ -22,7 +22,10 @@ async function connectMongo() {
   }
   if (!cached.promise) {
     const opts = {
-      bufferCommands: false
+      bufferCommands: false,
+      serverSelectionTimeoutMS: 5e3,
+      connectTimeoutMS: 5e3,
+      socketTimeoutMS: 1e4
     };
     cached.promise = mongoose.connect(uri, opts).then((m) => {
       console.log("[MongoDB] Successfully connected to database");
@@ -42,9 +45,11 @@ var cached;
 var init_db = __esm({
   "server/config/db.ts"() {
     "use strict";
-    try {
-      dns.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4"]);
-    } catch {
+    if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+      try {
+        dns.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4"]);
+      } catch {
+      }
     }
     cached = global.mongooseCache;
     if (!cached) {

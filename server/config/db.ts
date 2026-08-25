@@ -1,11 +1,14 @@
 import dns from "node:dns";
 import mongoose from "mongoose";
 
-// Set resilient DNS servers for MongoDB Atlas SRV lookups on environments with local DNS issues
-try {
-  dns.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4"]);
-} catch {
-  // Ignore if running in environment where setServers is restricted
+// Only override DNS servers in local development when needed for Windows DNS SRV lookup issues.
+// Never override DNS in Vercel / AWS Lambda environments as VPC firewalls block external UDP port 53.
+if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+  try {
+    dns.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4"]);
+  } catch {
+    // Ignore
+  }
 }
 
 interface MongooseCache {
@@ -39,6 +42,9 @@ export async function connectMongo(): Promise<typeof mongoose> {
   if (!cached!.promise) {
     const opts = {
       bufferCommands: false,
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+      socketTimeoutMS: 10000,
     };
 
     cached!.promise = mongoose.connect(uri, opts).then((m) => {
