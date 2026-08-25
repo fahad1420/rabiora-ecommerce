@@ -33,8 +33,8 @@ export function createExpressApp(): express.Express {
     }
   });
 
-  // Health check endpoint (handles both /api/health and /health under rewrites)
-  app.get(["/api/health", "/health"], (req: Request, res: Response) => {
+  // Health check endpoint (handles /api/health, /health, /api, /)
+  app.get(["/api/health", "/health", "/api", "/"], (req: Request, res: Response) => {
     res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
