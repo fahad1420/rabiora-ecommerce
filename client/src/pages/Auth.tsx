@@ -61,19 +61,26 @@ export function AuthPage({
     setError("");
 
     try {
+      let result;
       if (mode === "register") {
-        await register.mutateAsync({
+        result = await register.mutateAsync({
           name,
           phone,
           password,
           anonymousToken: getGuestCartToken(),
         });
       } else {
-        await login.mutateAsync({
+        result = await login.mutateAsync({
           phone,
           password,
           anonymousToken: getGuestCartToken(),
         });
+      }
+
+      if (result && "token" in result && typeof result.token === "string") {
+        try {
+          localStorage.setItem("rabiora_customer_token", result.token);
+        } catch {}
       }
 
       const guestWishlist = getGuestWishlist();
@@ -87,9 +94,14 @@ export function AuthPage({
       }
 
       await utils.customer.me.invalidate();
+      await utils.auth.me.invalidate();
       await utils.wishlist.list.invalidate();
 
-      navigate("/account");
+      if (result?.role === "admin") {
+        navigate("/admin");
+      } else {
+        navigate("/account");
+      }
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -391,11 +403,11 @@ export function AuthPage({
           )}
 
           <label>
-            {t("bangladeshPhone")}
+            {mode === "login" ? `${t("bangladeshPhone")} / Email` : t("bangladeshPhone")}
             <input
               required
-              inputMode="tel"
-              placeholder="01XXXXXXXXX"
+              inputMode={mode === "login" ? "text" : "tel"}
+              placeholder={mode === "login" ? "01XXXXXXXXX or email" : "01XXXXXXXXX"}
               value={phone}
               onChange={(event) =>
                 setPhone(event.target.value)

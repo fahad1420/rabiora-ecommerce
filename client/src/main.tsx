@@ -62,8 +62,12 @@ const trpcClient = trpc.createClient({
               return { Authorization: `Bearer ${token}` };
             }
           }
+          const customerToken = localStorage.getItem("rabiora_customer_token");
+          if (customerToken) {
+            return { Authorization: `Bearer ${customerToken}` };
+          }
         } catch {
-          // sessionStorage unavailable
+          // storage unavailable
         }
         return {};
       },

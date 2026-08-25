@@ -1467,10 +1467,7 @@ export default function Admin() {
     );
   }
 
-  if (
-    user &&
-    user.role !== "admin"
-  ) {
+  if (!user || user.role !== "admin") {
     return (
       <div className="admin-forbidden">
         <h1>
@@ -1478,17 +1475,27 @@ export default function Admin() {
         </h1>
 
         <p>
-          Your account is signed in but
-          does not have access to Rabiora
-          operations.
+          {!user
+            ? "Please sign in with your administrator credentials to access Rabiora operations."
+            : "Your account is signed in but does not have administrator privileges."}
         </p>
 
-        <Link
-          href="/"
-          className="btn"
-        >
-          Return to Storefront
-        </Link>
+        <div style={{ display: "flex", gap: "1rem", marginTop: "1rem", justifyContent: "center" }}>
+          {!user && (
+            <Link
+              href="/login"
+              className="btn"
+            >
+              Sign In as Admin
+            </Link>
+          )}
+          <Link
+            href="/"
+            className="btn-outline"
+          >
+            Return to Storefront
+          </Link>
+        </div>
       </div>
     );
   }

@@ -56,7 +56,7 @@ export async function verifyPassword(
   return bcrypt.compare(password, passwordHash);
 }
 
-async function signCustomerSession(user: RabioraCustomer) {
+export async function signCustomerSession(user: RabioraCustomer) {
   return new SignJWT({
     type: "rabiora_customer",
     role: user.role,
@@ -246,14 +246,38 @@ export async function createCustomer({
   };
 }
 
-export async function findCustomerByPhone(phone: string) {
-  const normalizedPhone = normalizeBangladeshPhone(phone);
-  if (!normalizedPhone) return null;
+export async function findCustomerByIdentifier(identifier: string) {
+  const trimmed = identifier.trim();
+  if (!trimmed) return null;
 
   await connectMongo();
-  const customer = await UserModel.findOne({ phone: normalizedPhone }).lean();
-  return customer ?? null;
+
+  // 1. Check if email
+  if (trimmed.includes("@")) {
+    const byEmail = await UserModel.findOne({ email: trimmed.toLowerCase() }).lean();
+    if (byEmail) return byEmail;
+  }
+
+  // 2. Check if normalized Bangladesh phone
+  const normalizedPhone = normalizeBangladeshPhone(trimmed);
+  if (normalizedPhone) {
+    const byPhone = await UserModel.findOne({ phone: normalizedPhone }).lean();
+    if (byPhone) return byPhone;
+  }
+
+  // 3. Fallback: query by exact phone, email, or openId
+  const fallback = await UserModel.findOne({
+    $or: [
+      { phone: trimmed },
+      { email: trimmed.toLowerCase() },
+      { openId: trimmed },
+    ],
+  }).lean();
+
+  return fallback ?? null;
 }
+
+export const findCustomerByPhone = findCustomerByIdentifier;
 
 export async function updateCustomerProfile(
   userId: string | number,

@@ -1,7 +1,10 @@
 import mongoose, { Types } from "mongoose";
 
 export function toObjectId(id: string | Types.ObjectId): Types.ObjectId {
-  return typeof id === "string" ? new mongoose.Types.ObjectId(id) : id;
+  if (typeof id !== "string") return id;
+  return Types.ObjectId.isValid(id)
+    ? Types.ObjectId.createFromHexString(id)
+    : new Types.ObjectId(id);
 }
 
 export function isValidObjectId(id: unknown): boolean {
@@ -15,7 +18,7 @@ export function findProductQuery(idOrLegacy: string | number): Record<string, an
     conditions.push({ legacyId: num });
   }
   if (typeof idOrLegacy === "string" && mongoose.isValidObjectId(idOrLegacy)) {
-    conditions.push({ _id: new mongoose.Types.ObjectId(idOrLegacy) });
+    conditions.push({ _id: Types.ObjectId.createFromHexString(idOrLegacy) });
   }
   if (conditions.length === 0) {
     conditions.push({ slug: String(idOrLegacy) });
@@ -26,7 +29,7 @@ export function findProductQuery(idOrLegacy: string | number): Record<string, an
 export function findUserQuery(idOrOpenId: string | number): Record<string, any> {
   const conditions: any[] = [{ openId: String(idOrOpenId) }];
   if (typeof idOrOpenId === "string" && mongoose.isValidObjectId(idOrOpenId)) {
-    conditions.push({ _id: new mongoose.Types.ObjectId(idOrOpenId) });
+    conditions.push({ _id: Types.ObjectId.createFromHexString(idOrOpenId) });
   }
   return conditions.length === 1 ? conditions[0] : { $or: conditions };
 }
@@ -34,8 +37,7 @@ export function findUserQuery(idOrOpenId: string | number): Record<string, any> 
 export function findOrderQuery(orderIdOrNumber: string | number): Record<string, any> {
   const conditions: any[] = [{ orderNumber: String(orderIdOrNumber) }];
   if (typeof orderIdOrNumber === "string" && mongoose.isValidObjectId(orderIdOrNumber)) {
-    conditions.push({ _id: new mongoose.Types.ObjectId(orderIdOrNumber) });
+    conditions.push({ _id: Types.ObjectId.createFromHexString(orderIdOrNumber) });
   }
   return conditions.length === 1 ? conditions[0] : { $or: conditions };
 }
-

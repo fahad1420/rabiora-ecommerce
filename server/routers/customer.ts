@@ -5,12 +5,14 @@ import {
   clearCustomerSession,
   createCustomer,
   createPasswordResetRequest,
+  findCustomerByIdentifier,
   findCustomerByPhone,
   getCustomerFromRequest,
   isValidCustomerPassword,
   normalizeBangladeshPhone,
   resetCustomerPassword,
   setCustomerSession,
+  signCustomerSession,
   updateCustomerProfile,
   verifyPassword,
 } from "../customerSession";
@@ -47,6 +49,19 @@ const guestTokenSchema = z
   .optional();
 
 const idSchema = z.union([z.number(), z.string()]);
+
+const loginIdentifierSchema = z
+  .string()
+  .trim()
+  .min(3)
+  .max(120)
+  .refine(
+    (value) =>
+      Boolean(normalizeBangladeshPhone(value)) ||
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ||
+      value.startsWith("admin_"),
+    "Enter a valid Bangladesh phone number or email address."
+  );
 
 export const customerRouter = router({
   me: publicProcedure.query(
@@ -100,7 +115,7 @@ export const customerRouter = router({
   login: publicProcedure
     .input(
       z.object({
-        phone: phoneSchema,
+        phone: loginIdentifierSchema,
         password: z.string().min(1).max(72),
         anonymousToken: guestTokenSchema,
       })
@@ -110,7 +125,7 @@ export const customerRouter = router({
 
       enforceAuthRateLimit(rateKey);
 
-      const customer = await findCustomerByPhone(
+      const customer = await findCustomerByIdentifier(
         input.phone
       );
 
@@ -150,9 +165,14 @@ export const customerRouter = router({
         ctx.req
       );
 
+      const token = await signCustomerSession(sessionCustomer);
+
       resetAuthRateLimit(rateKey);
 
-      return sessionCustomer;
+      return {
+        ...sessionCustomer,
+        token,
+      };
     }),
 
   logout: publicProcedure.mutation(({ ctx }) => {
