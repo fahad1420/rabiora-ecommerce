@@ -31,8 +31,7 @@ export async function connectMongo(): Promise<typeof mongoose> {
   const uri = process.env.MONGODB_URI || process.env.DATABASE_URL || "";
 
   if (!uri) {
-    console.warn("[MongoDB] MONGODB_URI not defined. Database operations may fail.");
-    return mongoose;
+    throw new Error("[MongoDB] MONGODB_URI environment variable is not configured in environment.");
   }
 
   if (cached!.conn && mongoose.connection.readyState === 1) {

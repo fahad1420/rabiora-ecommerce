@@ -14,8 +14,7 @@ import mongoose from "mongoose";
 async function connectMongo() {
   const uri = process.env.MONGODB_URI || process.env.DATABASE_URL || "";
   if (!uri) {
-    console.warn("[MongoDB] MONGODB_URI not defined. Database operations may fail.");
-    return mongoose;
+    throw new Error("[MongoDB] MONGODB_URI environment variable is not configured in environment.");
   }
   if (cached.conn && mongoose.connection.readyState === 1) {
     return cached.conn;
@@ -3220,7 +3219,18 @@ function createExpressApp() {
     }
   });
   app2.get(["/api/health", "/health", "/api", "/"], (req, res) => {
-    res.status(200).json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
+    res.status(200).json({
+      status: "ok",
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      env: {
+        hasMongoUri: Boolean(process.env.MONGODB_URI || process.env.DATABASE_URL),
+        hasJwtSecret: Boolean(process.env.JWT_SECRET),
+        hasCloudinary: Boolean(
+          process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET || process.env.CLOUDINARY_URL
+        ),
+        nodeEnv: process.env.NODE_ENV
+      }
+    });
   });
   registerOAuthRoutes(app2);
   app2.use(

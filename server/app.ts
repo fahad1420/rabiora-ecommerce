@@ -35,7 +35,19 @@ export function createExpressApp(): express.Express {
 
   // Health check endpoint (handles /api/health, /health, /api, /)
   app.get(["/api/health", "/health", "/api", "/"], (req: Request, res: Response) => {
-    res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+    res.status(200).json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      env: {
+        hasMongoUri: Boolean(process.env.MONGODB_URI || process.env.DATABASE_URL),
+        hasJwtSecret: Boolean(process.env.JWT_SECRET),
+        hasCloudinary: Boolean(
+          (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) ||
+          process.env.CLOUDINARY_URL
+        ),
+        nodeEnv: process.env.NODE_ENV,
+      },
+    });
   });
 
   // OAuth routes if configured
