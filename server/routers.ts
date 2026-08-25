@@ -1,4 +1,4 @@
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME } from "../shared/const";
 import { z } from "zod";
 import { getCatalogueProduct, listCatalogue } from "./catalogue";
 import { cartRouter, customerRouter } from "./routers/customer";
