@@ -138,6 +138,7 @@ export default function ProductDetail() {
                   className="main-image"
                   src={mainImage.storageUrl}
                   alt={mainImage.altText}
+                  decoding="async"
                 />
               ) : (
                 <div className="image-fallback detail-fallback">
@@ -175,6 +176,8 @@ export default function ProductDetail() {
                       <img
                         src={image.storageUrl}
                         alt=""
+                        loading="lazy"
+                        decoding="async"
                       />
                     </button>
                   ),

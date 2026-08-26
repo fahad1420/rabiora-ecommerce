@@ -33,3 +33,4 @@ SubscriberSchema.index({ email: 1, phone: 1 }, { unique: true });
 
 export const SubscriberModel: Model<ISubscriber> =
   mongoose.models.Subscriber || mongoose.model<ISubscriber>("Subscriber", SubscriberSchema);
+

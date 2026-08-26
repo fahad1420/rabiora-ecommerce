@@ -13,8 +13,9 @@ export function OfferBannerSlider() {
     if (activeOffers.length <= 1 || isPaused) return;
 
     const timer = setInterval(() => {
+      if (document.hidden) return;
       setCurrentIndex((prev) => (prev + 1) % activeOffers.length);
-    }, 5000);
+    }, 6000);
 
     return () => clearInterval(timer);
   }, [activeOffers.length, isPaused]);
@@ -75,6 +76,7 @@ export function OfferBannerSlider() {
               src={current.imageUrl}
               alt={current.title}
               loading="lazy"
+              decoding="async"
               className="offer-banner-img"
             />
           </div>
@@ -118,3 +120,4 @@ export function OfferBannerSlider() {
     </section>
   );
 }
+

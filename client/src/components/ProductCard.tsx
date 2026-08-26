@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Heart, ShoppingBag, ShoppingCart, Zap } from "lucide-react";
 import { Link } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -18,7 +19,7 @@ export type CatalogueProductCard = {
 
 const taka = (amount: number) => `৳${amount.toLocaleString("en-BD")}`;
 
-export function ProductCard({
+export const ProductCard = memo(function ProductCard({
   product,
   onAddCart,
   onBuyNow,
@@ -58,6 +59,7 @@ export function ProductCard({
               src={coverImage.storageUrl}
               alt={coverImage.altText || product.name}
               loading="lazy"
+              decoding="async"
             />
           ) : (
             <div className="image-fallback">{t("imageUnavailable")}</div>
@@ -114,4 +116,4 @@ export function ProductCard({
       </div>
     </article>
   );
-}
+});

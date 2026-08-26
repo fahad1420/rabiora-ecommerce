@@ -10,7 +10,7 @@ import {
   Sparkles,
   Truck,
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { ProductCard } from "@/components/ProductCard";
 import { RabioraFooter } from "@/components/RabioraFooter";
@@ -71,7 +71,17 @@ export default function Home() {
   const reviewsQuery = trpc.customer.homeReviews.useQuery();
 
   useEffect(() => {
-    const onScroll = () => setShowBackToTop(window.scrollY > 420);
+    let ticking = false;
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const shouldShow = window.scrollY > 420;
+          setShowBackToTop((prev) => (prev !== shouldShow ? shouldShow : prev));
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -83,16 +93,22 @@ export default function Home() {
     return [...images, ...images];
   }, [featuredQuery.data]);
 
-  const addCart = (productId: number | string) => cart.add(productId);
+  const addCart = useCallback((productId: number | string) => {
+    cart.add(productId);
+  }, [cart.add]);
 
-  const handleBuyNow = (productId: number | string) => {
+  const handleBuyNow = useCallback((productId: number | string) => {
     const targetUrl = `/checkout?buyNowProductId=${productId}&qty=1`;
     if (!customer.data) {
       navigate(`/login?redirect=${encodeURIComponent(targetUrl)}`);
     } else {
       navigate(targetUrl);
     }
-  };
+  }, [customer.data, navigate]);
+
+  const toggleWishlist = useCallback((id: number | string) => {
+    wishlist.toggle(id);
+  }, [wishlist.toggle]);
 
   const handleSubscribe = async (e: FormEvent) => {
     e.preventDefault();
@@ -184,6 +200,7 @@ export default function Home() {
                     alt={image.altText}
                     key={`${image.storageUrl}-${index}`}
                     loading="lazy"
+                    decoding="async"
                   />
                 ))}
               </div>
@@ -234,7 +251,7 @@ export default function Home() {
                     product={product}
                     onAddCart={addCart}
                     onBuyNow={handleBuyNow}
-                    onToggleWishlist={(id) => wishlist.toggle(id)}
+                    onToggleWishlist={toggleWishlist}
                     wishlisted={wishlist.ids.includes(product.id)}
                   />
                 ))}

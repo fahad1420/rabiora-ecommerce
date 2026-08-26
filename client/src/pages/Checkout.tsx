@@ -109,7 +109,6 @@ export default function Checkout() {
 
       if (order.clickToWhatsAppUrl) {
         sessionStorage.setItem(`rabiora_order_whatsapp_${order.orderNumber}`, order.clickToWhatsAppUrl);
-        window.open(order.clickToWhatsAppUrl, "_blank", "noopener,noreferrer");
       }
 
       navigate(`/order-confirmation/${order.orderNumber}`);

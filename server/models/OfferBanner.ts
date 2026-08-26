@@ -31,3 +31,4 @@ const OfferBannerSchema = new Schema<IOfferBanner>(
 
 export const OfferBannerModel: Model<IOfferBanner> =
   mongoose.models.OfferBanner || mongoose.model<IOfferBanner>("OfferBanner", OfferBannerSchema);
+
