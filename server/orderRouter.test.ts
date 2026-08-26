@@ -43,8 +43,8 @@ const checkoutInput = {
   paymentMethod: "Cash on Delivery" as const,
 };
 
-function caller() {
-  return orderRouter.createCaller({ user: null, req: {} as TrpcContext["req"], res: {} as TrpcContext["res"] });
+function caller(user: any = { id: 41, name: "Acceptance Customer", phone: "+8801700000000", role: "user" }) {
+  return orderRouter.createCaller({ user, req: {} as TrpcContext["req"], res: {} as TrpcContext["res"] });
 }
 
 describe("checkout router validation and handoff contract", () => {
@@ -65,8 +65,12 @@ describe("checkout router validation and handoff contract", () => {
   it("creates an order through the validated route and returns a Click-to-WhatsApp handoff URL", async () => {
     const result = await caller().checkout(checkoutInput);
     expect(orderService.createOrder).toHaveBeenCalledWith({ anonymousToken }, expect.objectContaining({ customerName: "Acceptance Customer", customerPhone: "+8801700000000", paymentMethod: "Cash on Delivery" }));
-    expect(orderService.setGuestOrderConfirmation).toHaveBeenCalledWith(expect.anything(), "RAB-ACCEPT-001");
     expect(result).toMatchObject({ orderNumber: "RAB-ACCEPT-001", clickToWhatsAppUrl: expect.stringContaining("https://wa.me/8801349529274?text=") });
+  });
+
+  it("rejects unauthenticated checkout attempts", async () => {
+    await expect(caller(null).checkout(checkoutInput)).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(orderService.createOrder).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid Bangladesh phone number before creating an order", async () => {
@@ -82,22 +86,22 @@ describe("checkout router validation and handoff contract", () => {
   it("accepts confirmation lookups for generated order numbers containing underscores", async () => {
     orderService.hasGuestOrderConfirmationAccess.mockResolvedValue(true);
     orderService.getOrderConfirmation.mockResolvedValue({ orderNumber: "RAB-MSS7IVDJ-E5P_P", totalTaka: 1590, deliveryChargeTaka: 0, paymentMethod: "Cash on Delivery", status: "pending" });
-    await expect(caller().confirmation({ orderNumber: "RAB-MSS7IVDJ-E5P_P" })).resolves.toMatchObject({ orderNumber: "RAB-MSS7IVDJ-E5P_P" });
+    await expect(caller(null).confirmation({ orderNumber: "RAB-MSS7IVDJ-E5P_P" })).resolves.toMatchObject({ orderNumber: "RAB-MSS7IVDJ-E5P_P" });
     expect(orderService.getOrderConfirmation).toHaveBeenCalledWith("RAB-MSS7IVDJ-E5P_P");
   });
 
   it("rejects guest confirmation lookup without the matching session-bound confirmation proof", async () => {
-    await expect(caller().confirmation({ orderNumber: "RAB-MSS7IVDJ-E5P_P" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller(null).confirmation({ orderNumber: "RAB-MSS7IVDJ-E5P_P" })).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(orderService.getOrderConfirmation).not.toHaveBeenCalled();
   });
 
   it("rejects guest access to protected customer order details", async () => {
-    await expect(caller().detail({ orderNumber: "RAB-MSS7IVDJ-E5P_P" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller(null).detail({ orderNumber: "RAB-MSS7IVDJ-E5P_P" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     expect(orderService.getCustomerOrderDetail).not.toHaveBeenCalled();
   });
 
   it("rejects guest access to customer order history", async () => {
-    await expect(caller().mine()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller(null).mine()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     expect(orderService.listCustomerOrders).not.toHaveBeenCalled();
   });
 

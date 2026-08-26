@@ -22,12 +22,15 @@ import {
 import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
+  CreditCard,
   LayoutDashboard,
   LogOut,
+  MailCheck,
   MessageSquare,
   Package,
   PanelLeft,
   ShoppingBag,
+  Sparkles,
   Tags,
   Users,
 } from "lucide-react";
@@ -66,6 +69,21 @@ const menuItems = [
     icon: MessageSquare,
     label: "Reviews",
     path: "/admin/reviews",
+  },
+  {
+    icon: Sparkles,
+    label: "Offer Banners",
+    path: "/admin/offers",
+  },
+  {
+    icon: MailCheck,
+    label: "Subscribers",
+    path: "/admin/subscribers",
+  },
+  {
+    icon: CreditCard,
+    label: "Payment & Settings",
+    path: "/admin/settings",
   },
 ];
 

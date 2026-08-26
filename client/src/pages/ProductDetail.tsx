@@ -1,6 +1,6 @@
 import { Heart, ShoppingCart, Star } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useRoute } from "wouter";
+import { useLocation, useRoute } from "wouter";
 
 import { ProductCard } from "@/components/ProductCard";
 import { RabioraFooter } from "@/components/RabioraFooter";
@@ -15,10 +15,12 @@ const taka = (amount: number) =>
 
 export default function ProductDetail() {
   const [, params] = useRoute("/products/:slug");
+  const [, navigate] = useLocation();
   const slug = params?.slug ?? "";
 
   const cart = useRabioraCart();
   const wishlist = useRabioraWishlist();
+  const customer = trpc.customer.me.useQuery();
   const { t } = useLanguage();
 
   const productQuery = trpc.catalogue.bySlug.useQuery(
@@ -58,6 +60,17 @@ export default function ProductDetail() {
 
   const addCart = (productId: number | string) =>
     cart.add(productId);
+
+  const handleBuyNow = (productId?: number | string) => {
+    const id = productId ?? product?.id;
+    if (!id) return;
+    const targetUrl = `/checkout?buyNowProductId=${id}&qty=1`;
+    if (!customer.data) {
+      navigate(`/login?redirect=${encodeURIComponent(targetUrl)}`);
+    } else {
+      navigate(targetUrl);
+    }
+  };
 
   const reviews = reviewsQuery.data ?? [];
 
@@ -299,7 +312,7 @@ export default function ProductDetail() {
                     !product.isInStock
                   }
                   onClick={() =>
-                    addCart(product.id)
+                    handleBuyNow()
                   }
                 >
                   {t("buyNow")}
@@ -503,6 +516,7 @@ export default function ProductDetail() {
                     key={item.id}
                     product={item}
                     onAddCart={addCart}
+                    onBuyNow={handleBuyNow}
                     onToggleWishlist={(id) =>
                       wishlist.toggle(id)
                     }

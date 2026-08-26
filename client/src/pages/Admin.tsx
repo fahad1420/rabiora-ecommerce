@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -755,16 +755,11 @@ function OrderManager() {
   const utils = trpc.useUtils();
   const orders = trpc.admin.orders.list.useQuery();
 
-  const advance =
-    trpc.admin.orders.advanceStatus.useMutation({
-      onSuccess: () =>
-        utils.admin.orders.list.invalidate(),
-    });
+  const advance = trpc.admin.orders.advanceStatus.useMutation({
+    onSuccess: () => utils.admin.orders.list.invalidate(),
+  });
 
-  const next: Record<
-    string,
-    "confirmed" | "shipped" | "delivered" | undefined
-  > = {
+  const next: Record<string, "confirmed" | "shipped" | "delivered" | undefined> = {
     pending: "confirmed",
     confirmed: "shipped",
     shipped: "delivered",
@@ -788,68 +783,60 @@ function OrderManager() {
         ) : (
           <div className="admin-order-list">
             {orders.data?.map((order) => (
-              <article
-                key={order.id}
-                className="admin-order"
-              >
+              <article key={order.id} className="admin-order">
                 <div className="order-topline">
                   <div>
-                    <strong>
-                      {order.orderNumber}
-                    </strong>
-
-                    <small>
-                      {new Date(
-                        order.createdAt,
-                      ).toLocaleString()}
-                    </small>
+                    <strong>{order.orderNumber}</strong>
+                    <small>{new Date(order.createdAt).toLocaleString("en-BD")}</small>
                   </div>
 
-                  <span
-                    className={`status-pill status-${order.status}`}
-                  >
-                    {order.status}
-                  </span>
+                  <span className={`status-pill status-${order.status}`}>{order.status}</span>
                 </div>
 
                 <p>
-                  <strong>
-                    {order.customerName}
-                  </strong>{" "}
-                  · {order.customerPhone}
+                  <strong>{order.customerName}</strong> · {order.customerPhone}
                 </p>
 
                 <p>
-                  {order.districtArea},{" "}
-                  {order.fullAddress}
+                  {order.districtArea}, {order.fullAddress}
                 </p>
 
-                <ul>
+                <div className="admin-order-items-grid">
                   {order.items.map((item) => (
-                    <li key={item.id}>
-                      {item.quantity} ×{" "}
-                      {item.productName} —{" "}
-                      {taka(item.lineTotalTaka)}
-                    </li>
+                    <div className="admin-order-item-card" key={item.id}>
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.productName}
+                          className="admin-order-item-img"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="admin-order-item-fallback">👗</div>
+                      )}
+                      <div className="admin-order-item-info">
+                        <strong>{item.productName}</strong>
+                        {item.sku && <small className="sku-tag">SKU: {item.sku}</small>}
+                        <span>
+                          {item.quantity} × {taka(item.unitPriceTaka)} = <strong>{taka(item.lineTotalTaka)}</strong>
+                        </span>
+                      </div>
+                    </div>
                   ))}
-                </ul>
+                </div>
 
                 <div className="order-payment">
-                  <span>
-                    {order.paymentMethod}
-                  </span>
+                  <span>Method: <strong>{order.paymentMethod}</strong></span>
 
                   {order.payment && (
                     <span>
                       {order.payment.transactionId
-                        ? `Txn: ${order.payment.transactionId}`
-                        : "No transaction ID"}
+                        ? `TrxID: ${order.payment.transactionId} (Paid: ${taka(order.payment.submittedAmountTaka || 0)})`
+                        : "No TrxID (COD)"}
                     </span>
                   )}
 
-                  <strong>
-                    {taka(order.totalTaka)}
-                  </strong>
+                  <strong>Total: {taka(order.totalTaka)}</strong>
                 </div>
 
                 {next[order.status] && (
@@ -859,8 +846,7 @@ function OrderManager() {
                     onClick={() =>
                       advance.mutate({
                         orderId: order.id,
-                        nextStatus:
-                          next[order.status]!,
+                        nextStatus: next[order.status]!,
                       })
                     }
                   >
@@ -1447,17 +1433,451 @@ function CustomerDetailManager() {
   );
 }
 
+function PaymentSettingsManager() {
+  const utils = trpc.useUtils();
+  const settings = trpc.settings.get.useQuery();
+  const updateSettings = trpc.admin.settings.update.useMutation({
+    onSuccess: () => {
+      utils.settings.get.invalidate();
+      setSavedStatus("Payment & Hero settings updated successfully!");
+      setTimeout(() => setSavedStatus(""), 4000);
+    },
+  });
+
+  const [bkashNumber, setBkashNumber] = useState("+8801349529274");
+  const [nagadNumber, setNagadNumber] = useState("+8801349529274");
+  const [rocketNumber, setRocketNumber] = useState("+8801349529274");
+  const [heroBadge, setHeroBadge] = useState("Premium Collection");
+  const [heroHeading, setHeroHeading] = useState("RABIORA");
+  const [heroTagline, setHeroTagline] = useState("Elegance • Comfort • Confidence");
+  const [savedStatus, setSavedStatus] = useState("");
+
+  useEffect(() => {
+    if (settings.data) {
+      setBkashNumber(settings.data.bkashNumber || "+8801349529274");
+      setNagadNumber(settings.data.nagadNumber || "+8801349529274");
+      setRocketNumber(settings.data.rocketNumber || "+8801349529274");
+      setHeroBadge(settings.data.heroBadge || "Premium Collection");
+      setHeroHeading(settings.data.heroHeading || "RABIORA");
+      setHeroTagline(settings.data.heroTagline || "Elegance • Comfort • Confidence");
+    }
+  }, [settings.data]);
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    updateSettings.mutate({
+      bkashNumber,
+      nagadNumber,
+      rocketNumber,
+      heroBadge,
+      heroHeading,
+      heroTagline,
+    });
+  };
+
+  return (
+    <div className="admin-stack">
+      <section className="admin-heading">
+        <div>
+          <p>System Configuration</p>
+          <h1>Payment & Site Settings</h1>
+        </div>
+      </section>
+
+      <form className="admin-form" onSubmit={handleSubmit}>
+        <h2>Payment Wallet Numbers</h2>
+        <p className="muted">These numbers are displayed live at checkout for customer transfers.</p>
+
+        <div className="admin-field-pair">
+          <label>
+            bKash Number (Personal/Merchant)
+            <input
+              required
+              value={bkashNumber}
+              onChange={(e) => setBkashNumber(e.target.value)}
+              placeholder="+8801XXXXXXXXX"
+            />
+          </label>
+
+          <label>
+            Nagad Number
+            <input
+              required
+              value={nagadNumber}
+              onChange={(e) => setNagadNumber(e.target.value)}
+              placeholder="+8801XXXXXXXXX"
+            />
+          </label>
+        </div>
+
+        <label>
+          Rocket Number
+          <input
+            required
+            value={rocketNumber}
+            onChange={(e) => setRocketNumber(e.target.value)}
+            placeholder="+8801XXXXXXXXX"
+          />
+        </label>
+
+        <h2 style={{ marginTop: "1rem" }}>Hero Brand Messaging</h2>
+
+        <div className="admin-field-pair">
+          <label>
+            Hero Badge
+            <input
+              value={heroBadge}
+              onChange={(e) => setHeroBadge(e.target.value)}
+              placeholder="Premium Collection"
+            />
+          </label>
+
+          <label>
+            Hero Brand Heading
+            <input
+              value={heroHeading}
+              onChange={(e) => setHeroHeading(e.target.value)}
+              placeholder="RABIORA"
+            />
+          </label>
+        </div>
+
+        <label>
+          Hero Tagline
+          <input
+            value={heroTagline}
+            onChange={(e) => setHeroTagline(e.target.value)}
+            placeholder="Elegance • Comfort • Confidence"
+          />
+        </label>
+
+        {savedStatus && <p className="form-success" role="status">{savedStatus}</p>}
+
+        <button className="btn" disabled={updateSettings.isPending}>
+          {updateSettings.isPending ? "Saving Settings..." : "Save Settings"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function OfferBannersManager() {
+  const utils = trpc.useUtils();
+  const offers = trpc.admin.offers.list.useQuery();
+
+  const create = trpc.admin.offers.create.useMutation({
+    onSuccess: () => {
+      utils.admin.offers.list.invalidate();
+      utils.offers.list.invalidate();
+      resetForm();
+    },
+  });
+
+  const update = trpc.admin.offers.update.useMutation({
+    onSuccess: () => {
+      utils.admin.offers.list.invalidate();
+      utils.offers.list.invalidate();
+      resetForm();
+    },
+  });
+
+  const remove = trpc.admin.offers.delete.useMutation({
+    onSuccess: () => {
+      utils.admin.offers.list.invalidate();
+      utils.offers.list.invalidate();
+    },
+  });
+
+  const uploadImage = trpc.admin.offers.uploadImage.useMutation();
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [title, setTitle] = useState("");
+  const [subtitle, setSubtitle] = useState("");
+  const [badge, setBadge] = useState("Special Offer");
+  const [discountCode, setDiscountCode] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [linkUrl, setLinkUrl] = useState("/#products");
+  const [isActive, setIsActive] = useState(true);
+  const [displayOrder, setDisplayOrder] = useState(0);
+
+  const resetForm = () => {
+    setEditingId(null);
+    setTitle("");
+    setSubtitle("");
+    setBadge("Special Offer");
+    setDiscountCode("");
+    setImageUrl("");
+    setLinkUrl("/#products");
+    setIsActive(true);
+    setDisplayOrder(0);
+  };
+
+  const handleEdit = (banner: any) => {
+    setEditingId(banner.id);
+    setTitle(banner.title);
+    setSubtitle(banner.subtitle || "");
+    setBadge(banner.badge || "Special Offer");
+    setDiscountCode(banner.discountCode || "");
+    setImageUrl(banner.imageUrl);
+    setLinkUrl(banner.linkUrl || "/#products");
+    setIsActive(banner.isActive);
+    setDisplayOrder(banner.displayOrder || 0);
+  };
+
+  const handleImageFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUri = reader.result as string;
+      const uploaded = await uploadImage.mutateAsync({ dataUri, fileName: file.name });
+      setImageUrl(uploaded.storageUrl);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (editingId) {
+      update.mutate({
+        id: editingId,
+        title,
+        subtitle,
+        badge,
+        discountCode,
+        imageUrl,
+        linkUrl,
+        isActive,
+        displayOrder,
+      });
+    } else {
+      create.mutate({
+        title,
+        subtitle,
+        badge,
+        discountCode,
+        imageUrl: imageUrl || "/uploads/images/branding/rabiora-logo.jpeg",
+        linkUrl,
+        isActive,
+        displayOrder,
+      });
+    }
+  };
+
+  return (
+    <div className="admin-stack">
+      <section className="admin-heading">
+        <div>
+          <p>Storefront Promotions</p>
+          <h1>Offer Banners</h1>
+        </div>
+      </section>
+
+      <div className="admin-grid">
+        <form className="admin-form" onSubmit={handleSubmit}>
+          <h2>{editingId ? "Edit Offer Banner" : "New Offer Banner"}</h2>
+
+          <label>
+            Offer Title
+            <input
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g., 10% OFF on bKash Payment"
+            />
+          </label>
+
+          <label>
+            Subtitle / Description
+            <input
+              value={subtitle}
+              onChange={(e) => setSubtitle(e.target.value)}
+              placeholder="Exclusive Rabiora Pakistani Three-Piece Discount"
+            />
+          </label>
+
+          <div className="admin-field-pair">
+            <label>
+              Badge Text
+              <input
+                value={badge}
+                onChange={(e) => setBadge(e.target.value)}
+                placeholder="Special Offer"
+              />
+            </label>
+
+            <label>
+              Discount Coupon Code
+              <input
+                value={discountCode}
+                onChange={(e) => setDiscountCode(e.target.value)}
+                placeholder="BKASH10"
+              />
+            </label>
+          </div>
+
+          <label>
+            Banner Image (Upload or Cloudinary URL)
+            <input type="file" accept="image/*" onChange={handleImageFile} />
+            {uploadImage.isPending && <small>Uploading to Cloudinary...</small>}
+            <input
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="https://res.cloudinary.com/..."
+              style={{ marginTop: "6px" }}
+            />
+          </label>
+
+          <div className="admin-field-pair">
+            <label>
+              Link URL
+              <input
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                placeholder="/#products"
+              />
+            </label>
+
+            <label>
+              Sort Order
+              <input
+                type="number"
+                value={displayOrder}
+                onChange={(e) => setDisplayOrder(Number(e.target.value))}
+              />
+            </label>
+          </div>
+
+          <label className="admin-checkbox">
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
+            />
+            <span>Active on Storefront</span>
+          </label>
+
+          <div className="admin-actions">
+            <button className="btn" disabled={create.isPending || update.isPending}>
+              {editingId ? "Update Banner" : "Create Banner"}
+            </button>
+            {editingId && (
+              <button type="button" className="btn-outline" onClick={resetForm}>
+                Cancel
+              </button>
+            )}
+          </div>
+        </form>
+
+        <section className="admin-list-card">
+          <h2>Active & Configured Banners</h2>
+          {offers.isLoading ? (
+            <p>Loading banners...</p>
+          ) : offers.data?.length === 0 ? (
+            <p>No offer banners created yet.</p>
+          ) : (
+            <div className="admin-product-list">
+              {offers.data?.map((banner) => (
+                <article key={banner.id} className="admin-product-row">
+                  <img src={banner.imageUrl} alt={banner.title} />
+                  <div>
+                    <strong>{banner.title}</strong>
+                    {banner.subtitle && <p>{banner.subtitle}</p>}
+                    <small>
+                      Badge: <strong>{banner.badge}</strong> • Code: <strong>{banner.discountCode || "None"}</strong> • Order: {banner.displayOrder}
+                    </small>
+                    <small>
+                      Status: <span className={`status-pill ${banner.isActive ? "status-confirmed" : "status-pending"}`}>{banner.isActive ? "Active" : "Hidden"}</span>
+                    </small>
+                  </div>
+                  <div className="row-actions">
+                    <button type="button" onClick={() => handleEdit(banner)}>Edit</button>
+                    <button
+                      type="button"
+                      className="danger"
+                      onClick={() => {
+                        if (window.confirm("Delete this banner?")) {
+                          remove.mutate({ id: banner.id });
+                        }
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function SubscribersManager() {
+  const utils = trpc.useUtils();
+  const subscribers = trpc.admin.subscribers.list.useQuery();
+  const remove = trpc.admin.subscribers.delete.useMutation({
+    onSuccess: () => utils.admin.subscribers.list.invalidate(),
+  });
+
+  return (
+    <div className="admin-stack">
+      <section className="admin-heading">
+        <div>
+          <p>Audience Management</p>
+          <h1>Newsletter Subscribers</h1>
+        </div>
+        <span className="status-pill status-confirmed">
+          {subscribers.data?.length ?? 0} Subscribers
+        </span>
+      </section>
+
+      <section className="admin-list-card">
+        {subscribers.isLoading ? (
+          <p>Loading subscribers...</p>
+        ) : subscribers.data?.length === 0 ? (
+          <p>No subscribers have signed up yet.</p>
+        ) : (
+          <div className="admin-order-list">
+            {subscribers.data?.map((sub) => (
+              <article key={sub.id} className="admin-order">
+                <div className="order-topline">
+                  <div>
+                    <strong>{sub.email}</strong>
+                    <small>Subscribed: {new Date(sub.createdAt).toLocaleDateString("en-BD")}</small>
+                  </div>
+                  <span className="status-pill status-confirmed">
+                    {sub.residency === "inside_bangladesh" ? "🇧🇩 Bangladesh" : "🌍 International"}
+                  </span>
+                </div>
+                <p><strong>Mobile:</strong> {sub.phone}</p>
+                <div className="row-actions" style={{ justifyContent: "flex-end" }}>
+                  <button
+                    type="button"
+                    className="danger"
+                    onClick={() => {
+                      if (window.confirm(`Remove subscriber ${sub.email}?`)) {
+                        remove.mutate({ id: sub.id });
+                      }
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 export default function Admin() {
-  const [location] =
-    useLocation();
-
-  const [matchCustomerDetail] =
-    useRoute(
-      "/admin/customers/:id",
-    );
-
-  const { user, loading } =
-    useAuth();
+  const [location] = useLocation();
+  const [matchCustomerDetail] = useRoute("/admin/customers/:id");
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -1470,29 +1890,19 @@ export default function Admin() {
   if (!user || user.role !== "admin") {
     return (
       <div className="admin-forbidden">
-        <h1>
-          Administrator access required
-        </h1>
-
+        <h1>Administrator access required</h1>
         <p>
           {!user
             ? "Please sign in with your administrator credentials to access Rabiora operations."
             : "Your account is signed in but does not have administrator privileges."}
         </p>
-
         <div style={{ display: "flex", gap: "1rem", marginTop: "1rem", justifyContent: "center" }}>
           {!user && (
-            <Link
-              href="/login"
-              className="btn"
-            >
+            <Link href="/login" className="btn">
               Sign In as Admin
             </Link>
           )}
-          <Link
-            href="/"
-            className="btn-outline"
-          >
+          <Link href="/" className="btn-outline">
             Return to Storefront
           </Link>
         </div>
@@ -1500,31 +1910,31 @@ export default function Admin() {
     );
   }
 
-  const page =
-    matchCustomerDetail
-      ? <CustomerDetailManager />
-      : location ===
-        "/admin/products"
-        ? <ProductManager />
-        : location ===
-          "/admin/categories"
-          ? <CategoryManager />
-        : location ===
-          "/admin/orders"
-          ? <OrderManager />
-        : location ===
-          "/admin/customers"
-          ? <CustomerManager />
-        : location ===
-          "/admin/reviews"
-          ? <ReviewManager />
-        : <AdminOverview />;
+  const page = matchCustomerDetail ? (
+    <CustomerDetailManager />
+  ) : location === "/admin/products" ? (
+    <ProductManager />
+  ) : location === "/admin/categories" ? (
+    <CategoryManager />
+  ) : location === "/admin/orders" ? (
+    <OrderManager />
+  ) : location === "/admin/customers" ? (
+    <CustomerManager />
+  ) : location === "/admin/reviews" ? (
+    <ReviewManager />
+  ) : location === "/admin/offers" ? (
+    <OfferBannersManager />
+  ) : location === "/admin/subscribers" ? (
+    <SubscribersManager />
+  ) : location === "/admin/settings" ? (
+    <PaymentSettingsManager />
+  ) : (
+    <AdminOverview />
+  );
 
   return (
-  <DashboardLayout>
-    <div className="admin-page">
-      {page}
-    </div>
-  </DashboardLayout>
-);
-}
+    <DashboardLayout>
+      <div className="admin-page">{page}</div>
+    </DashboardLayout>
+  );
+}

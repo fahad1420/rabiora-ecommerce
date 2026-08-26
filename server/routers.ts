@@ -9,8 +9,25 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 
+import { getPublicSiteSettings, listActiveOfferBanners, subscribeCustomer } from "./marketingService";
+
 export const appRouter = router({
   system: systemRouter,
+  settings: router({
+    get: publicProcedure.query(() => getPublicSiteSettings()),
+  }),
+  offers: router({
+    list: publicProcedure.query(() => listActiveOfferBanners()),
+  }),
+  subscribe: publicProcedure
+    .input(
+      z.object({
+        email: z.string().trim().email(),
+        phone: z.string().trim().min(7).max(25),
+        residency: z.enum(["inside_bangladesh", "outside_bangladesh"]),
+      })
+    )
+    .mutation(({ input }) => subscribeCustomer(input)),
   auth: router({
     me: publicProcedure.query(({ ctx }) => ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

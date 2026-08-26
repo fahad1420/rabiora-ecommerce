@@ -362,14 +362,94 @@ var init_Wishlist = __esm({
   }
 });
 
+// server/models/SiteSettings.ts
+import mongoose11, { Schema as Schema10 } from "mongoose";
+var SiteSettingsSchema, SiteSettingsModel;
+var init_SiteSettings = __esm({
+  "server/models/SiteSettings.ts"() {
+    "use strict";
+    SiteSettingsSchema = new Schema10(
+      {
+        key: { type: String, required: true, unique: true, default: "default" },
+        bkashNumber: { type: String, default: "+8801349529274" },
+        nagadNumber: { type: String, default: "+8801349529274" },
+        rocketNumber: { type: String, default: "+8801349529274" },
+        heroBadge: { type: String, default: "Premium Collection" },
+        heroHeading: { type: String, default: "RABIORA" },
+        heroTagline: { type: String, default: "Elegance \u2022 Comfort \u2022 Confidence" },
+        heroImageUrl: { type: String, default: "" }
+      },
+      {
+        timestamps: true
+      }
+    );
+    SiteSettingsModel = mongoose11.models.SiteSettings || mongoose11.model("SiteSettings", SiteSettingsSchema);
+  }
+});
+
+// server/models/Subscriber.ts
+import mongoose12, { Schema as Schema11 } from "mongoose";
+var SubscriberSchema, SubscriberModel;
+var init_Subscriber = __esm({
+  "server/models/Subscriber.ts"() {
+    "use strict";
+    SubscriberSchema = new Schema11(
+      {
+        email: { type: String, required: true, trim: true, lowercase: true, index: true },
+        phone: { type: String, required: true, trim: true },
+        residency: {
+          type: String,
+          enum: ["inside_bangladesh", "outside_bangladesh"],
+          default: "inside_bangladesh"
+        },
+        status: {
+          type: String,
+          enum: ["active", "unsubscribed"],
+          default: "active"
+        }
+      },
+      {
+        timestamps: true
+      }
+    );
+    SubscriberSchema.index({ email: 1, phone: 1 }, { unique: true });
+    SubscriberModel = mongoose12.models.Subscriber || mongoose12.model("Subscriber", SubscriberSchema);
+  }
+});
+
+// server/models/OfferBanner.ts
+import mongoose13, { Schema as Schema12 } from "mongoose";
+var OfferBannerSchema, OfferBannerModel;
+var init_OfferBanner = __esm({
+  "server/models/OfferBanner.ts"() {
+    "use strict";
+    OfferBannerSchema = new Schema12(
+      {
+        title: { type: String, required: true, trim: true },
+        subtitle: { type: String, trim: true, default: "" },
+        badge: { type: String, trim: true, default: "Special Offer" },
+        discountCode: { type: String, trim: true, default: "" },
+        imageUrl: { type: String, required: true, trim: true },
+        linkUrl: { type: String, trim: true, default: "/#products" },
+        isActive: { type: Boolean, default: true, index: true },
+        displayOrder: { type: Number, default: 0, index: true }
+      },
+      {
+        timestamps: true
+      }
+    );
+    OfferBannerModel = mongoose13.models.OfferBanner || mongoose13.model("OfferBanner", OfferBannerSchema);
+  }
+});
+
 // server/models/helpers.ts
-import mongoose11, { Types as Types8 } from "mongoose";
+import mongoose14, { Types as Types8 } from "mongoose";
 function toObjectId(id) {
   if (typeof id !== "string") return id;
   return Types8.ObjectId.isValid(id) ? Types8.ObjectId.createFromHexString(id) : new Types8.ObjectId(id);
 }
 function isValidObjectId(id) {
-  return typeof id === "string" && mongoose11.isValidObjectId(id);
+  return typeof id === "string" && mongoose14.isValidObjectId(id);
 }
 function findProductQuery(idOrLegacy) {
   const conditions = [];
@@ -377,7 +457,7 @@ function findProductQuery(idOrLegacy) {
   if (!isNaN(num) && num > 0) {
     conditions.push({ legacyId: num });
   }
-  if (typeof idOrLegacy === "string" && mongoose11.isValidObjectId(idOrLegacy)) {
+  if (typeof idOrLegacy === "string" && mongoose14.isValidObjectId(idOrLegacy)) {
     conditions.push({ _id: Types8.ObjectId.createFromHexString(idOrLegacy) });
   }
   if (conditions.length === 0) {
@@ -387,14 +467,14 @@ function findProductQuery(idOrLegacy) {
 }
 function findUserQuery(idOrOpenId) {
   const conditions = [{ openId: String(idOrOpenId) }];
-  if (typeof idOrOpenId === "string" && mongoose11.isValidObjectId(idOrOpenId)) {
+  if (typeof idOrOpenId === "string" && mongoose14.isValidObjectId(idOrOpenId)) {
     conditions.push({ _id: Types8.ObjectId.createFromHexString(idOrOpenId) });
   }
   return conditions.length === 1 ? conditions[0] : { $or: conditions };
 }
 function findOrderQuery(orderIdOrNumber) {
   const conditions = [{ orderNumber: String(orderIdOrNumber) }];
-  if (typeof orderIdOrNumber === "string" && mongoose11.isValidObjectId(orderIdOrNumber)) {
+  if (typeof orderIdOrNumber === "string" && mongoose14.isValidObjectId(orderIdOrNumber)) {
     conditions.push({ _id: Types8.ObjectId.createFromHexString(orderIdOrNumber) });
   }
   return conditions.length === 1 ? conditions[0] : { $or: conditions };
@@ -418,6 +498,9 @@ var init_models = __esm({
     init_Address();
     init_PasswordResetToken();
     init_Wishlist();
+    init_SiteSettings();
+    init_Subscriber();
+    init_OfferBanner();
     init_helpers();
   }
 });
@@ -625,12 +708,13 @@ async function updateCustomerProfile(userId, {
   email
 }) {
   await connectMongo();
+  const cleanEmail = email && email.trim() ? email.trim().toLowerCase() : null;
   const customer = await UserModel.findOneAndUpdate(
     findUserQuery(userId),
     {
       $set: {
-        name,
-        email: email || void 0
+        name: name.trim(),
+        email: cleanEmail
       }
     },
     { new: true }
@@ -2080,32 +2164,23 @@ function generateOrderNumber() {
 async function createOrder(identity, input) {
   await connectMongo();
   let userDoc = null;
-  let cartQuery = {};
   if (identity.userId) {
     userDoc = await UserModel.findOne(findUserQuery(identity.userId));
-    cartQuery = userDoc ? { userId: userDoc._id } : { userId: identity.userId };
-  } else if (identity.anonymousToken) {
-    cartQuery = { anonymousToken: identity.anonymousToken };
-  } else {
-    throw new TRPCError11({ code: "BAD_REQUEST", message: "Your cart is empty." });
-  }
-  const cart = await CartModel.findOne(cartQuery).populate("items.productId");
-  if (!cart || !cart.items || cart.items.length === 0) {
-    throw new TRPCError11({ code: "BAD_REQUEST", message: "Your cart is empty." });
   }
   const orderItems = [];
   let subtotalTaka = 0;
-  for (const item of cart.items) {
-    const product = item.productId;
-    if (!product || !product.isInStock || (product.stockQuantity || 0) < item.quantity) {
+  if (input.buyNowItem) {
+    const product = await ProductModel.findOne(findProductQuery(input.buyNowItem.productId));
+    const qty = Math.max(1, input.buyNowItem.quantity || 1);
+    if (!product || !product.isInStock || (product.stockQuantity || 0) < qty) {
       throw new TRPCError11({
         code: "BAD_REQUEST",
-        message: `Product ${product?.name || "in cart"} is out of stock.`
+        message: `Product ${product?.name || "selected"} is out of stock.`
       });
     }
     const coverImage = (product.images || []).find((img) => img.isCover) || (product.images || [])[0];
     const unitPrice = product.priceTaka || 0;
-    const lineTotal = unitPrice * item.quantity;
+    const lineTotal = unitPrice * qty;
     subtotalTaka += lineTotal;
     orderItems.push({
       productId: product._id,
@@ -2113,9 +2188,44 @@ async function createOrder(identity, input) {
       sku: product.sku,
       imageUrl: coverImage ? coverImage.storageUrl : "",
       unitPriceTaka: unitPrice,
-      quantity: item.quantity,
+      quantity: qty,
       lineTotalTaka: lineTotal
     });
+  } else {
+    let cartQuery = {};
+    if (userDoc) {
+      cartQuery = { userId: userDoc._id };
+    } else if (identity.anonymousToken) {
+      cartQuery = { anonymousToken: identity.anonymousToken };
+    } else {
+      throw new TRPCError11({ code: "BAD_REQUEST", message: "Your cart is empty." });
+    }
+    const cart = await CartModel.findOne(cartQuery).populate("items.productId");
+    if (!cart || !cart.items || cart.items.length === 0) {
+      throw new TRPCError11({ code: "BAD_REQUEST", message: "Your cart is empty." });
+    }
+    for (const item of cart.items) {
+      const product = item.productId;
+      if (!product || !product.isInStock || (product.stockQuantity || 0) < item.quantity) {
+        throw new TRPCError11({
+          code: "BAD_REQUEST",
+          message: `Product ${product?.name || "in cart"} is out of stock.`
+        });
+      }
+      const coverImage = (product.images || []).find((img) => img.isCover) || (product.images || [])[0];
+      const unitPrice = product.priceTaka || 0;
+      const lineTotal = unitPrice * item.quantity;
+      subtotalTaka += lineTotal;
+      orderItems.push({
+        productId: product._id,
+        productName: product.name,
+        sku: product.sku,
+        imageUrl: coverImage ? coverImage.storageUrl : "",
+        unitPriceTaka: unitPrice,
+        quantity: item.quantity,
+        lineTotalTaka: lineTotal
+      });
+    }
   }
   const deliveryChargeTaka = calculateDeliveryCharge(input.districtArea);
   const totalTaka = subtotalTaka + deliveryChargeTaka;
@@ -2151,21 +2261,43 @@ async function createOrder(identity, input) {
     payments: [paymentRecord],
     statusHistory: [statusHistoryRecord]
   });
-  for (const item of cart.items) {
-    const product = item.productId;
-    const nextStock = Math.max(0, (product.stockQuantity || 0) - item.quantity);
-    await ProductModel.updateOne(
-      { _id: product._id },
-      {
-        $set: {
-          stockQuantity: nextStock,
-          isInStock: nextStock > 0
+  if (input.buyNowItem) {
+    const qty = Math.max(1, input.buyNowItem.quantity || 1);
+    const prod = await ProductModel.findOne(findProductQuery(input.buyNowItem.productId));
+    if (prod) {
+      const nextStock = Math.max(0, (prod.stockQuantity || 0) - qty);
+      prod.stockQuantity = nextStock;
+      prod.isInStock = nextStock > 0;
+      await prod.save();
+    }
+  } else {
+    let cartQuery = {};
+    if (userDoc) {
+      cartQuery = { userId: userDoc._id };
+    } else if (identity.anonymousToken) {
+      cartQuery = { anonymousToken: identity.anonymousToken };
+    }
+    const cart = await CartModel.findOne(cartQuery).populate("items.productId");
+    if (cart) {
+      for (const item of cart.items) {
+        const product = item.productId;
+        if (product) {
+          const nextStock = Math.max(0, (product.stockQuantity || 0) - item.quantity);
+          await ProductModel.updateOne(
+            { _id: product._id },
+            {
+              $set: {
+                stockQuantity: nextStock,
+                isInStock: nextStock > 0
+              }
+            }
+          );
         }
       }
-    );
+      cart.items = [];
+      await cart.save();
+    }
   }
-  cart.items = [];
-  await cart.save();
   return {
     orderNumber: order.orderNumber,
     totalTaka: order.totalTaka,
@@ -2332,9 +2464,20 @@ var orderRouter = router({
     fullAddress: z3.string().trim().min(8).max(1e3),
     paymentMethod: z3.enum(PAYMENT_METHODS2),
     transactionId: z3.string().trim().min(3).max(120).optional(),
-    submittedAmountTaka: z3.number().int().positive().max(1e6).optional()
+    submittedAmountTaka: z3.number().int().positive().max(1e6).optional(),
+    buyNowItem: z3.object({
+      productId: z3.union([z3.string(), z3.number()]),
+      quantity: z3.number().int().positive().max(100)
+    }).optional()
   })).mutation(async ({ ctx, input }) => {
-    const identity = await resolveCartIdentity(ctx.req, ctx.user, input.anonymousToken);
+    const customer = ctx.user ?? await getCustomerFromRequest(ctx.req);
+    if (!customer) {
+      throw new TRPCError12({
+        code: "UNAUTHORIZED",
+        message: "Please sign in to your Rabiora account to complete your order."
+      });
+    }
+    const identity = await resolveCartIdentity(ctx.req, customer, input.anonymousToken);
     const normalizedPhone = normalizeBangladeshPhone(input.customerPhone);
     const created = await createOrder(identity, { ...input, customerPhone: normalizedPhone });
     if (!identity.userId) await setGuestOrderConfirmation(ctx.res, created.orderNumber);
@@ -2970,6 +3113,246 @@ async function advanceOrderStatus(orderId, nextStatus, actorUserId, adminNote) {
   };
 }
 
+// server/marketingService.ts
+init_db();
+init_models();
+init_customerSession();
+import { TRPCError as TRPCError15 } from "@trpc/server";
+async function getPublicSiteSettings() {
+  await connectMongo();
+  let settings = await SiteSettingsModel.findOne({ key: "default" }).lean();
+  if (!settings) {
+    settings = await SiteSettingsModel.create({
+      key: "default",
+      bkashNumber: "+8801349529274",
+      nagadNumber: "+8801349529274",
+      rocketNumber: "+8801349529274",
+      heroBadge: "Premium Collection",
+      heroHeading: "RABIORA",
+      heroTagline: "Elegance \u2022 Comfort \u2022 Confidence",
+      heroImageUrl: ""
+    });
+  }
+  return {
+    bkashNumber: settings.bkashNumber || "+8801349529274",
+    nagadNumber: settings.nagadNumber || "+8801349529274",
+    rocketNumber: settings.rocketNumber || "+8801349529274",
+    heroBadge: settings.heroBadge || "Premium Collection",
+    heroHeading: settings.heroHeading || "RABIORA",
+    heroTagline: settings.heroTagline || "Elegance \u2022 Comfort \u2022 Confidence",
+    heroImageUrl: settings.heroImageUrl || ""
+  };
+}
+async function updateAdminSiteSettings(input) {
+  await connectMongo();
+  const updated = await SiteSettingsModel.findOneAndUpdate(
+    { key: "default" },
+    {
+      $set: {
+        ...input.bkashNumber !== void 0 && { bkashNumber: input.bkashNumber.trim() },
+        ...input.nagadNumber !== void 0 && { nagadNumber: input.nagadNumber.trim() },
+        ...input.rocketNumber !== void 0 && { rocketNumber: input.rocketNumber.trim() },
+        ...input.heroBadge !== void 0 && { heroBadge: input.heroBadge.trim() },
+        ...input.heroHeading !== void 0 && { heroHeading: input.heroHeading.trim() },
+        ...input.heroTagline !== void 0 && { heroTagline: input.heroTagline.trim() },
+        ...input.heroImageUrl !== void 0 && { heroImageUrl: input.heroImageUrl.trim() }
+      }
+    },
+    { upsert: true, new: true }
+  ).lean();
+  return {
+    bkashNumber: updated.bkashNumber,
+    nagadNumber: updated.nagadNumber,
+    rocketNumber: updated.rocketNumber,
+    heroBadge: updated.heroBadge,
+    heroHeading: updated.heroHeading,
+    heroTagline: updated.heroTagline,
+    heroImageUrl: updated.heroImageUrl
+  };
+}
+async function subscribeCustomer(input) {
+  await connectMongo();
+  const email = input.email.trim().toLowerCase();
+  const phoneInput = input.phone.trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new TRPCError15({
+      code: "BAD_REQUEST",
+      message: "Please enter a valid email address."
+    });
+  }
+  let normalizedPhone = phoneInput;
+  if (input.residency === "inside_bangladesh") {
+    const bd = normalizeBangladeshPhone(phoneInput);
+    if (!bd) {
+      throw new TRPCError15({
+        code: "BAD_REQUEST",
+        message: "Please enter a valid 11-digit Bangladesh mobile number."
+      });
+    }
+    normalizedPhone = bd;
+  } else {
+    if (phoneInput.length < 7 || phoneInput.length > 20) {
+      throw new TRPCError15({
+        code: "BAD_REQUEST",
+        message: "Please enter a valid international mobile number."
+      });
+    }
+  }
+  const existing = await SubscriberModel.findOne({ email }).lean();
+  if (existing) {
+    if (existing.status === "unsubscribed") {
+      await SubscriberModel.updateOne(
+        { _id: existing._id },
+        { $set: { status: "active", phone: normalizedPhone, residency: input.residency } }
+      );
+      return { success: true, message: "Thank you! Your subscription has been reactivated." };
+    }
+    return { success: true, message: "You are already subscribed to Rabiora updates!" };
+  }
+  await SubscriberModel.create({
+    email,
+    phone: normalizedPhone,
+    residency: input.residency,
+    status: "active"
+  });
+  return { success: true, message: "Thank you for subscribing to Rabiora!" };
+}
+async function listAdminSubscribers() {
+  await connectMongo();
+  const subscribers = await SubscriberModel.find().sort({ createdAt: -1 }).lean();
+  return subscribers.map((s) => ({
+    id: s._id.toString(),
+    email: s.email,
+    phone: s.phone,
+    residency: s.residency,
+    status: s.status,
+    createdAt: s.createdAt
+  }));
+}
+async function deleteAdminSubscriber(id) {
+  await connectMongo();
+  await SubscriberModel.findByIdAndDelete(id);
+  return { success: true };
+}
+async function listActiveOfferBanners() {
+  await connectMongo();
+  let banners = await OfferBannerModel.find({ isActive: true }).sort({ displayOrder: 1, createdAt: -1 }).lean();
+  if (banners.length === 0) {
+    return [
+      {
+        id: "default-offer-1",
+        title: "10% OFF on bKash Payment",
+        subtitle: "Exclusive Rabiora Discount on all Three-Piece Collections",
+        badge: "Special Offer",
+        discountCode: "BKASH10",
+        imageUrl: "/uploads/images/branding/rabiora-logo.jpeg",
+        linkUrl: "/#products",
+        isActive: true,
+        displayOrder: 0
+      }
+    ];
+  }
+  return banners.map((b) => ({
+    id: b._id.toString(),
+    title: b.title,
+    subtitle: b.subtitle || "",
+    badge: b.badge || "Special Offer",
+    discountCode: b.discountCode || "",
+    imageUrl: b.imageUrl,
+    linkUrl: b.linkUrl || "/#products",
+    isActive: b.isActive,
+    displayOrder: b.displayOrder
+  }));
+}
+async function listAdminOfferBanners() {
+  await connectMongo();
+  const banners = await OfferBannerModel.find().sort({ displayOrder: 1, createdAt: -1 }).lean();
+  return banners.map((b) => ({
+    id: b._id.toString(),
+    title: b.title,
+    subtitle: b.subtitle || "",
+    badge: b.badge || "Special Offer",
+    discountCode: b.discountCode || "",
+    imageUrl: b.imageUrl,
+    linkUrl: b.linkUrl || "/#products",
+    isActive: b.isActive,
+    displayOrder: b.displayOrder,
+    createdAt: b.createdAt
+  }));
+}
+async function createAdminOfferBanner(input) {
+  await connectMongo();
+  const created = await OfferBannerModel.create({
+    title: input.title.trim(),
+    subtitle: input.subtitle?.trim() || "",
+    badge: input.badge?.trim() || "Special Offer",
+    discountCode: input.discountCode?.trim() || "",
+    imageUrl: input.imageUrl.trim(),
+    linkUrl: input.linkUrl?.trim() || "/#products",
+    isActive: input.isActive ?? true,
+    displayOrder: input.displayOrder ?? 0
+  });
+  return {
+    id: created._id.toString(),
+    title: created.title,
+    subtitle: created.subtitle,
+    badge: created.badge,
+    discountCode: created.discountCode,
+    imageUrl: created.imageUrl,
+    linkUrl: created.linkUrl,
+    isActive: created.isActive,
+    displayOrder: created.displayOrder
+  };
+}
+async function updateAdminOfferBanner(id, input) {
+  await connectMongo();
+  const updated = await OfferBannerModel.findByIdAndUpdate(
+    id,
+    {
+      $set: {
+        ...input.title !== void 0 && { title: input.title.trim() },
+        ...input.subtitle !== void 0 && { subtitle: input.subtitle.trim() },
+        ...input.badge !== void 0 && { badge: input.badge.trim() },
+        ...input.discountCode !== void 0 && { discountCode: input.discountCode.trim() },
+        ...input.imageUrl !== void 0 && { imageUrl: input.imageUrl.trim() },
+        ...input.linkUrl !== void 0 && { linkUrl: input.linkUrl.trim() },
+        ...input.isActive !== void 0 && { isActive: input.isActive },
+        ...input.displayOrder !== void 0 && { displayOrder: input.displayOrder }
+      }
+    },
+    { new: true }
+  ).lean();
+  if (!updated) {
+    throw new TRPCError15({ code: "NOT_FOUND", message: "Offer banner not found." });
+  }
+  return {
+    id: updated._id.toString(),
+    title: updated.title,
+    subtitle: updated.subtitle,
+    badge: updated.badge,
+    discountCode: updated.discountCode,
+    imageUrl: updated.imageUrl,
+    linkUrl: updated.linkUrl,
+    isActive: updated.isActive,
+    displayOrder: updated.displayOrder
+  };
+}
+async function deleteAdminOfferBanner(id) {
+  await connectMongo();
+  await OfferBannerModel.findByIdAndDelete(id);
+  return { success: true };
+}
+async function uploadAdminOfferImage(dataUri, fileName) {
+  const match = dataUri.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) {
+    throw new TRPCError15({ code: "BAD_REQUEST", message: "Invalid image format." });
+  }
+  const mimeType = match[1];
+  const buffer = Buffer.from(match[2], "base64");
+  const upload = await saveProductImage("offers", buffer, mimeType, fileName || "offer-banner.jpg");
+  return { storageUrl: upload.url, storageKey: upload.key };
+}
+
 // server/routers/admin.ts
 var idSchema3 = z4.union([z4.number(), z4.string()]);
 var productInput = z4.object({
@@ -3106,6 +3489,58 @@ var adminRouter = router({
     ).mutation(
       ({ input }) => deleteProductReview(input.reviewId)
     )
+  }),
+  settings: router({
+    update: adminProcedure.input(
+      z4.object({
+        bkashNumber: z4.string().trim().optional(),
+        nagadNumber: z4.string().trim().optional(),
+        rocketNumber: z4.string().trim().optional(),
+        heroBadge: z4.string().trim().optional(),
+        heroHeading: z4.string().trim().optional(),
+        heroTagline: z4.string().trim().optional(),
+        heroImageUrl: z4.string().trim().optional()
+      })
+    ).mutation(({ input }) => updateAdminSiteSettings(input))
+  }),
+  subscribers: router({
+    list: adminProcedure.query(() => listAdminSubscribers()),
+    delete: adminProcedure.input(z4.object({ id: z4.string() })).mutation(({ input }) => deleteAdminSubscriber(input.id))
+  }),
+  offers: router({
+    list: adminProcedure.query(() => listAdminOfferBanners()),
+    create: adminProcedure.input(
+      z4.object({
+        title: z4.string().trim().min(2).max(200),
+        subtitle: z4.string().trim().max(300).optional(),
+        badge: z4.string().trim().max(100).optional(),
+        discountCode: z4.string().trim().max(50).optional(),
+        imageUrl: z4.string().trim().min(1),
+        linkUrl: z4.string().trim().max(300).optional(),
+        isActive: z4.boolean().optional(),
+        displayOrder: z4.number().int().optional()
+      })
+    ).mutation(({ input }) => createAdminOfferBanner(input)),
+    update: adminProcedure.input(
+      z4.object({
+        id: z4.string(),
+        title: z4.string().trim().min(2).max(200).optional(),
+        subtitle: z4.string().trim().max(300).optional(),
+        badge: z4.string().trim().max(100).optional(),
+        discountCode: z4.string().trim().max(50).optional(),
+        imageUrl: z4.string().trim().optional(),
+        linkUrl: z4.string().trim().max(300).optional(),
+        isActive: z4.boolean().optional(),
+        displayOrder: z4.number().int().optional()
+      })
+    ).mutation(({ input }) => updateAdminOfferBanner(input.id, input)),
+    delete: adminProcedure.input(z4.object({ id: z4.string() })).mutation(({ input }) => deleteAdminOfferBanner(input.id)),
+    uploadImage: adminProcedure.input(
+      z4.object({
+        dataUri: z4.string().min(10),
+        fileName: z4.string().optional()
+      })
+    ).mutation(({ input }) => uploadAdminOfferImage(input.dataUri, input.fileName))
   })
 });
 
@@ -3113,7 +3548,7 @@ var adminRouter = router({
 import { z as z5 } from "zod";
 
 // server/_core/notification.ts
-import { TRPCError as TRPCError15 } from "@trpc/server";
+import { TRPCError as TRPCError16 } from "@trpc/server";
 var TITLE_MAX_LENGTH = 1200;
 var CONTENT_MAX_LENGTH = 2e4;
 var trimValue = (value) => value.trim();
@@ -3127,13 +3562,13 @@ var buildEndpointUrl = (baseUrl) => {
 };
 var validatePayload = (input) => {
   if (!isNonEmptyString2(input.title)) {
-    throw new TRPCError15({
+    throw new TRPCError16({
       code: "BAD_REQUEST",
       message: "Notification title is required."
     });
   }
   if (!isNonEmptyString2(input.content)) {
-    throw new TRPCError15({
+    throw new TRPCError16({
       code: "BAD_REQUEST",
       message: "Notification content is required."
     });
@@ -3141,13 +3576,13 @@ var validatePayload = (input) => {
   const title = trimValue(input.title);
   const content = trimValue(input.content);
   if (title.length > TITLE_MAX_LENGTH) {
-    throw new TRPCError15({
+    throw new TRPCError16({
       code: "BAD_REQUEST",
       message: `Notification title must be at most ${TITLE_MAX_LENGTH} characters.`
     });
   }
   if (content.length > CONTENT_MAX_LENGTH) {
-    throw new TRPCError15({
+    throw new TRPCError16({
       code: "BAD_REQUEST",
       message: `Notification content must be at most ${CONTENT_MAX_LENGTH} characters.`
     });
@@ -3157,13 +3592,13 @@ var validatePayload = (input) => {
 async function notifyOwner(payload) {
   const { title, content } = validatePayload(payload);
   if (!ENV.forgeApiUrl) {
-    throw new TRPCError15({
+    throw new TRPCError16({
       code: "INTERNAL_SERVER_ERROR",
       message: "Notification service URL is not configured."
     });
   }
   if (!ENV.forgeApiKey) {
-    throw new TRPCError15({
+    throw new TRPCError16({
       code: "INTERNAL_SERVER_ERROR",
       message: "Notification service API key is not configured."
     });
@@ -3219,6 +3654,19 @@ var systemRouter = router({
 // server/routers.ts
 var appRouter = router({
   system: systemRouter,
+  settings: router({
+    get: publicProcedure.query(() => getPublicSiteSettings())
+  }),
+  offers: router({
+    list: publicProcedure.query(() => listActiveOfferBanners())
+  }),
+  subscribe: publicProcedure.input(
+    z6.object({
+      email: z6.string().trim().email(),
+      phone: z6.string().trim().min(7).max(25),
+      residency: z6.enum(["inside_bangladesh", "outside_bangladesh"])
+    })
+  ).mutation(({ input }) => subscribeCustomer(input)),
   auth: router({
     me: publicProcedure.query(({ ctx }) => ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

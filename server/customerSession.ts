@@ -317,12 +317,14 @@ export async function updateCustomerProfile(
 ) {
   await connectMongo();
 
+  const cleanEmail = email && email.trim() ? email.trim().toLowerCase() : null;
+
   const customer = await UserModel.findOneAndUpdate(
     findUserQuery(userId),
     {
       $set: {
-        name,
-        email: email || undefined,
+        name: name.trim(),
+        email: cleanEmail,
       },
     },
     { new: true }

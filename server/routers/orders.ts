@@ -18,8 +18,20 @@ export const orderRouter = router({
     paymentMethod: z.enum(PAYMENT_METHODS),
     transactionId: z.string().trim().min(3).max(120).optional(),
     submittedAmountTaka: z.number().int().positive().max(1_000_000).optional(),
+    buyNowItem: z.object({
+      productId: z.union([z.string(), z.number()]),
+      quantity: z.number().int().positive().max(100),
+    }).optional(),
   })).mutation(async ({ ctx, input }) => {
-    const identity = await resolveCartIdentity(ctx.req, ctx.user, input.anonymousToken);
+    const customer = ctx.user ?? await getCustomerFromRequest(ctx.req);
+    if (!customer) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Please sign in to your Rabiora account to complete your order.",
+      });
+    }
+
+    const identity = await resolveCartIdentity(ctx.req, customer, input.anonymousToken);
     const normalizedPhone = normalizeBangladeshPhone(input.customerPhone)!;
     const created = await createOrder(identity, { ...input, customerPhone: normalizedPhone });
     if (!identity.userId) await setGuestOrderConfirmation(ctx.res, created.orderNumber);

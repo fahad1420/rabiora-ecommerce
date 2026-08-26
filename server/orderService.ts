@@ -67,42 +67,32 @@ export async function createOrder(
     paymentMethod: PaymentMethod;
     transactionId?: string;
     submittedAmountTaka?: number;
+    buyNowItem?: { productId: number | string; quantity: number };
   }
 ) {
   await connectMongo();
 
   let userDoc = null;
-  let cartQuery: Record<string, unknown> = {};
-
   if (identity.userId) {
     userDoc = await UserModel.findOne(findUserQuery(identity.userId));
-    cartQuery = userDoc ? { userId: userDoc._id } : { userId: identity.userId };
-  } else if (identity.anonymousToken) {
-    cartQuery = { anonymousToken: identity.anonymousToken };
-  } else {
-    throw new TRPCError({ code: "BAD_REQUEST", message: "Your cart is empty." });
-  }
-
-  const cart = await CartModel.findOne(cartQuery).populate("items.productId");
-  if (!cart || !cart.items || cart.items.length === 0) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: "Your cart is empty." });
   }
 
   const orderItems = [];
   let subtotalTaka = 0;
 
-  for (const item of cart.items) {
-    const product: any = item.productId;
-    if (!product || !product.isInStock || (product.stockQuantity || 0) < item.quantity) {
+  if (input.buyNowItem) {
+    const product: any = await ProductModel.findOne(findProductQuery(input.buyNowItem.productId));
+    const qty = Math.max(1, input.buyNowItem.quantity || 1);
+    if (!product || !product.isInStock || (product.stockQuantity || 0) < qty) {
       throw new TRPCError({
         code: "BAD_REQUEST",
-        message: `Product ${product?.name || "in cart"} is out of stock.`,
+        message: `Product ${product?.name || "selected"} is out of stock.`,
       });
     }
 
     const coverImage = (product.images || []).find((img: any) => img.isCover) || (product.images || [])[0];
     const unitPrice = product.priceTaka || 0;
-    const lineTotal = unitPrice * item.quantity;
+    const lineTotal = unitPrice * qty;
     subtotalTaka += lineTotal;
 
     orderItems.push({
@@ -111,9 +101,48 @@ export async function createOrder(
       sku: product.sku,
       imageUrl: coverImage ? coverImage.storageUrl : "",
       unitPriceTaka: unitPrice,
-      quantity: item.quantity,
+      quantity: qty,
       lineTotalTaka: lineTotal,
     });
+  } else {
+    let cartQuery: Record<string, unknown> = {};
+    if (userDoc) {
+      cartQuery = { userId: userDoc._id };
+    } else if (identity.anonymousToken) {
+      cartQuery = { anonymousToken: identity.anonymousToken };
+    } else {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Your cart is empty." });
+    }
+
+    const cart = await CartModel.findOne(cartQuery).populate("items.productId");
+    if (!cart || !cart.items || cart.items.length === 0) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Your cart is empty." });
+    }
+
+    for (const item of cart.items) {
+      const product: any = item.productId;
+      if (!product || !product.isInStock || (product.stockQuantity || 0) < item.quantity) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Product ${product?.name || "in cart"} is out of stock.`,
+        });
+      }
+
+      const coverImage = (product.images || []).find((img: any) => img.isCover) || (product.images || [])[0];
+      const unitPrice = product.priceTaka || 0;
+      const lineTotal = unitPrice * item.quantity;
+      subtotalTaka += lineTotal;
+
+      orderItems.push({
+        productId: product._id,
+        productName: product.name,
+        sku: product.sku,
+        imageUrl: coverImage ? coverImage.storageUrl : "",
+        unitPriceTaka: unitPrice,
+        quantity: item.quantity,
+        lineTotalTaka: lineTotal,
+      });
+    }
   }
 
   const deliveryChargeTaka = calculateDeliveryCharge(input.districtArea);
@@ -157,23 +186,43 @@ export async function createOrder(
   });
 
   // Decrement product stocks
-  for (const item of cart.items) {
-    const product: any = item.productId;
-    const nextStock = Math.max(0, (product.stockQuantity || 0) - item.quantity);
-    await ProductModel.updateOne(
-      { _id: product._id },
-      {
-        $set: {
-          stockQuantity: nextStock,
-          isInStock: nextStock > 0,
-        },
+  if (input.buyNowItem) {
+    const qty = Math.max(1, input.buyNowItem.quantity || 1);
+    const prod = await ProductModel.findOne(findProductQuery(input.buyNowItem.productId));
+    if (prod) {
+      const nextStock = Math.max(0, (prod.stockQuantity || 0) - qty);
+      prod.stockQuantity = nextStock;
+      prod.isInStock = nextStock > 0;
+      await prod.save();
+    }
+  } else {
+    let cartQuery: Record<string, unknown> = {};
+    if (userDoc) {
+      cartQuery = { userId: userDoc._id };
+    } else if (identity.anonymousToken) {
+      cartQuery = { anonymousToken: identity.anonymousToken };
+    }
+    const cart = await CartModel.findOne(cartQuery).populate("items.productId");
+    if (cart) {
+      for (const item of cart.items) {
+        const product: any = item.productId;
+        if (product) {
+          const nextStock = Math.max(0, (product.stockQuantity || 0) - item.quantity);
+          await ProductModel.updateOne(
+            { _id: product._id },
+            {
+              $set: {
+                stockQuantity: nextStock,
+                isInStock: nextStock > 0,
+              },
+            }
+          );
+        }
       }
-    );
+      cart.items = [];
+      await cart.save();
+    }
   }
-
-  // Clear cart items
-  cart.items = [];
-  await cart.save();
 
   return {
     orderNumber: order.orderNumber,

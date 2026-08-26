@@ -23,6 +23,9 @@ const OrderConfirmation = lazy(
   () => import("./pages/OrderConfirmation"),
 );
 const Admin = lazy(() => import("./pages/Admin"));
+const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const CustomerService = lazy(() => import("./pages/CustomerService"));
 
 function Router() {
   return (
@@ -79,6 +82,17 @@ function Router() {
           component={OrderConfirmation}
         />
 
+        <Route path="/terms" component={TermsAndConditions} />
+        <Route path="/privacy" component={PrivacyPolicy} />
+        <Route path="/customer-service" component={CustomerService} />
+        <Route path="/customer-service/:topic" component={CustomerService} />
+        <Route path="/faq" component={CustomerService} />
+        <Route path="/returns" component={CustomerService} />
+        <Route path="/shipping" component={CustomerService} />
+        <Route path="/fabric-care" component={CustomerService} />
+        <Route path="/how-to-order" component={CustomerService} />
+        <Route path="/payment-help" component={CustomerService} />
+
         <Route
           path="/admin"
           component={Admin}
@@ -111,6 +125,21 @@ function Router() {
 
         <Route
           path="/admin/reviews"
+          component={Admin}
+        />
+
+        <Route
+          path="/admin/offers"
+          component={Admin}
+        />
+
+        <Route
+          path="/admin/subscribers"
+          component={Admin}
+        />
+
+        <Route
+          path="/admin/settings"
           component={Admin}
         />
 

@@ -1,16 +1,21 @@
 import {
   Award,
-  ChevronUp,
-  HeartHandshake,
+  ChevronRight,
   Headphones,
-  Search,
+  HeartHandshake,
+  Mail,
+  Phone,
+  Send,
   Shirt,
+  Sparkles,
   Truck,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { ProductCard } from "@/components/ProductCard";
 import { RabioraFooter } from "@/components/RabioraFooter";
 import { RabioraHeader } from "@/components/RabioraHeader";
+import { OfferBannerSlider } from "@/components/OfferBannerSlider";
 import { useRabioraCart } from "@/hooks/useRabioraCart";
 import { useRabioraWishlist } from "@/hooks/useRabioraWishlist";
 import { trpc } from "@/lib/trpc";
@@ -23,13 +28,36 @@ const paymentMethods = [
   ["/uploads/images/payment/cash-on-delivery.jpg", "Cash On Delivery"],
 ] as const;
 
+function WhyCard({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
+  return (
+    <article className="why-card">
+      <div className="why-icon" aria-hidden="true">
+        {icon}
+      </div>
+      <h3>{title}</h3>
+      <p>{text}</p>
+    </article>
+  );
+}
+
 export default function Home() {
+  const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "featured">("all");
   const [showBackToTop, setShowBackToTop] = useState(false);
   const { t } = useLanguage();
   const cart = useRabioraCart();
   const wishlist = useRabioraWishlist();
+  const customer = trpc.customer.me.useQuery();
+
+  // Newsletter State
+  const [subscribeEmail, setSubscribeEmail] = useState("");
+  const [subscribePhone, setSubscribePhone] = useState("");
+  const [residency, setResidency] = useState<"inside_bangladesh" | "outside_bangladesh">("inside_bangladesh");
+  const [subscribeSuccess, setSubscribeSuccess] = useState("");
+  const [subscribeError, setSubscribeError] = useState("");
+
+  const subscribeMutation = trpc.subscribe.useMutation();
 
   const productsQuery = trpc.catalogue.list.useQuery({
     query: search || undefined,
@@ -44,21 +72,46 @@ export default function Home() {
 
   useEffect(() => {
     const onScroll = () => setShowBackToTop(window.scrollY > 420);
-
     window.addEventListener("scroll", onScroll, { passive: true });
-
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   const carouselImages = useMemo(() => {
     const images = (featuredQuery.data ?? []).flatMap((product) =>
-      product.images.slice(0, 2),
+      product.images.slice(0, 2)
     );
-
     return [...images, ...images];
   }, [featuredQuery.data]);
 
   const addCart = (productId: number | string) => cart.add(productId);
+
+  const handleBuyNow = (productId: number | string) => {
+    const targetUrl = `/checkout?buyNowProductId=${productId}&qty=1`;
+    if (!customer.data) {
+      navigate(`/login?redirect=${encodeURIComponent(targetUrl)}`);
+    } else {
+      navigate(targetUrl);
+    }
+  };
+
+  const handleSubscribe = async (e: FormEvent) => {
+    e.preventDefault();
+    setSubscribeError("");
+    setSubscribeSuccess("");
+
+    try {
+      const res = await subscribeMutation.mutateAsync({
+        email: subscribeEmail,
+        phone: subscribePhone,
+        residency,
+      });
+      setSubscribeSuccess(res.message);
+      setSubscribeEmail("");
+      setSubscribePhone("");
+    } catch (err: any) {
+      setSubscribeError(err.message || "Failed to subscribe. Please try again.");
+    }
+  };
 
   return (
     <div className="page-shell">
@@ -70,28 +123,51 @@ export default function Home() {
       />
 
       <main>
+        {/* Luxury Editorial Hero Section */}
         <section className="hero" id="home">
           <div className="container hero-content">
             <div className="hero-text">
-              <span className="badge">{t("premium")}</span>
-              <h1>{t("heroHeading")}</h1>
-              <p>{t("heroCopy")}</p>
+              <span className="badge hero-badge">
+                <Sparkles size={13} className="hero-badge-icon" />
+                {t("premiumCollection") || "Premium Collection"}
+              </span>
+
+              <h1>
+                RABIORA <br />
+                <span className="hero-subtitle-highlight">Premium Pakistani Three Piece</span>
+              </h1>
+
+              <p className="hero-tagline">
+                Elegance • Comfort • Confidence
+              </p>
+              <p className="hero-copy">
+                Discover authentic handcrafted luxury Pakistani Three-Piece collections. Crafted with pure lawn, premium cotton, and intricate embroidery for timeless elegance.
+              </p>
 
               <div className="hero-buttons">
-                <a href="#products" className="btn">
-                  {t("shopNow")}
+                <a href="#products" className="btn hero-primary-btn">
+                  Shop Collection <ChevronRight size={16} />
                 </a>
-
-                <a href="#contact" className="btn-outline">
-                  {t("contact")}
+                <a href="#about" className="btn-outline hero-secondary-btn">
+                  Explore Story
                 </a>
               </div>
             </div>
 
-            <div className="hero-image" aria-hidden="true" />
+            <div className="hero-image" aria-hidden="true">
+              <div className="hero-image-backdrop" />
+              <div className="hero-floating-card">
+                <strong>100% Authentic</strong>
+                <span>Handcrafted Pakistani Design</span>
+              </div>
+            </div>
           </div>
         </section>
 
+        {/* Promotional Offer Banner Slider */}
+        <OfferBannerSlider />
+
+        {/* Featured Collection Slider */}
         <section className="featured-section">
           <div className="container">
             <div className="section-title">
@@ -107,6 +183,7 @@ export default function Home() {
                     src={image.storageUrl}
                     alt={image.altText}
                     key={`${image.storageUrl}-${index}`}
+                    loading="lazy"
                   />
                 ))}
               </div>
@@ -114,6 +191,7 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Products Grid Section */}
         <section id="products" className="products">
           <div className="container">
             <div className="section-title">
@@ -155,6 +233,7 @@ export default function Home() {
                     key={product.id}
                     product={product}
                     onAddCart={addCart}
+                    onBuyNow={handleBuyNow}
                     onToggleWishlist={(id) => wishlist.toggle(id)}
                     wishlisted={wishlist.ids.includes(product.id)}
                   />
@@ -164,6 +243,7 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Compact Why Customers Love Us Section */}
         <section className="why-us">
           <div className="container">
             <div className="section-title">
@@ -173,25 +253,22 @@ export default function Home() {
 
             <div className="why-grid">
               <WhyCard
-                icon={<Shirt />}
+                icon={<Shirt size={26} />}
                 title={t("premiumFabric")}
                 text={t("premiumFabricCopy")}
               />
-
               <WhyCard
-                icon={<Truck />}
+                icon={<Truck size={26} />}
                 title={t("fastDelivery")}
                 text={t("fastDeliveryCopy")}
               />
-
               <WhyCard
-                icon={<Award />}
+                icon={<Award size={26} />}
                 title={t("trustedQuality")}
                 text={t("trustedQualityCopy")}
               />
-
               <WhyCard
-                icon={<Headphones />}
+                icon={<Headphones size={26} />}
                 title={t("support")}
                 text={t("supportCopy")}
               />
@@ -199,7 +276,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Customer Reviews */}
+        {/* Customer Reviews Section */}
         <section id="reviews" className="reviews">
           <div className="container">
             <div className="section-title">
@@ -217,53 +294,30 @@ export default function Home() {
                 <HeartHandshake size={32} />
                 <p>Unable to load customer reviews.</p>
               </div>
-            ) : reviewsQuery.data &&
-              reviewsQuery.data.length > 0 ? (
+            ) : reviewsQuery.data && reviewsQuery.data.length > 0 ? (
               <div className="home-reviews-grid">
                 {reviewsQuery.data.map((review) => (
-                  <article
-                    key={review.id}
-                    className="home-review-card"
-                  >
+                  <article key={review.id} className="home-review-card">
                     <div className="home-review-header">
                       <div>
-                        <strong>
-                          {review.customerName ||
-                            "Verified Customer"}
-                        </strong>
-
-                        <div
-                          className="home-review-stars"
-                          aria-label={`${review.rating} out of 5 stars`}
-                        >
+                        <strong>{review.customerName || "Verified Customer"}</strong>
+                        <div className="home-review-stars" aria-label={`${review.rating} out of 5 stars`}>
                           {"★".repeat(review.rating)}
                           {"☆".repeat(5 - review.rating)}
                         </div>
                       </div>
-
                       <span className="home-review-date">
-                        {new Date(
-                          review.createdAt,
-                        ).toLocaleDateString("en-BD", {
+                        {new Date(review.createdAt).toLocaleDateString("en-BD", {
                           day: "numeric",
                           month: "short",
                           year: "numeric",
                         })}
                       </span>
                     </div>
-
-                    <p className="home-review-text">
-                      “{review.review}”
-                    </p>
-
+                    <p className="home-review-text">“{review.review}”</p>
                     <div className="home-review-footer">
-                      <span className="verified-review-label">
-                        ✓ Verified Purchase
-                      </span>
-
-                      <span className="home-review-product">
-                        {review.productName}
-                      </span>
+                      <span className="verified-review-label">✓ Verified Purchase</span>
+                      <span className="home-review-product">{review.productName}</span>
                     </div>
                   </article>
                 ))}
@@ -277,17 +331,18 @@ export default function Home() {
           </div>
         </section>
 
+        {/* About Section */}
         <section id="about" className="about">
           <div className="container">
             <div className="section-title">
               <span>{t("about")}</span>
               <h2>{t("aboutStore")}</h2>
             </div>
-
             <p>{t("aboutCopy")}</p>
           </div>
         </section>
 
+        {/* Payment Methods Section */}
         <section className="payment">
           <div className="container">
             <div className="section-title">
@@ -297,165 +352,98 @@ export default function Home() {
 
             <div className="payment-grid">
               {paymentMethods.map(([src, alt]) => (
-                <img
-                  src={src}
-                  alt={alt}
-                  key={alt}
-                />
+                <div className="payment-badge-card" key={alt}>
+                  <img src={src} alt={alt} loading="lazy" />
+                  <span>{alt}</span>
+                </div>
               ))}
             </div>
           </div>
         </section>
 
-        <section id="contact" className="contact">
+        {/* Stay Tuned / Subscription Section */}
+        <section className="stay-tuned-section">
           <div className="container">
-            <div className="section-title">
-              <span>{t("contact")}</span>
-              <h2>{t("getInTouch")}</h2>
-            </div>
+            <div className="stay-tuned-card">
+              <div className="stay-tuned-header">
+                <span className="badge">Newsletter</span>
+                <h2>STAY TUNED WITH RABIORA</h2>
+                <p>
+                  Subscribe to receive exclusive collection drops, VIP discounts, and luxury Pakistani fashion updates directly to your inbox.
+                </p>
+              </div>
 
-            <div className="contact-info">
-              <p>
-                <strong>{t("address")}:</strong> Mirerbazar,
-                Tongi, Gazipur, Dhaka, Bangladesh
-              </p>
+              <form className="stay-tuned-form" onSubmit={handleSubscribe}>
+                <div className="stay-tuned-inputs">
+                  <div className="form-input-group">
+                    <Mail size={17} className="input-icon" />
+                    <input
+                      type="email"
+                      required
+                      placeholder="Enter your email address"
+                      value={subscribeEmail}
+                      onChange={(e) => setSubscribeEmail(e.target.value)}
+                    />
+                  </div>
 
-              <p>
-                <strong>{t("phone")}:</strong> +8801349529274
-              </p>
+                  <div className="form-input-group">
+                    <Phone size={17} className="input-icon" />
+                    <input
+                      type="tel"
+                      required
+                      placeholder="Mobile number (01XXXXXXXXX)"
+                      value={subscribePhone}
+                      onChange={(e) => setSubscribePhone(e.target.value)}
+                    />
+                  </div>
+                </div>
 
-              <p>
-                <strong>{t("email")}:</strong>{" "}
-                rabiora001@gmail.com
-              </p>
-            </div>
+                <div className="stay-tuned-residency">
+                  <label className={`residency-option ${residency === "inside_bangladesh" ? "active" : ""}`}>
+                    <input
+                      type="radio"
+                      name="residency"
+                      value="inside_bangladesh"
+                      checked={residency === "inside_bangladesh"}
+                      onChange={() => setResidency("inside_bangladesh")}
+                    />
+                    <span>I live in Bangladesh</span>
+                  </label>
 
-            <div className="social-links">
-              <a
-                href="https://www.facebook.com/profile.php?id=61588852721335"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Facebook"
-                title="Facebook"
-              >
-                <SocialBrandIcon brand="facebook" />
-              </a>
+                  <label className={`residency-option ${residency === "outside_bangladesh" ? "active" : ""}`}>
+                    <input
+                      type="radio"
+                      name="residency"
+                      value="outside_bangladesh"
+                      checked={residency === "outside_bangladesh"}
+                      onChange={() => setResidency("outside_bangladesh")}
+                    />
+                    <span>I live outside Bangladesh</span>
+                  </label>
+                </div>
 
-              <a
-                href="https://www.instagram.com/rabiora001"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Instagram"
-                title="Instagram"
-              >
-                <SocialBrandIcon brand="instagram" />
-              </a>
+                {subscribeError && (
+                  <p className="form-error" role="alert">{subscribeError}</p>
+                )}
+                {subscribeSuccess && (
+                  <p className="form-success" role="status">{subscribeSuccess}</p>
+                )}
 
-              <a
-                href="https://www.tiktok.com/@rabiora01"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="TikTok"
-                title="TikTok"
-              >
-                <SocialBrandIcon brand="tiktok" />
-              </a>
+                <button
+                  type="submit"
+                  className="btn stay-tuned-btn"
+                  disabled={subscribeMutation.isPending}
+                >
+                  <Send size={16} />
+                  <span>{subscribeMutation.isPending ? "Subscribing..." : "SUBSCRIBE"}</span>
+                </button>
+              </form>
             </div>
           </div>
         </section>
       </main>
 
-      {showBackToTop && (
-        <button
-          className="back-to-top"
-          type="button"
-          onClick={() =>
-            window.scrollTo({
-              top: 0,
-              behavior: "smooth",
-            })
-          }
-          aria-label={t("backToTop")}
-        >
-          <ChevronUp size={21} />
-        </button>
-      )}
-
       <RabioraFooter />
     </div>
-  );
-}
-
-function WhyCard({
-  icon,
-  title,
-  text,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  text: string;
-}) {
-  return (
-    <article className="why-card">
-      <div className="why-icon">{icon}</div>
-      <h3>{title}</h3>
-      <p>{text}</p>
-    </article>
-  );
-}
-
-function SocialBrandIcon({
-  brand,
-}: {
-  brand: "facebook" | "instagram" | "tiktok";
-}) {
-  if (brand === "instagram") {
-    return (
-      <svg
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      >
-        <rect
-          x="3.4"
-          y="3.4"
-          width="17.2"
-          height="17.2"
-          rx="4.6"
-        />
-        <circle cx="12" cy="12" r="4.1" />
-        <circle
-          cx="17.35"
-          cy="6.75"
-          r=".85"
-          fill="currentColor"
-          stroke="none"
-        />
-      </svg>
-    );
-  }
-
-  if (brand === "facebook") {
-    return (
-      <svg
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-        fill="currentColor"
-      >
-        <path d="M13.8 21v-8h2.7l.4-3.1h-3.1V7.92c0-.9.25-1.52 1.58-1.52H17V3.62A21.86 21.86 0 0 0 14.61 3c-2.37 0-4 1.45-4 4.1v2.8H7.92V13h2.69v8h3.19Z" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      fill="currentColor"
-    >
-      <path d="M19.32 5.56a5.13 5.13 0 0 1-3.4-2.24A5.2 5.2 0 0 1 15.37 2h-3.2v13.04a2.6 2.6 0 1 1-2.6-2.6c.33 0 .65.06.95.18V9.37a5.8 5.8 0 1 0 4.85 5.73V8.49a8.3 8.3 0 0 0 4.86 1.56V6.88a5.14 5.14 0 0 1-.91-.12Z" />
-    </svg>
   );
 }

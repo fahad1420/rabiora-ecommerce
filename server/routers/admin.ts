@@ -24,6 +24,16 @@ import {
   setReviewVisibility,
   deleteProductReview,
 } from "../reviewService";
+import {
+  updateAdminSiteSettings,
+  listAdminSubscribers,
+  deleteAdminSubscriber,
+  listAdminOfferBanners,
+  createAdminOfferBanner,
+  updateAdminOfferBanner,
+  deleteAdminOfferBanner,
+  uploadAdminOfferImage,
+} from "../marketingService";
 
 const idSchema = z.union([z.number(), z.string()]);
 
@@ -209,5 +219,72 @@ export const adminRouter = router({
       .mutation(({ input }) =>
         deleteProductReview(input.reviewId)
       ),
+  }),
+
+  settings: router({
+    update: adminProcedure
+      .input(
+        z.object({
+          bkashNumber: z.string().trim().optional(),
+          nagadNumber: z.string().trim().optional(),
+          rocketNumber: z.string().trim().optional(),
+          heroBadge: z.string().trim().optional(),
+          heroHeading: z.string().trim().optional(),
+          heroTagline: z.string().trim().optional(),
+          heroImageUrl: z.string().trim().optional(),
+        })
+      )
+      .mutation(({ input }) => updateAdminSiteSettings(input)),
+  }),
+
+  subscribers: router({
+    list: adminProcedure.query(() => listAdminSubscribers()),
+    delete: adminProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(({ input }) => deleteAdminSubscriber(input.id)),
+  }),
+
+  offers: router({
+    list: adminProcedure.query(() => listAdminOfferBanners()),
+    create: adminProcedure
+      .input(
+        z.object({
+          title: z.string().trim().min(2).max(200),
+          subtitle: z.string().trim().max(300).optional(),
+          badge: z.string().trim().max(100).optional(),
+          discountCode: z.string().trim().max(50).optional(),
+          imageUrl: z.string().trim().min(1),
+          linkUrl: z.string().trim().max(300).optional(),
+          isActive: z.boolean().optional(),
+          displayOrder: z.number().int().optional(),
+        })
+      )
+      .mutation(({ input }) => createAdminOfferBanner(input)),
+    update: adminProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          title: z.string().trim().min(2).max(200).optional(),
+          subtitle: z.string().trim().max(300).optional(),
+          badge: z.string().trim().max(100).optional(),
+          discountCode: z.string().trim().max(50).optional(),
+          imageUrl: z.string().trim().optional(),
+          linkUrl: z.string().trim().max(300).optional(),
+          isActive: z.boolean().optional(),
+          displayOrder: z.number().int().optional(),
+        })
+      )
+      .mutation(({ input }) => updateAdminOfferBanner(input.id, input)),
+    delete: adminProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(({ input }) => deleteAdminOfferBanner(input.id)),
+    uploadImage: adminProcedure
+      .input(
+        z.object({
+          dataUri: z.string().min(10),
+          fileName: z.string().optional(),
+        })
+      )
+      .mutation(({ input }) => uploadAdminOfferImage(input.dataUri, input.fileName)),
   }),
 });
