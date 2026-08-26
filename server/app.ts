@@ -55,6 +55,12 @@ export function createExpressApp(): express.Express {
     res.status(200).json({
       status: "ok",
       timestamp: new Date().toISOString(),
+      vercelProject: {
+        projectName: process.env.VERCEL_PROJECT_NAME || "local",
+        environment: process.env.VERCEL_ENV || "development",
+        gitRepo: process.env.VERCEL_GIT_REPO_SLUG || "rabiora-ecommerce",
+        gitBranch: process.env.VERCEL_GIT_COMMIT_REF || "main",
+      },
       env: {
         hasMongoUri: Boolean(mongoUri),
         mongoUriScheme: mongoUri ? (mongoUri.startsWith("mongodb+srv://") ? "mongodb+srv" : "mongodb") : "none",
