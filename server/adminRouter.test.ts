@@ -14,6 +14,7 @@ const adminService = vi.hoisted(() => ({
   advanceOrderStatus: vi.fn(),
   listAdminCustomers: vi.fn(),
   getAdminCustomerDetail: vi.fn(),
+  updateAdminCustomerRole: vi.fn(),
 }));
 
 vi.mock("./adminService", () => adminService);
@@ -106,5 +107,27 @@ describe("admin product CRUD and order authorization", () => {
 
     expect(adminService.listAdminCustomers).toHaveBeenCalledTimes(1);
     expect(adminService.getAdminCustomerDetail).toHaveBeenCalledWith(7);
+  });
+
+  it("allows administrators to update customer roles", async () => {
+    adminService.updateAdminCustomerRole.mockResolvedValue({
+      id: "7",
+      name: "Test Customer",
+      phone: "+8801712345678",
+      email: "test@example.com",
+      role: "admin",
+    });
+
+    await expect(
+      caller("admin").customers.updateRole({ id: "7", role: "admin" })
+    ).resolves.toEqual({
+      id: "7",
+      name: "Test Customer",
+      phone: "+8801712345678",
+      email: "test@example.com",
+      role: "admin",
+    });
+
+    expect(adminService.updateAdminCustomerRole).toHaveBeenCalledWith("7", "admin");
   });
 });

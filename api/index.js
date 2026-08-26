@@ -2913,6 +2913,28 @@ async function getAdminCustomerDetail(customerId) {
     }))
   };
 }
+async function updateAdminCustomerRole(customerId, role) {
+  await connectMongo();
+  const query = findUserQuery(customerId);
+  const updated = await UserModel.findOneAndUpdate(
+    query,
+    { $set: { role } },
+    { new: true }
+  ).lean();
+  if (!updated) {
+    throw new TRPCError14({
+      code: "NOT_FOUND",
+      message: "Customer not found."
+    });
+  }
+  return {
+    id: updated._id.toString(),
+    name: updated.name,
+    phone: updated.phone,
+    email: updated.email,
+    role: updated.role
+  };
+}
 async function advanceOrderStatus(orderId, nextStatus, actorUserId, adminNote) {
   await connectMongo();
   const order = await OrderModel.findOne(findOrderQuery(orderId));
@@ -3056,7 +3078,13 @@ var adminRouter = router({
       z4.object({
         id: idSchema3
       })
-    ).query(({ input }) => getAdminCustomerDetail(input.id))
+    ).query(({ input }) => getAdminCustomerDetail(input.id)),
+    updateRole: adminProcedure.input(
+      z4.object({
+        id: idSchema3,
+        role: z4.enum(["user", "admin"])
+      })
+    ).mutation(({ input }) => updateAdminCustomerRole(input.id, input.role))
   }),
   reviews: router({
     list: adminProcedure.query(() => listAdminReviews()),

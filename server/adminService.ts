@@ -575,6 +575,31 @@ export async function getAdminCustomerDetail(customerId: string | number) {
   };
 }
 
+export async function updateAdminCustomerRole(customerId: string | number, role: "user" | "admin") {
+  await connectMongo();
+  const query = findUserQuery(customerId);
+  const updated = await UserModel.findOneAndUpdate(
+    query,
+    { $set: { role } },
+    { new: true }
+  ).lean();
+
+  if (!updated) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Customer not found.",
+    });
+  }
+
+  return {
+    id: updated._id.toString(),
+    name: updated.name,
+    phone: updated.phone,
+    email: updated.email,
+    role: updated.role,
+  };
+}
+
 export async function advanceOrderStatus(
   orderId: string | number,
   nextStatus: "confirmed" | "shipped" | "delivered",

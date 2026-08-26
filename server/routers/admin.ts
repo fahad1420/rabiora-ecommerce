@@ -14,6 +14,7 @@ import {
   removeAdminProductImage,
   setAdminProductCover,
   updateAdminCategory,
+  updateAdminCustomerRole,
   updateAdminProduct,
   uploadAdminProductImage,
 } from "../adminService";
@@ -171,6 +172,15 @@ export const adminRouter = router({
         })
       )
       .query(({ input }) => getAdminCustomerDetail(input.id)),
+
+    updateRole: adminProcedure
+      .input(
+        z.object({
+          id: idSchema,
+          role: z.enum(["user", "admin"]),
+        })
+      )
+      .mutation(({ input }) => updateAdminCustomerRole(input.id, input.role)),
   }),
 
   reviews: router({
