@@ -134,6 +134,11 @@ function Router() {
         />
 
         <Route
+          path="/admin/coupons"
+          component={Admin}
+        />
+
+        <Route
           path="/admin/subscribers"
           component={Admin}
         />
