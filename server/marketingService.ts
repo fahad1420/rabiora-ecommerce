@@ -150,11 +150,12 @@ export async function listActiveOfferBanners() {
   if (totalCount === 0) {
     // If database is brand new, seed an initial persistent banner
     const defaultBanner = await OfferBannerModel.create({
+      offerType: "text",
       title: "10% OFF on bKash Payment",
       subtitle: "Exclusive Rabiora Discount on all Three-Piece Collections",
       badge: "Special Offer",
       discountCode: "BKASH10",
-      imageUrl: "/uploads/images/branding/rabiora-logo.jpeg",
+      imageUrl: "",
       linkUrl: "/#products",
       isActive: true,
       displayOrder: 0,
@@ -162,11 +163,12 @@ export async function listActiveOfferBanners() {
     return [
       {
         id: defaultBanner._id.toString(),
+        offerType: defaultBanner.offerType || "text",
         title: defaultBanner.title,
         subtitle: defaultBanner.subtitle || "",
         badge: defaultBanner.badge || "Special Offer",
         discountCode: defaultBanner.discountCode || "",
-        imageUrl: defaultBanner.imageUrl,
+        imageUrl: defaultBanner.imageUrl || "",
         linkUrl: defaultBanner.linkUrl || "/#products",
         isActive: defaultBanner.isActive,
         displayOrder: defaultBanner.displayOrder,
@@ -177,11 +179,12 @@ export async function listActiveOfferBanners() {
   const banners = await OfferBannerModel.find({ isActive: true }).sort({ displayOrder: 1, createdAt: -1 }).lean();
   return banners.map((b) => ({
     id: b._id.toString(),
+    offerType: (b.offerType || "text") as "text" | "image_banner",
     title: b.title,
     subtitle: b.subtitle || "",
     badge: b.badge || "Special Offer",
     discountCode: b.discountCode || "",
-    imageUrl: b.imageUrl,
+    imageUrl: b.imageUrl || "",
     linkUrl: b.linkUrl || "/#products",
     isActive: b.isActive,
     displayOrder: b.displayOrder,
@@ -193,11 +196,12 @@ export async function listAdminOfferBanners() {
   const banners = await OfferBannerModel.find().sort({ displayOrder: 1, createdAt: -1 }).lean();
   return banners.map((b) => ({
     id: b._id.toString(),
+    offerType: (b.offerType || "text") as "text" | "image_banner",
     title: b.title,
     subtitle: b.subtitle || "",
     badge: b.badge || "Special Offer",
     discountCode: b.discountCode || "",
-    imageUrl: b.imageUrl,
+    imageUrl: b.imageUrl || "",
     linkUrl: b.linkUrl || "/#products",
     isActive: b.isActive,
     displayOrder: b.displayOrder,
@@ -206,22 +210,29 @@ export async function listAdminOfferBanners() {
 }
 
 export async function createAdminOfferBanner(input: {
+  offerType?: "text" | "image_banner";
   title: string;
   subtitle?: string;
   badge?: string;
   discountCode?: string;
-  imageUrl: string;
+  imageUrl?: string;
   linkUrl?: string;
   isActive?: boolean;
   displayOrder?: number;
 }) {
   await connectMongo();
+  const offerType = input.offerType || "image_banner";
+  if (offerType === "image_banner" && !input.imageUrl?.trim()) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "An image is required for Image Banner offers." });
+  }
+
   const created = await OfferBannerModel.create({
+    offerType,
     title: input.title.trim(),
     subtitle: input.subtitle?.trim() || "",
     badge: input.badge?.trim() || "Special Offer",
     discountCode: input.discountCode?.trim() || "",
-    imageUrl: input.imageUrl.trim(),
+    imageUrl: input.imageUrl?.trim() || "",
     linkUrl: input.linkUrl?.trim() || "/#products",
     isActive: input.isActive ?? true,
     displayOrder: input.displayOrder ?? 0,
@@ -229,6 +240,7 @@ export async function createAdminOfferBanner(input: {
 
   return {
     id: created._id.toString(),
+    offerType: created.offerType,
     title: created.title,
     subtitle: created.subtitle,
     badge: created.badge,
@@ -243,6 +255,7 @@ export async function createAdminOfferBanner(input: {
 export async function updateAdminOfferBanner(
   id: string,
   input: {
+    offerType?: "text" | "image_banner";
     title?: string;
     subtitle?: string;
     badge?: string;
@@ -254,10 +267,15 @@ export async function updateAdminOfferBanner(
   }
 ) {
   await connectMongo();
+  if (input.offerType === "image_banner" && input.imageUrl !== undefined && !input.imageUrl.trim()) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "An image is required for Image Banner offers." });
+  }
+
   const updated = await OfferBannerModel.findByIdAndUpdate(
     id,
     {
       $set: {
+        ...(input.offerType !== undefined && { offerType: input.offerType }),
         ...(input.title !== undefined && { title: input.title.trim() }),
         ...(input.subtitle !== undefined && { subtitle: input.subtitle.trim() }),
         ...(input.badge !== undefined && { badge: input.badge.trim() }),
@@ -277,11 +295,12 @@ export async function updateAdminOfferBanner(
 
   return {
     id: updated._id.toString(),
+    offerType: updated.offerType || "text",
     title: updated.title,
     subtitle: updated.subtitle,
     badge: updated.badge,
     discountCode: updated.discountCode,
-    imageUrl: updated.imageUrl,
+    imageUrl: updated.imageUrl || "",
     linkUrl: updated.linkUrl,
     isActive: updated.isActive,
     displayOrder: updated.displayOrder,

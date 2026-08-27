@@ -1209,6 +1209,47 @@ img { display: block; max-width: 100%; }
   background: #c9a46c;
 }
 
+/* Dual Special Offer Types: Text & Full Image Banner */
+.offer-banner-card.has-no-media {
+  grid-template-columns: 1fr;
+  text-align: left;
+}
+
+.offer-image-banner-card {
+  position: relative;
+  background: #0d2825;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 12px 36px rgba(16, 51, 48, 0.25);
+  border: 1px solid rgba(201, 164, 108, 0.35);
+  line-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.offer-image-banner-link {
+  display: block;
+  width: 100%;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.offer-image-banner-full-img {
+  width: 100%;
+  height: auto;
+  max-height: 380px;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  border-radius: 20px;
+  transition: transform 0.28s ease;
+}
+
+.offer-image-banner-link:hover .offer-image-banner-full-img {
+  transform: scale(1.01);
+}
+
 /* 4. Compact Product Card & Split Actions */
 .product-card {
   border-radius: 14px;
@@ -2643,5 +2684,14 @@ img { display: block; max-width: 100%; }
     height: 86px;
     border-radius: 12px;
     object-fit: contain;
+  }
+
+  .offer-image-banner-card {
+    border-radius: 12px;
+  }
+
+  .offer-image-banner-full-img {
+    max-height: 200px;
+    border-radius: 12px;
   }
 }

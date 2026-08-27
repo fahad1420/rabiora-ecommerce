@@ -1591,6 +1591,7 @@ function OfferBannersManager() {
   const uploadImage = trpc.admin.offers.uploadImage.useMutation();
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [offerType, setOfferType] = useState<"text" | "image_banner">("image_banner");
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [badge, setBadge] = useState("Special Offer");
@@ -1604,6 +1605,7 @@ function OfferBannersManager() {
 
   const resetForm = () => {
     setEditingId(null);
+    setOfferType("image_banner");
     setTitle("");
     setSubtitle("");
     setBadge("Special Offer");
@@ -1618,11 +1620,12 @@ function OfferBannersManager() {
 
   const handleEdit = (banner: any) => {
     setEditingId(banner.id);
+    setOfferType(banner.offerType || "text");
     setTitle(banner.title);
     setSubtitle(banner.subtitle || "");
     setBadge(banner.badge || "Special Offer");
     setDiscountCode(banner.discountCode || "");
-    setImageUrl(banner.imageUrl);
+    setImageUrl(banner.imageUrl || "");
     setLinkUrl(banner.linkUrl || "/#products");
     setIsActive(banner.isActive);
     setDisplayOrder(banner.displayOrder || 0);
@@ -1657,18 +1660,19 @@ function OfferBannersManager() {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!imageUrl.trim()) {
-      alert("Please upload or provide an image for this Special Offer banner.");
+    if (offerType === "image_banner" && !imageUrl.trim()) {
+      alert("Please upload or provide an image for the Image Banner offer.");
       return;
     }
 
     if (editingId) {
       update.mutate({
         id: editingId,
+        offerType,
         title,
-        subtitle,
-        badge,
-        discountCode,
+        subtitle: offerType === "text" ? subtitle : "",
+        badge: offerType === "text" ? badge : "",
+        discountCode: offerType === "text" ? discountCode : "",
         imageUrl: imageUrl.trim(),
         linkUrl: linkUrl.trim() || "/#products",
         isActive,
@@ -1676,10 +1680,11 @@ function OfferBannersManager() {
       });
     } else {
       create.mutate({
+        offerType,
         title,
-        subtitle,
-        badge,
-        discountCode,
+        subtitle: offerType === "text" ? subtitle : "",
+        badge: offerType === "text" ? badge : "",
+        discountCode: offerType === "text" ? discountCode : "",
         imageUrl: imageUrl.trim(),
         linkUrl: linkUrl.trim() || "/#products",
         isActive,
@@ -1693,55 +1698,88 @@ function OfferBannersManager() {
       <section className="admin-heading">
         <div>
           <p>Storefront Promotions</p>
-          <h1>Offer Banners</h1>
+          <h1>Special Offers & Banners</h1>
         </div>
       </section>
 
       <div className="admin-grid">
         <form className="admin-form" onSubmit={handleSubmit}>
-          <h2>{editingId ? "Edit Offer Banner" : "New Offer Banner"}</h2>
+          <h2>{editingId ? "Edit Special Offer" : "New Special Offer"}</h2>
+
+          {/* Offer Type Selector */}
+          <label>
+            Offer Format Type
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "6px" }}>
+              <button
+                type="button"
+                className={offerType === "image_banner" ? "btn" : "btn-outline"}
+                style={{ padding: "10px", fontSize: "13px", fontWeight: "700" }}
+                onClick={() => setOfferType("image_banner")}
+              >
+                🖼️ Image Banner
+              </button>
+              <button
+                type="button"
+                className={offerType === "text" ? "btn" : "btn-outline"}
+                style={{ padding: "10px", fontSize: "13px", fontWeight: "700" }}
+                onClick={() => setOfferType("text")}
+              >
+                📝 Text Offer
+              </button>
+            </div>
+            <small style={{ display: "block", marginTop: "4px", color: "var(--gray)" }}>
+              {offerType === "image_banner"
+                ? "Uploads one complete banner image with all graphics/text built in. No text overlays shown on homepage."
+                : "Creates a styled text offer box. Image is optional and no placeholder is forced."}
+            </small>
+          </label>
 
           <label>
-            Offer Title
+            {offerType === "image_banner" ? "Banner Name / Alt Label" : "Offer Title"}
             <input
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., 10% OFF on bKash Payment"
+              placeholder={offerType === "image_banner" ? "e.g., Eid Mega Discount Banner" : "e.g., 10% OFF on bKash Payment"}
             />
           </label>
 
+          {offerType === "text" && (
+            <>
+              <label>
+                Subtitle / Description
+                <input
+                  value={subtitle}
+                  onChange={(e) => setSubtitle(e.target.value)}
+                  placeholder="Exclusive Rabiora Pakistani Three-Piece Discount"
+                />
+              </label>
+
+              <div className="admin-field-pair">
+                <label>
+                  Badge Text
+                  <input
+                    value={badge}
+                    onChange={(e) => setBadge(e.target.value)}
+                    placeholder="Special Offer"
+                  />
+                </label>
+
+                <label>
+                  Discount Coupon Code
+                  <input
+                    value={discountCode}
+                    onChange={(e) => setDiscountCode(e.target.value)}
+                    placeholder="BKASH10"
+                  />
+                </label>
+              </div>
+            </>
+          )}
+
+          {/* Banner Image Upload */}
           <label>
-            Subtitle / Description
-            <input
-              value={subtitle}
-              onChange={(e) => setSubtitle(e.target.value)}
-              placeholder="Exclusive Rabiora Pakistani Three-Piece Discount"
-            />
-          </label>
-
-          <div className="admin-field-pair">
-            <label>
-              Badge Text
-              <input
-                value={badge}
-                onChange={(e) => setBadge(e.target.value)}
-                placeholder="Special Offer"
-              />
-            </label>
-
-            <label>
-              Discount Coupon Code
-              <input
-                value={discountCode}
-                onChange={(e) => setDiscountCode(e.target.value)}
-                placeholder="BKASH10"
-              />
-            </label>
-          </div>
-
-          <label>
-            Banner Image (Upload or Cloudinary URL)
+            {offerType === "image_banner" ? "Full Banner Image (Required)" : "Side Image (Optional for Text Offer)"}
             <input type="file" accept="image/*" onChange={handleImageFile} disabled={isUploading} />
             {isUploading && <small style={{ color: "var(--primary)" }}>Uploading image to storage...</small>}
             {uploadError && <small style={{ color: "var(--sale)" }}>{uploadError}</small>}
@@ -1750,23 +1788,41 @@ function OfferBannersManager() {
               onChange={(e) => setImageUrl(e.target.value)}
               placeholder="https://res.cloudinary.com/..."
               style={{ marginTop: "6px" }}
-              required
+              required={offerType === "image_banner"}
             />
           </label>
 
           {imageUrl && (
             <div style={{ margin: "10px 0", display: "flex", alignItems: "center", gap: "12px", background: "var(--soft-bg)", padding: "10px", borderRadius: "10px" }}>
-              <img src={imageUrl} alt="Banner Preview" style={{ width: "70px", height: "70px", objectFit: "contain", borderRadius: "8px", background: "#fff" }} />
-              <div>
-                <strong style={{ color: "var(--primary)", fontSize: "13px" }}>✓ Image Uploaded & Persistent</strong>
-                <p style={{ margin: "2px 0 0", fontSize: "11px", color: "var(--gray)", wordBreak: "break-all" }}>{imageUrl}</p>
+              <img
+                src={imageUrl}
+                alt="Banner Preview"
+                style={{
+                  width: offerType === "image_banner" ? "120px" : "70px",
+                  height: "70px",
+                  objectFit: "contain",
+                  borderRadius: "8px",
+                  background: "#fff",
+                  border: "1px solid var(--border)",
+                }}
+              />
+              <div style={{ flex: 1 }}>
+                <strong style={{ color: "var(--primary)", fontSize: "13px" }}>✓ Image Ready & Saved</strong>
+                <p style={{ margin: "2px 0 4px", fontSize: "11px", color: "var(--gray)", wordBreak: "break-all" }}>{imageUrl}</p>
+                <button
+                  type="button"
+                  style={{ background: "none", border: 0, padding: 0, color: "var(--sale)", fontSize: "11px", cursor: "pointer", textDecoration: "underline" }}
+                  onClick={() => setImageUrl("")}
+                >
+                  Remove Image
+                </button>
               </div>
             </div>
           )}
 
           <div className="admin-field-pair">
             <label>
-              Link URL
+              Link URL (Click Destination)
               <input
                 value={linkUrl}
                 onChange={(e) => setLinkUrl(e.target.value)}
@@ -1795,7 +1851,7 @@ function OfferBannersManager() {
 
           <div className="admin-actions">
             <button className="btn" disabled={isUploading || create.isPending || update.isPending}>
-              {editingId ? "Update Banner" : "Create Banner"}
+              {editingId ? "Update Offer" : "Create Offer"}
             </button>
             {editingId && (
               <button type="button" className="btn-outline" onClick={resetForm}>
@@ -1806,24 +1862,39 @@ function OfferBannersManager() {
         </form>
 
         <section className="admin-list-card">
-          <h2>Active & Configured Banners</h2>
+          <h2>Active & Configured Offers ({offers.data?.length ?? 0})</h2>
           {offers.isLoading ? (
-            <p>Loading banners...</p>
+            <p>Loading offers...</p>
           ) : offers.data?.length === 0 ? (
             <p>No offer banners created yet.</p>
           ) : (
             <div className="admin-product-list">
               {offers.data?.map((banner) => (
                 <article key={banner.id} className="admin-product-row">
-                  <img src={banner.imageUrl} alt={banner.title} style={{ width: "64px", height: "64px", objectFit: "contain", background: "#f8fafc", borderRadius: "8px", padding: "2px" }} />
+                  {banner.imageUrl ? (
+                    <img
+                      src={banner.imageUrl}
+                      alt={banner.title}
+                      style={{ width: "70px", height: "64px", objectFit: "contain", background: "#f8fafc", borderRadius: "8px", padding: "2px" }}
+                    />
+                  ) : (
+                    <div style={{ width: "70px", height: "64px", display: "grid", placeItems: "center", background: "#f1f5f9", borderRadius: "8px", fontSize: "20px" }}>
+                      📝
+                    </div>
+                  )}
                   <div>
                     <strong>{banner.title}</strong>
-                    {banner.subtitle && <p>{banner.subtitle}</p>}
+                    <div style={{ margin: "3px 0", display: "flex", gap: "6px", alignItems: "center" }}>
+                      <span className="status-pill status-confirmed" style={{ fontSize: "10px", padding: "2px 8px" }}>
+                        {banner.offerType === "image_banner" ? "🖼️ Image Banner" : "📝 Text Offer"}
+                      </span>
+                      <span className={`status-pill ${banner.isActive ? "status-confirmed" : "status-pending"}`} style={{ fontSize: "10px", padding: "2px 8px" }}>
+                        {banner.isActive ? "Active" : "Hidden"}
+                      </span>
+                    </div>
+                    {banner.subtitle && <p style={{ margin: "2px 0", fontSize: "12px" }}>{banner.subtitle}</p>}
                     <small>
-                      Badge: <strong>{banner.badge}</strong> • Code: <strong>{banner.discountCode || "None"}</strong> • Order: {banner.displayOrder}
-                    </small>
-                    <small>
-                      Status: <span className={`status-pill ${banner.isActive ? "status-confirmed" : "status-pending"}`}>{banner.isActive ? "Active" : "Hidden"}</span>
+                      {banner.badge ? `Badge: ${banner.badge} • ` : ""}{banner.discountCode ? `Code: ${banner.discountCode} • ` : ""}Order: {banner.displayOrder}
                     </small>
                   </div>
                   <div className="row-actions">
@@ -1844,7 +1915,7 @@ function OfferBannersManager() {
                       type="button"
                       className="danger"
                       onClick={() => {
-                        if (window.confirm(`Delete banner "${banner.title}"?`)) {
+                        if (window.confirm(`Delete offer "${banner.title}"?`)) {
                           remove.mutate({ id: banner.id });
                         }
                       }}

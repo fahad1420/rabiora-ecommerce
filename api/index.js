@@ -425,11 +425,17 @@ var init_OfferBanner = __esm({
     "use strict";
     OfferBannerSchema = new Schema12(
       {
+        offerType: {
+          type: String,
+          enum: ["text", "image_banner"],
+          default: "text",
+          index: true
+        },
         title: { type: String, required: true, trim: true },
         subtitle: { type: String, trim: true, default: "" },
         badge: { type: String, trim: true, default: "Special Offer" },
         discountCode: { type: String, trim: true, default: "" },
-        imageUrl: { type: String, required: true, trim: true },
+        imageUrl: { type: String, trim: true, default: "" },
         linkUrl: { type: String, trim: true, default: "/#products" },
         isActive: { type: Boolean, default: true, index: true },
         displayOrder: { type: Number, default: 0, index: true }
@@ -3243,11 +3249,12 @@ async function listActiveOfferBanners() {
   const totalCount = await OfferBannerModel.countDocuments();
   if (totalCount === 0) {
     const defaultBanner = await OfferBannerModel.create({
+      offerType: "text",
       title: "10% OFF on bKash Payment",
       subtitle: "Exclusive Rabiora Discount on all Three-Piece Collections",
       badge: "Special Offer",
       discountCode: "BKASH10",
-      imageUrl: "/uploads/images/branding/rabiora-logo.jpeg",
+      imageUrl: "",
       linkUrl: "/#products",
       isActive: true,
       displayOrder: 0
@@ -3255,11 +3262,12 @@ async function listActiveOfferBanners() {
     return [
       {
         id: defaultBanner._id.toString(),
+        offerType: defaultBanner.offerType || "text",
         title: defaultBanner.title,
         subtitle: defaultBanner.subtitle || "",
         badge: defaultBanner.badge || "Special Offer",
         discountCode: defaultBanner.discountCode || "",
-        imageUrl: defaultBanner.imageUrl,
+        imageUrl: defaultBanner.imageUrl || "",
         linkUrl: defaultBanner.linkUrl || "/#products",
         isActive: defaultBanner.isActive,
         displayOrder: defaultBanner.displayOrder
@@ -3269,11 +3277,12 @@ async function listActiveOfferBanners() {
   const banners = await OfferBannerModel.find({ isActive: true }).sort({ displayOrder: 1, createdAt: -1 }).lean();
   return banners.map((b) => ({
     id: b._id.toString(),
+    offerType: b.offerType || "text",
     title: b.title,
     subtitle: b.subtitle || "",
     badge: b.badge || "Special Offer",
     discountCode: b.discountCode || "",
-    imageUrl: b.imageUrl,
+    imageUrl: b.imageUrl || "",
     linkUrl: b.linkUrl || "/#products",
     isActive: b.isActive,
     displayOrder: b.displayOrder
@@ -3284,11 +3293,12 @@ async function listAdminOfferBanners() {
   const banners = await OfferBannerModel.find().sort({ displayOrder: 1, createdAt: -1 }).lean();
   return banners.map((b) => ({
     id: b._id.toString(),
+    offerType: b.offerType || "text",
     title: b.title,
     subtitle: b.subtitle || "",
     badge: b.badge || "Special Offer",
     discountCode: b.discountCode || "",
-    imageUrl: b.imageUrl,
+    imageUrl: b.imageUrl || "",
     linkUrl: b.linkUrl || "/#products",
     isActive: b.isActive,
     displayOrder: b.displayOrder,
@@ -3297,18 +3307,24 @@ async function listAdminOfferBanners() {
 }
 async function createAdminOfferBanner(input) {
   await connectMongo();
+  const offerType = input.offerType || "image_banner";
+  if (offerType === "image_banner" && !input.imageUrl?.trim()) {
+    throw new TRPCError15({ code: "BAD_REQUEST", message: "An image is required for Image Banner offers." });
+  }
   const created = await OfferBannerModel.create({
+    offerType,
     title: input.title.trim(),
     subtitle: input.subtitle?.trim() || "",
     badge: input.badge?.trim() || "Special Offer",
     discountCode: input.discountCode?.trim() || "",
-    imageUrl: input.imageUrl.trim(),
+    imageUrl: input.imageUrl?.trim() || "",
     linkUrl: input.linkUrl?.trim() || "/#products",
     isActive: input.isActive ?? true,
     displayOrder: input.displayOrder ?? 0
   });
   return {
     id: created._id.toString(),
+    offerType: created.offerType,
     title: created.title,
     subtitle: created.subtitle,
     badge: created.badge,
@@ -3321,10 +3337,14 @@ async function createAdminOfferBanner(input) {
 }
 async function updateAdminOfferBanner(id, input) {
   await connectMongo();
+  if (input.offerType === "image_banner" && input.imageUrl !== void 0 && !input.imageUrl.trim()) {
+    throw new TRPCError15({ code: "BAD_REQUEST", message: "An image is required for Image Banner offers." });
+  }
   const updated = await OfferBannerModel.findByIdAndUpdate(
     id,
     {
       $set: {
+        ...input.offerType !== void 0 && { offerType: input.offerType },
         ...input.title !== void 0 && { title: input.title.trim() },
         ...input.subtitle !== void 0 && { subtitle: input.subtitle.trim() },
         ...input.badge !== void 0 && { badge: input.badge.trim() },
@@ -3342,11 +3362,12 @@ async function updateAdminOfferBanner(id, input) {
   }
   return {
     id: updated._id.toString(),
+    offerType: updated.offerType || "text",
     title: updated.title,
     subtitle: updated.subtitle,
     badge: updated.badge,
     discountCode: updated.discountCode,
-    imageUrl: updated.imageUrl,
+    imageUrl: updated.imageUrl || "",
     linkUrl: updated.linkUrl,
     isActive: updated.isActive,
     displayOrder: updated.displayOrder
@@ -3526,11 +3547,12 @@ var adminRouter = router({
     list: adminProcedure.query(() => listAdminOfferBanners()),
     create: adminProcedure.input(
       z4.object({
-        title: z4.string().trim().min(2).max(200),
+        offerType: z4.enum(["text", "image_banner"]).optional(),
+        title: z4.string().trim().min(1).max(200),
         subtitle: z4.string().trim().max(300).optional(),
         badge: z4.string().trim().max(100).optional(),
         discountCode: z4.string().trim().max(50).optional(),
-        imageUrl: z4.string().trim().min(1),
+        imageUrl: z4.string().trim().optional(),
         linkUrl: z4.string().trim().max(300).optional(),
         isActive: z4.boolean().optional(),
         displayOrder: z4.number().int().optional()
@@ -3539,7 +3561,8 @@ var adminRouter = router({
     update: adminProcedure.input(
       z4.object({
         id: z4.string(),
-        title: z4.string().trim().min(2).max(200).optional(),
+        offerType: z4.enum(["text", "image_banner"]).optional(),
+        title: z4.string().trim().min(1).max(200).optional(),
         subtitle: z4.string().trim().max(300).optional(),
         badge: z4.string().trim().max(100).optional(),
         discountCode: z4.string().trim().max(50).optional(),

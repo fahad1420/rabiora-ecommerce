@@ -249,11 +249,12 @@ export const adminRouter = router({
     create: adminProcedure
       .input(
         z.object({
-          title: z.string().trim().min(2).max(200),
+          offerType: z.enum(["text", "image_banner"]).optional(),
+          title: z.string().trim().min(1).max(200),
           subtitle: z.string().trim().max(300).optional(),
           badge: z.string().trim().max(100).optional(),
           discountCode: z.string().trim().max(50).optional(),
-          imageUrl: z.string().trim().min(1),
+          imageUrl: z.string().trim().optional(),
           linkUrl: z.string().trim().max(300).optional(),
           isActive: z.boolean().optional(),
           displayOrder: z.number().int().optional(),
@@ -264,7 +265,8 @@ export const adminRouter = router({
       .input(
         z.object({
           id: z.string(),
-          title: z.string().trim().min(2).max(200).optional(),
+          offerType: z.enum(["text", "image_banner"]).optional(),
+          title: z.string().trim().min(1).max(200).optional(),
           subtitle: z.string().trim().max(300).optional(),
           badge: z.string().trim().max(100).optional(),
           discountCode: z.string().trim().max(50).optional(),
