@@ -1439,10 +1439,11 @@ async function saveLocalProductImage(productId, bytes, mimeType, fileName) {
   const extension = allowedExtensions[mimeType];
   if (!extension) throw new TRPCError({ code: "BAD_REQUEST", message: "Use a JPEG, PNG, or WebP image." });
   const fileNameWithId = `${safeStem(fileName)}-${crypto.randomUUID().slice(0, 12)}${extension}`;
-  const directory = path.join(getProductRoot(), String(productId));
+  const subFolder = typeof productId === "number" ? path.join("products", String(productId)) : String(productId);
+  const directory = path.join(getLocalImagesRoot(), subFolder);
   await fs.mkdir(directory, { recursive: true });
   await fs.writeFile(path.join(directory, fileNameWithId), bytes);
-  const storageKey = `products/${productId}/${fileNameWithId}`;
+  const storageKey = path.posix.join(...subFolder.split(path.sep), fileNameWithId);
   return { key: storageKey, url: `/uploads/images/${storageKey}` };
 }
 async function removeLocalProductImage(storageKey) {
@@ -2567,14 +2568,17 @@ function getCloudinaryConfig() {
 async function uploadToCloudinary(bytes, mimeType, fileName, productId) {
   const base64Data = `data:${mimeType};base64,${bytes.toString("base64")}`;
   const publicId = `${safeStem2(fileName)}_${Date.now().toString(36)}`;
+  const isOffer = productId === "offers";
+  const folder = isOffer ? "rabiora/offers" : "rabiora/products";
+  const tags = isOffer ? ["rabiora_offers"] : [`product_${productId}`, "rabiora_catalogue"];
   return new Promise((resolve, reject) => {
     cloudinary.uploader.upload(
       base64Data,
       {
-        folder: "rabiora/products",
+        folder,
         public_id: publicId,
         resource_type: "image",
-        tags: [`product_${productId}`, "rabiora_catalogue"]
+        tags
       },
       (error, result) => {
         if (error || !result) {
@@ -2610,7 +2614,7 @@ async function saveProductImage(productId, bytes, mimeType, fileName) {
       }
     }
   }
-  return saveLocalProductImage(typeof productId === "number" ? productId : 1, bytes, mimeType, fileName);
+  return saveLocalProductImage(productId, bytes, mimeType, fileName);
 }
 async function removeProductImage(storageKey) {
   if (!storageKey) return;
@@ -3236,22 +3240,33 @@ async function deleteAdminSubscriber(id) {
 }
 async function listActiveOfferBanners() {
   await connectMongo();
-  let banners = await OfferBannerModel.find({ isActive: true }).sort({ displayOrder: 1, createdAt: -1 }).lean();
-  if (banners.length === 0) {
+  const totalCount = await OfferBannerModel.countDocuments();
+  if (totalCount === 0) {
+    const defaultBanner = await OfferBannerModel.create({
+      title: "10% OFF on bKash Payment",
+      subtitle: "Exclusive Rabiora Discount on all Three-Piece Collections",
+      badge: "Special Offer",
+      discountCode: "BKASH10",
+      imageUrl: "/uploads/images/branding/rabiora-logo.jpeg",
+      linkUrl: "/#products",
+      isActive: true,
+      displayOrder: 0
+    });
     return [
       {
-        id: "default-offer-1",
-        title: "10% OFF on bKash Payment",
-        subtitle: "Exclusive Rabiora Discount on all Three-Piece Collections",
-        badge: "Special Offer",
-        discountCode: "BKASH10",
-        imageUrl: "/uploads/images/branding/rabiora-logo.jpeg",
-        linkUrl: "/#products",
-        isActive: true,
-        displayOrder: 0
+        id: defaultBanner._id.toString(),
+        title: defaultBanner.title,
+        subtitle: defaultBanner.subtitle || "",
+        badge: defaultBanner.badge || "Special Offer",
+        discountCode: defaultBanner.discountCode || "",
+        imageUrl: defaultBanner.imageUrl,
+        linkUrl: defaultBanner.linkUrl || "/#products",
+        isActive: defaultBanner.isActive,
+        displayOrder: defaultBanner.displayOrder
       }
     ];
   }
+  const banners = await OfferBannerModel.find({ isActive: true }).sort({ displayOrder: 1, createdAt: -1 }).lean();
   return banners.map((b) => ({
     id: b._id.toString(),
     title: b.title,

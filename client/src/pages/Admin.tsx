@@ -1599,6 +1599,8 @@ function OfferBannersManager() {
   const [linkUrl, setLinkUrl] = useState("/#products");
   const [isActive, setIsActive] = useState(true);
   const [displayOrder, setDisplayOrder] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
   const resetForm = () => {
     setEditingId(null);
@@ -1610,6 +1612,8 @@ function OfferBannersManager() {
     setLinkUrl("/#products");
     setIsActive(true);
     setDisplayOrder(0);
+    setIsUploading(false);
+    setUploadError("");
   };
 
   const handleEdit = (banner: any) => {
@@ -1622,22 +1626,42 @@ function OfferBannersManager() {
     setLinkUrl(banner.linkUrl || "/#products");
     setIsActive(banner.isActive);
     setDisplayOrder(banner.displayOrder || 0);
+    setIsUploading(false);
+    setUploadError("");
   };
 
   const handleImageFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setIsUploading(true);
+    setUploadError("");
+
     const reader = new FileReader();
     reader.onload = async () => {
-      const dataUri = reader.result as string;
-      const uploaded = await uploadImage.mutateAsync({ dataUri, fileName: file.name });
-      setImageUrl(uploaded.storageUrl);
+      try {
+        const dataUri = reader.result as string;
+        const uploaded = await uploadImage.mutateAsync({ dataUri, fileName: file.name });
+        setImageUrl(uploaded.storageUrl);
+      } catch (err: any) {
+        setUploadError(err.message || "Failed to upload image.");
+      } finally {
+        setIsUploading(false);
+      }
+    };
+    reader.onerror = () => {
+      setUploadError("Could not read local file.");
+      setIsUploading(false);
     };
     reader.readAsDataURL(file);
   };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    if (!imageUrl.trim()) {
+      alert("Please upload or provide an image for this Special Offer banner.");
+      return;
+    }
+
     if (editingId) {
       update.mutate({
         id: editingId,
@@ -1645,8 +1669,8 @@ function OfferBannersManager() {
         subtitle,
         badge,
         discountCode,
-        imageUrl,
-        linkUrl,
+        imageUrl: imageUrl.trim(),
+        linkUrl: linkUrl.trim() || "/#products",
         isActive,
         displayOrder,
       });
@@ -1656,8 +1680,8 @@ function OfferBannersManager() {
         subtitle,
         badge,
         discountCode,
-        imageUrl: imageUrl || "/uploads/images/branding/rabiora-logo.jpeg",
-        linkUrl,
+        imageUrl: imageUrl.trim(),
+        linkUrl: linkUrl.trim() || "/#products",
         isActive,
         displayOrder,
       });
@@ -1718,15 +1742,27 @@ function OfferBannersManager() {
 
           <label>
             Banner Image (Upload or Cloudinary URL)
-            <input type="file" accept="image/*" onChange={handleImageFile} />
-            {uploadImage.isPending && <small>Uploading to Cloudinary...</small>}
+            <input type="file" accept="image/*" onChange={handleImageFile} disabled={isUploading} />
+            {isUploading && <small style={{ color: "var(--primary)" }}>Uploading image to storage...</small>}
+            {uploadError && <small style={{ color: "var(--sale)" }}>{uploadError}</small>}
             <input
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
               placeholder="https://res.cloudinary.com/..."
               style={{ marginTop: "6px" }}
+              required
             />
           </label>
+
+          {imageUrl && (
+            <div style={{ margin: "10px 0", display: "flex", alignItems: "center", gap: "12px", background: "var(--soft-bg)", padding: "10px", borderRadius: "10px" }}>
+              <img src={imageUrl} alt="Banner Preview" style={{ width: "70px", height: "70px", objectFit: "contain", borderRadius: "8px", background: "#fff" }} />
+              <div>
+                <strong style={{ color: "var(--primary)", fontSize: "13px" }}>✓ Image Uploaded & Persistent</strong>
+                <p style={{ margin: "2px 0 0", fontSize: "11px", color: "var(--gray)", wordBreak: "break-all" }}>{imageUrl}</p>
+              </div>
+            </div>
+          )}
 
           <div className="admin-field-pair">
             <label>
@@ -1758,7 +1794,7 @@ function OfferBannersManager() {
           </label>
 
           <div className="admin-actions">
-            <button className="btn" disabled={create.isPending || update.isPending}>
+            <button className="btn" disabled={isUploading || create.isPending || update.isPending}>
               {editingId ? "Update Banner" : "Create Banner"}
             </button>
             {editingId && (
@@ -1779,7 +1815,7 @@ function OfferBannersManager() {
             <div className="admin-product-list">
               {offers.data?.map((banner) => (
                 <article key={banner.id} className="admin-product-row">
-                  <img src={banner.imageUrl} alt={banner.title} />
+                  <img src={banner.imageUrl} alt={banner.title} style={{ width: "64px", height: "64px", objectFit: "contain", background: "#f8fafc", borderRadius: "8px", padding: "2px" }} />
                   <div>
                     <strong>{banner.title}</strong>
                     {banner.subtitle && <p>{banner.subtitle}</p>}
@@ -1791,12 +1827,24 @@ function OfferBannersManager() {
                     </small>
                   </div>
                   <div className="row-actions">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        update.mutate({
+                          id: banner.id,
+                          isActive: !banner.isActive,
+                        });
+                      }}
+                      title={banner.isActive ? "Hide from Storefront" : "Show on Storefront"}
+                    >
+                      {banner.isActive ? "Hide" : "Activate"}
+                    </button>
                     <button type="button" onClick={() => handleEdit(banner)}>Edit</button>
                     <button
                       type="button"
                       className="danger"
                       onClick={() => {
-                        if (window.confirm("Delete this banner?")) {
+                        if (window.confirm(`Delete banner "${banner.title}"?`)) {
                           remove.mutate({ id: banner.id });
                         }
                       }}

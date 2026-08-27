@@ -78,6 +78,9 @@ export function OfferBannerSlider() {
               loading="lazy"
               decoding="async"
               className="offer-banner-img"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
             />
           </div>
 

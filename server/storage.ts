@@ -62,15 +62,18 @@ async function uploadToCloudinary(
 ): Promise<StorageUploadResult> {
   const base64Data = `data:${mimeType};base64,${bytes.toString("base64")}`;
   const publicId = `${safeStem(fileName)}_${Date.now().toString(36)}`;
+  const isOffer = productId === "offers";
+  const folder = isOffer ? "rabiora/offers" : "rabiora/products";
+  const tags = isOffer ? ["rabiora_offers"] : [`product_${productId}`, "rabiora_catalogue"];
 
   return new Promise((resolve, reject) => {
     cloudinary.uploader.upload(
       base64Data,
       {
-        folder: "rabiora/products",
+        folder,
         public_id: publicId,
         resource_type: "image",
-        tags: [`product_${productId}`, "rabiora_catalogue"],
+        tags,
       },
       (error, result) => {
         if (error || !result) {
@@ -116,7 +119,7 @@ export async function saveProductImage(
   }
 
   // 2. Fallback to local storage for local development
-  return saveLocalProductImage(typeof productId === "number" ? productId : 1, bytes, mimeType, fileName);
+  return saveLocalProductImage(productId, bytes, mimeType, fileName);
 }
 
 export async function removeProductImage(storageKey: string): Promise<void> {

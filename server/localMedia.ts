@@ -21,14 +21,15 @@ function safeStem(fileName: string) {
   return stem || "product-image";
 }
 
-export async function saveLocalProductImage(productId: number, bytes: Buffer, mimeType: string, fileName: string) {
+export async function saveLocalProductImage(productId: number | string, bytes: Buffer, mimeType: string, fileName: string) {
   const extension = allowedExtensions[mimeType];
   if (!extension) throw new TRPCError({ code: "BAD_REQUEST", message: "Use a JPEG, PNG, or WebP image." });
   const fileNameWithId = `${safeStem(fileName)}-${crypto.randomUUID().slice(0, 12)}${extension}`;
-  const directory = path.join(getProductRoot(), String(productId));
+  const subFolder = typeof productId === "number" ? path.join("products", String(productId)) : String(productId);
+  const directory = path.join(getLocalImagesRoot(), subFolder);
   await fs.mkdir(directory, { recursive: true });
   await fs.writeFile(path.join(directory, fileNameWithId), bytes);
-  const storageKey = `products/${productId}/${fileNameWithId}`;
+  const storageKey = path.posix.join(...subFolder.split(path.sep), fileNameWithId);
   return { key: storageKey, url: `/uploads/images/${storageKey}` };
 }
 

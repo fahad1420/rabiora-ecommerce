@@ -146,25 +146,35 @@ export async function deleteAdminSubscriber(id: string) {
 
 export async function listActiveOfferBanners() {
   await connectMongo();
-  let banners = await OfferBannerModel.find({ isActive: true }).sort({ displayOrder: 1, createdAt: -1 }).lean();
-
-  if (banners.length === 0) {
-    // Provide default initial offer banner if none created yet
+  const totalCount = await OfferBannerModel.countDocuments();
+  if (totalCount === 0) {
+    // If database is brand new, seed an initial persistent banner
+    const defaultBanner = await OfferBannerModel.create({
+      title: "10% OFF on bKash Payment",
+      subtitle: "Exclusive Rabiora Discount on all Three-Piece Collections",
+      badge: "Special Offer",
+      discountCode: "BKASH10",
+      imageUrl: "/uploads/images/branding/rabiora-logo.jpeg",
+      linkUrl: "/#products",
+      isActive: true,
+      displayOrder: 0,
+    });
     return [
       {
-        id: "default-offer-1",
-        title: "10% OFF on bKash Payment",
-        subtitle: "Exclusive Rabiora Discount on all Three-Piece Collections",
-        badge: "Special Offer",
-        discountCode: "BKASH10",
-        imageUrl: "/uploads/images/branding/rabiora-logo.jpeg",
-        linkUrl: "/#products",
-        isActive: true,
-        displayOrder: 0,
+        id: defaultBanner._id.toString(),
+        title: defaultBanner.title,
+        subtitle: defaultBanner.subtitle || "",
+        badge: defaultBanner.badge || "Special Offer",
+        discountCode: defaultBanner.discountCode || "",
+        imageUrl: defaultBanner.imageUrl,
+        linkUrl: defaultBanner.linkUrl || "/#products",
+        isActive: defaultBanner.isActive,
+        displayOrder: defaultBanner.displayOrder,
       },
     ];
   }
 
+  const banners = await OfferBannerModel.find({ isActive: true }).sort({ displayOrder: 1, createdAt: -1 }).lean();
   return banners.map((b) => ({
     id: b._id.toString(),
     title: b.title,
