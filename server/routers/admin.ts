@@ -35,6 +35,13 @@ import {
   uploadAdminOfferImage,
 } from "../marketingService";
 
+import {
+  listAdminCoupons,
+  createAdminCoupon,
+  updateAdminCoupon,
+  deleteAdminCoupon,
+} from "../couponService";
+
 const idSchema = z.union([z.number(), z.string()]);
 
 const productInput = z.object({
@@ -288,5 +295,41 @@ export const adminRouter = router({
         })
       )
       .mutation(({ input }) => uploadAdminOfferImage(input.dataUri, input.fileName)),
+  }),
+
+  coupons: router({
+    list: adminProcedure.query(() => listAdminCoupons()),
+    create: adminProcedure
+      .input(
+        z.object({
+          code: z.string().trim().min(2).max(50),
+          discountType: z.enum(["percentage"]).optional(),
+          discountValue: z.number().int().min(1).max(100),
+          isActive: z.boolean().optional(),
+          expiryDate: z.string().nullable().optional(),
+          minOrderAmount: z.number().int().nonnegative().optional(),
+          usageLimit: z.number().int().positive().nullable().optional(),
+          allowedPaymentMethods: z.array(z.string()).optional(),
+        })
+      )
+      .mutation(({ input }) => createAdminCoupon(input)),
+    update: adminProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          code: z.string().trim().min(2).max(50).optional(),
+          discountType: z.enum(["percentage"]).optional(),
+          discountValue: z.number().int().min(1).max(100).optional(),
+          isActive: z.boolean().optional(),
+          expiryDate: z.string().nullable().optional(),
+          minOrderAmount: z.number().int().nonnegative().optional(),
+          usageLimit: z.number().int().positive().nullable().optional(),
+          allowedPaymentMethods: z.array(z.string()).optional(),
+        })
+      )
+      .mutation(({ input }) => updateAdminCoupon(input.id, input)),
+    delete: adminProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(({ input }) => deleteAdminCoupon(input.id)),
   }),
 });

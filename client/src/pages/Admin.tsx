@@ -828,6 +828,12 @@ function OrderManager() {
                 <div className="order-payment">
                   <span>Method: <strong>{order.paymentMethod}</strong></span>
 
+                  {(order as any).couponCode && (
+                    <span style={{ color: "#16a34a", fontWeight: 600 }}>
+                      🏷️ Coupon: <strong>{(order as any).couponCode}</strong> (-{(order as any).discountPercent}%, -{taka((order as any).discountAmountTaka || 0)})
+                    </span>
+                  )}
+
                   {order.payment && (
                     <span>
                       {order.payment.transactionId
@@ -836,7 +842,11 @@ function OrderManager() {
                     </span>
                   )}
 
-                  <strong>Total: {taka(order.totalTaka)}</strong>
+                  <strong>
+                    {(order as any).couponCode && (order as any).originalSubtotalTaka
+                      ? `Payable: ${taka(order.totalTaka)} (Subtotal: ${taka((order as any).originalSubtotalTaka)})`
+                      : `Total: ${taka(order.totalTaka)}`}
+                  </strong>
                 </div>
 
                 {next[order.status] && (
@@ -1933,6 +1943,312 @@ function OfferBannersManager() {
   );
 }
 
+function CouponManager() {
+  const utils = trpc.useUtils();
+  const coupons = trpc.admin.coupons.list.useQuery();
+
+  const create = trpc.admin.coupons.create.useMutation({
+    onSuccess: () => {
+      utils.admin.coupons.list.invalidate();
+      resetForm();
+    },
+  });
+
+  const update = trpc.admin.coupons.update.useMutation({
+    onSuccess: () => {
+      utils.admin.coupons.list.invalidate();
+      resetForm();
+    },
+  });
+
+  const remove = trpc.admin.coupons.delete.useMutation({
+    onSuccess: () => utils.admin.coupons.list.invalidate(),
+  });
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [discountValue, setDiscountValue] = useState(10);
+  const [minOrderAmount, setMinOrderAmount] = useState(0);
+  const [usageLimit, setUsageLimit] = useState<number | "">("");
+  const [expiryDate, setExpiryDate] = useState("");
+  const [isActive, setIsActive] = useState(true);
+  const [allowedPaymentMethods, setAllowedPaymentMethods] = useState<string[]>([
+    "bKash",
+    "Nagad",
+    "Rocket",
+  ]);
+  const [error, setError] = useState("");
+
+  const resetForm = () => {
+    setEditingId(null);
+    setCode("");
+    setDiscountValue(10);
+    setMinOrderAmount(0);
+    setUsageLimit("");
+    setExpiryDate("");
+    setIsActive(true);
+    setAllowedPaymentMethods(["bKash", "Nagad", "Rocket"]);
+    setError("");
+  };
+
+  const handleEdit = (coupon: any) => {
+    setEditingId(coupon.id);
+    setCode(coupon.code);
+    setDiscountValue(coupon.discountValue);
+    setMinOrderAmount(coupon.minOrderAmount || 0);
+    setUsageLimit(coupon.usageLimit ?? "");
+    setExpiryDate(
+      coupon.expiryDate ? new Date(coupon.expiryDate).toISOString().split("T")[0] : ""
+    );
+    setIsActive(coupon.isActive);
+    setAllowedPaymentMethods(coupon.allowedPaymentMethods || ["bKash", "Nagad", "Rocket"]);
+    setError("");
+  };
+
+  const handleTogglePaymentMethod = (method: string) => {
+    setAllowedPaymentMethods((prev) =>
+      prev.includes(method) ? prev.filter((m) => m !== method) : [...prev, method]
+    );
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!code.trim()) {
+      setError("Coupon code is required.");
+      return;
+    }
+
+    if (discountValue < 1 || discountValue > 100) {
+      setError("Discount percentage must be between 1 and 100.");
+      return;
+    }
+
+    if (allowedPaymentMethods.length === 0) {
+      setError("Please select at least one eligible payment method.");
+      return;
+    }
+
+    const payload = {
+      code: code.trim().toUpperCase(),
+      discountValue: Number(discountValue),
+      minOrderAmount: Number(minOrderAmount) || 0,
+      usageLimit: usageLimit === "" ? null : Number(usageLimit),
+      expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
+      isActive,
+      allowedPaymentMethods,
+    };
+
+    if (editingId) {
+      update.mutate(
+        { id: editingId, ...payload },
+        { onError: (err) => setError(err.message) }
+      );
+    } else {
+      create.mutate(payload, {
+        onError: (err) => setError(err.message),
+      });
+    }
+  };
+
+  return (
+    <div className="admin-stack">
+      <section className="admin-heading">
+        <div>
+          <p>Discounts & Promotions</p>
+          <h1>Coupon Codes</h1>
+        </div>
+        <span className="status-pill status-confirmed">
+          {coupons.data?.length ?? 0} Coupons Configured
+        </span>
+      </section>
+
+      <div className="admin-grid">
+        <form className="admin-form" onSubmit={handleSubmit}>
+          <h2>{editingId ? "Edit Coupon" : "New Coupon Code"}</h2>
+
+          {error && <p className="form-error" role="alert">{error}</p>}
+
+          <label>
+            Coupon Code
+            <input
+              required
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              placeholder="e.g., RABIORA10"
+              style={{ textTransform: "uppercase", letterSpacing: "1px", fontWeight: "700" }}
+            />
+          </label>
+
+          <div className="admin-field-pair">
+            <label>
+              Discount Percentage (%)
+              <input
+                required
+                type="number"
+                min="1"
+                max="100"
+                value={discountValue}
+                onChange={(e) => setDiscountValue(Number(e.target.value))}
+              />
+            </label>
+
+            <label>
+              Min. Order Amount (৳ BDT)
+              <input
+                type="number"
+                min="0"
+                value={minOrderAmount}
+                onChange={(e) => setMinOrderAmount(Number(e.target.value))}
+                placeholder="0 for no minimum"
+              />
+            </label>
+          </div>
+
+          <div className="admin-field-pair">
+            <label>
+              Usage Limit (Max Redemptions)
+              <input
+                type="number"
+                min="1"
+                value={usageLimit}
+                onChange={(e) => setUsageLimit(e.target.value === "" ? "" : Number(e.target.value))}
+                placeholder="Leave blank for unlimited"
+              />
+            </label>
+
+            <label>
+              Expiry Date
+              <input
+                type="date"
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(e.target.value)}
+              />
+            </label>
+          </div>
+
+          <label>
+            Allowed Online Payment Methods
+            <div style={{ display: "flex", gap: "14px", marginTop: "6px" }}>
+              {["bKash", "Nagad", "Rocket"].map((method) => (
+                <label key={method} className="admin-checkbox" style={{ margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={allowedPaymentMethods.includes(method)}
+                    onChange={() => handleTogglePaymentMethod(method)}
+                  />
+                  <span>{method}</span>
+                </label>
+              ))}
+            </div>
+            <small style={{ color: "var(--gray)", display: "block", marginTop: "4px" }}>
+              Note: Coupons are strictly disallowed on Cash on Delivery by system policy.
+            </small>
+          </label>
+
+          <label className="admin-checkbox">
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
+            />
+            <span>Active & Redeemable on Checkout</span>
+          </label>
+
+          <div className="admin-actions">
+            <button className="btn" disabled={create.isPending || update.isPending}>
+              {create.isPending || update.isPending ? "Saving..." : editingId ? "Update Coupon" : "Create Coupon"}
+            </button>
+            {editingId && (
+              <button type="button" className="btn-outline" onClick={resetForm}>
+                Cancel
+              </button>
+            )}
+          </div>
+        </form>
+
+        <section className="admin-list-card">
+          <h2>Configured Coupons ({coupons.data?.length ?? 0})</h2>
+          {coupons.isLoading ? (
+            <p>Loading coupons...</p>
+          ) : coupons.data?.length === 0 ? (
+            <p>No coupons found.</p>
+          ) : (
+            <div className="admin-product-list">
+              {coupons.data?.map((c) => (
+                <article key={c.id} className="admin-product-row">
+                  <div
+                    style={{
+                      width: "60px",
+                      height: "60px",
+                      borderRadius: "10px",
+                      background: "color-mix(in srgb, var(--primary) 12%, transparent)",
+                      color: "var(--primary)",
+                      display: "grid",
+                      placeItems: "center",
+                      fontSize: "22px",
+                    }}
+                  >
+                    🏷️
+                  </div>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <strong style={{ fontSize: "16px", letterSpacing: "0.5px" }}>{c.code}</strong>
+                      <span className={`status-pill ${c.isActive ? "status-confirmed" : "status-pending"}`}>
+                        {c.isActive ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+                    <p style={{ margin: "3px 0", fontSize: "13px" }}>
+                      Discount: <strong style={{ color: "#16a34a" }}>{c.discountValue}% OFF</strong>
+                      {c.minOrderAmount > 0 && ` • Min Order: ৳${c.minOrderAmount.toLocaleString("en-BD")}`}
+                    </p>
+                    <small>
+                      Usage: <strong>{c.usedCount}</strong> / {c.usageLimit ? `${c.usageLimit} max` : "Unlimited"} • Expiry:{" "}
+                      {c.expiryDate ? new Date(c.expiryDate).toLocaleDateString("en-BD") : "Never"}
+                    </small>
+                    <small style={{ display: "block" }}>
+                      Valid on: {c.allowedPaymentMethods?.join(", ") || "bKash, Nagad, Rocket"}
+                    </small>
+                  </div>
+                  <div className="row-actions">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        update.mutate({
+                          id: c.id,
+                          isActive: !c.isActive,
+                        });
+                      }}
+                      title={c.isActive ? "Deactivate coupon" : "Activate coupon"}
+                    >
+                      {c.isActive ? "Deactivate" : "Activate"}
+                    </button>
+                    <button type="button" onClick={() => handleEdit(c)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="danger"
+                      onClick={() => {
+                        if (window.confirm(`Delete coupon "${c.code}"?`)) {
+                          remove.mutate({ id: c.id });
+                        }
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
 function SubscribersManager() {
   const utils = trpc.useUtils();
   const subscribers = trpc.admin.subscribers.list.useQuery();
@@ -2037,6 +2353,8 @@ export default function Admin() {
     <CategoryManager />
   ) : location === "/admin/orders" ? (
     <OrderManager />
+  ) : location === "/admin/coupons" ? (
+    <CouponManager />
   ) : location === "/admin/customers" ? (
     <CustomerManager />
   ) : location === "/admin/reviews" ? (

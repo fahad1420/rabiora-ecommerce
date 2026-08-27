@@ -10,6 +10,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 
 import { getPublicSiteSettings, listActiveOfferBanners, subscribeCustomer } from "./marketingService";
+import { validateCoupon } from "./couponService";
 
 export const appRouter = router({
   system: systemRouter,
@@ -18,6 +19,17 @@ export const appRouter = router({
   }),
   offers: router({
     list: publicProcedure.query(() => listActiveOfferBanners()),
+  }),
+  coupon: router({
+    validate: publicProcedure
+      .input(
+        z.object({
+          code: z.string().trim().min(1).max(50),
+          subtotalTaka: z.number().int().nonnegative(),
+          paymentMethod: z.string().trim(),
+        })
+      )
+      .mutation(({ input }) => validateCoupon(input.code, input.subtotalTaka, input.paymentMethod)),
   }),
   subscribe: publicProcedure
     .input(

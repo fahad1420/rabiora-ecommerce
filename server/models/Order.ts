@@ -47,6 +47,10 @@ export interface IOrder extends Document {
   subtotalTaka: number;
   deliveryChargeTaka: number;
   totalTaka: number;
+  couponCode?: string;
+  originalSubtotalTaka?: number;
+  discountPercent?: number;
+  discountAmountTaka?: number;
   paymentMethod: PaymentMethod;
   status: OrderStatus;
   adminNote?: string;
@@ -103,6 +107,10 @@ const OrderSchema = new Schema<IOrder>(
     subtotalTaka: { type: Number, required: true },
     deliveryChargeTaka: { type: Number, required: true },
     totalTaka: { type: Number, required: true },
+    couponCode: { type: String, trim: true },
+    originalSubtotalTaka: { type: Number },
+    discountPercent: { type: Number },
+    discountAmountTaka: { type: Number },
     paymentMethod: { type: String, enum: PAYMENT_METHODS, required: true },
     status: { type: String, enum: ORDER_STATUSES, default: "pending", index: true },
     adminNote: { type: String },

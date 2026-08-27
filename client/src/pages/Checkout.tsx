@@ -1,4 +1,4 @@
-import { Check, Copy, Info, Lock, ShoppingBag, Truck } from "lucide-react";
+import { Check, Copy, Info, Lock, ShoppingBag, Tag, Truck } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { RabioraFooter } from "@/components/RabioraFooter";
@@ -46,9 +46,21 @@ export default function Checkout() {
   const [copiedNumber, setCopiedNumber] = useState<string | null>(null);
   const [error, setError] = useState("");
 
+  // Coupon state
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    discountPercent: number;
+    discountAmount: number;
+    payableSubtotal: number;
+  } | null>(null);
+  const [couponError, setCouponError] = useState("");
+  const [couponSuccess, setCouponSuccess] = useState("");
+
   const { t } = useLanguage();
   const utils = trpc.useUtils();
   const checkout = trpc.order.checkout.useMutation();
+  const validateCouponMutation = trpc.coupon.validate.useMutation();
 
   useEffect(() => {
     if (customer.data) {
@@ -68,7 +80,73 @@ export default function Checkout() {
     return cart.subtotalTaka;
   }, [isBuyNow, buyNowProduct, buyNowQty, cart.subtotalTaka]);
 
-  const grandTotal = subtotal + expectedDelivery;
+  // When payment method changes to COD, remove any applied coupon
+  const handlePaymentMethodChange = (newMethod: PaymentMethod) => {
+    setPaymentMethod(newMethod);
+    if (newMethod === "Cash on Delivery") {
+      if (appliedCoupon) {
+        setAppliedCoupon(null);
+        setCouponSuccess("");
+        setCouponError("Coupons are only valid for online payment methods (bKash, Nagad, Rocket).");
+      }
+    } else {
+      setCouponError("");
+    }
+  };
+
+  const discountAmount = useMemo(() => {
+    if (!appliedCoupon || paymentMethod === "Cash on Delivery") return 0;
+    // Re-verify against current subtotal
+    return Math.min(subtotal, Math.round((subtotal * appliedCoupon.discountPercent) / 100));
+  }, [appliedCoupon, paymentMethod, subtotal]);
+
+  const payableSubtotal = Math.max(0, subtotal - discountAmount);
+  const grandTotal = payableSubtotal + expectedDelivery;
+
+  const handleApplyCoupon = async (e?: FormEvent) => {
+    if (e) e.preventDefault();
+    setCouponError("");
+    setCouponSuccess("");
+
+    if (paymentMethod === "Cash on Delivery") {
+      setCouponError("Coupons work only with online payment methods (bKash, Nagad, Rocket). Please select an online payment method.");
+      return;
+    }
+
+    const code = couponInput.trim();
+    if (!code) {
+      setCouponError("Please enter a coupon code.");
+      return;
+    }
+
+    try {
+      const result = await validateCouponMutation.mutateAsync({
+        code,
+        subtotalTaka: subtotal,
+        paymentMethod,
+      });
+
+      setAppliedCoupon({
+        code: result.code,
+        discountPercent: result.discountPercent,
+        discountAmount: result.discountAmount,
+        payableSubtotal: result.payableSubtotal,
+      });
+      setCouponSuccess(`${result.code} applied! ${result.discountPercent}% discount (৳${result.discountAmount.toLocaleString("en-BD")})`);
+      setCouponError("");
+    } catch (err: any) {
+      setAppliedCoupon(null);
+      setCouponSuccess("");
+      setCouponError(err.message || "Invalid coupon code.");
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponSuccess("");
+    setCouponError("");
+  };
 
   // Dynamic payment numbers
   const paymentNumbers: Record<string, string> = {
@@ -102,6 +180,7 @@ export default function Checkout() {
         paymentMethod,
         transactionId: manualWallet ? transactionId : undefined,
         submittedAmountTaka: manualWallet ? Number(submittedAmountTaka) : undefined,
+        couponCode: appliedCoupon && paymentMethod !== "Cash on Delivery" ? appliedCoupon.code : undefined,
         buyNowItem: isBuyNow && buyNowProduct ? { productId: buyNowProduct.id, quantity: Math.max(1, buyNowQty) } : undefined,
       });
 
@@ -252,7 +331,7 @@ export default function Checkout() {
                         type="radio"
                         name="paymentMethod"
                         checked={isSelected}
-                        onChange={() => setPaymentMethod(method)}
+                        onChange={() => handlePaymentMethodChange(method)}
                       />
                       <span className="payment-method-name">{method}</span>
                     </label>
@@ -289,7 +368,7 @@ export default function Checkout() {
                   </div>
 
                   <p className="wallet-guide">
-                    1. Send the order amount (<strong>{taka(grandTotal)}</strong>) to the {paymentMethod} number above. <br />
+                    1. Send the final discounted payable amount (<strong>{taka(grandTotal)}</strong>) to the {paymentMethod} number above. <br />
                     2. Enter your Transaction ID (TrxID) and Submitted Amount below for instant verification.
                   </p>
 
@@ -356,11 +435,79 @@ export default function Checkout() {
               )}
             </div>
 
+            {/* Coupon / Discount Code Section */}
+            <div className="checkout-coupon-card">
+              <div className="coupon-header">
+                <Tag size={15} className="coupon-icon" />
+                <strong>Discount Coupon</strong>
+              </div>
+
+              {paymentMethod === "Cash on Delivery" ? (
+                <div className="coupon-notice-cod">
+                  <small>💡 Coupons are valid exclusively for online payment methods (bKash, Nagad, Rocket).</small>
+                </div>
+              ) : appliedCoupon ? (
+                <div className="coupon-applied-box">
+                  <div className="coupon-applied-info">
+                    <span className="coupon-badge">🏷️ {appliedCoupon.code}</span>
+                    <span className="coupon-save-text">-{appliedCoupon.discountPercent}% OFF ({taka(discountAmount)})</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="coupon-remove-btn"
+                    onClick={handleRemoveCoupon}
+                    title="Remove coupon"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="coupon-input-group">
+                  <input
+                    type="text"
+                    placeholder="e.g. RABIORA10"
+                    value={couponInput}
+                    onChange={(e) => {
+                      setCouponInput(e.target.value.toUpperCase());
+                      setCouponError("");
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleApplyCoupon();
+                      }
+                    }}
+                    className="coupon-input"
+                  />
+                  <button
+                    type="button"
+                    className="btn coupon-apply-btn"
+                    onClick={() => handleApplyCoupon()}
+                    disabled={validateCouponMutation.isPending || !couponInput.trim()}
+                  >
+                    {validateCouponMutation.isPending ? "Applying..." : "Apply"}
+                  </button>
+                </div>
+              )}
+
+              {couponError && <p className="coupon-msg error">{couponError}</p>}
+              {couponSuccess && <p className="coupon-msg success">{couponSuccess}</p>}
+            </div>
+
             <div className="checkout-calc-block">
               <div className="checkout-line">
                 <span>{t("subtotal")}</span>
                 <strong>{taka(subtotal)}</strong>
               </div>
+
+              {discountAmount > 0 && appliedCoupon && paymentMethod !== "Cash on Delivery" && (
+                <div className="checkout-line coupon-discount-line">
+                  <span style={{ color: "var(--primary-dark, #0d5f57)", fontWeight: 600 }}>
+                    Discount ({appliedCoupon.code})
+                  </span>
+                  <strong style={{ color: "#16a34a" }}>-{taka(discountAmount)}</strong>
+                </div>
+              )}
 
               <div className="checkout-line">
                 <span>
@@ -372,7 +519,7 @@ export default function Checkout() {
               </div>
 
               <div className="checkout-grand">
-                <span>{t("estimatedTotal")}</span>
+                <span>Payable Amount</span>
                 <strong>{taka(grandTotal)}</strong>
               </div>
             </div>

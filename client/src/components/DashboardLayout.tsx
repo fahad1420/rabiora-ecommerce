@@ -31,6 +31,7 @@ import {
   PanelLeft,
   ShoppingBag,
   Sparkles,
+  Tag,
   Tags,
   Users,
 } from "lucide-react";
@@ -59,6 +60,11 @@ const menuItems = [
     icon: ShoppingBag,
     label: "Orders",
     path: "/admin/orders",
+  },
+  {
+    icon: Tag,
+    label: "Coupons",
+    path: "/admin/coupons",
   },
   {
     icon: Users,

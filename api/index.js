@@ -255,6 +255,10 @@ var init_Order = __esm({
         subtotalTaka: { type: Number, required: true },
         deliveryChargeTaka: { type: Number, required: true },
         totalTaka: { type: Number, required: true },
+        couponCode: { type: String, trim: true },
+        originalSubtotalTaka: { type: Number },
+        discountPercent: { type: Number },
+        discountAmountTaka: { type: Number },
         paymentMethod: { type: String, enum: PAYMENT_METHODS, required: true },
         status: { type: String, enum: ORDER_STATUSES, default: "pending", index: true },
         adminNote: { type: String },
@@ -448,14 +452,43 @@ var init_OfferBanner = __esm({
   }
 });
 
+// server/models/Coupon.ts
+import mongoose14, { Schema as Schema13 } from "mongoose";
+var CouponSchema, CouponModel;
+var init_Coupon = __esm({
+  "server/models/Coupon.ts"() {
+    "use strict";
+    CouponSchema = new Schema13(
+      {
+        code: { type: String, required: true, unique: true, uppercase: true, trim: true, index: true },
+        discountType: { type: String, enum: ["percentage"], default: "percentage" },
+        discountValue: { type: Number, required: true, min: 1, max: 100 },
+        isActive: { type: Boolean, default: true, index: true },
+        expiryDate: { type: Date, default: null },
+        minOrderAmount: { type: Number, default: 0 },
+        usageLimit: { type: Number, default: null },
+        usedCount: { type: Number, default: 0 },
+        allowedPaymentMethods: {
+          type: [String],
+          default: ["bKash", "Nagad", "Rocket"]
+        }
+      },
+      {
+        timestamps: true
+      }
+    );
+    CouponModel = mongoose14.models.Coupon || mongoose14.model("Coupon", CouponSchema);
+  }
+});
+
 // server/models/helpers.ts
-import mongoose14, { Types as Types8 } from "mongoose";
+import mongoose15, { Types as Types8 } from "mongoose";
 function toObjectId(id) {
   if (typeof id !== "string") return id;
   return Types8.ObjectId.isValid(id) ? Types8.ObjectId.createFromHexString(id) : new Types8.ObjectId(id);
 }
 function isValidObjectId(id) {
-  return typeof id === "string" && mongoose14.isValidObjectId(id);
+  return typeof id === "string" && mongoose15.isValidObjectId(id);
 }
 function findProductQuery(idOrLegacy) {
   const conditions = [];
@@ -463,7 +496,7 @@ function findProductQuery(idOrLegacy) {
   if (!isNaN(num) && num > 0) {
     conditions.push({ legacyId: num });
   }
-  if (typeof idOrLegacy === "string" && mongoose14.isValidObjectId(idOrLegacy)) {
+  if (typeof idOrLegacy === "string" && mongoose15.isValidObjectId(idOrLegacy)) {
     conditions.push({ _id: Types8.ObjectId.createFromHexString(idOrLegacy) });
   }
   if (conditions.length === 0) {
@@ -473,14 +506,14 @@ function findProductQuery(idOrLegacy) {
 }
 function findUserQuery(idOrOpenId) {
   const conditions = [{ openId: String(idOrOpenId) }];
-  if (typeof idOrOpenId === "string" && mongoose14.isValidObjectId(idOrOpenId)) {
+  if (typeof idOrOpenId === "string" && mongoose15.isValidObjectId(idOrOpenId)) {
     conditions.push({ _id: Types8.ObjectId.createFromHexString(idOrOpenId) });
   }
   return conditions.length === 1 ? conditions[0] : { $or: conditions };
 }
 function findOrderQuery(orderIdOrNumber) {
   const conditions = [{ orderNumber: String(orderIdOrNumber) }];
-  if (typeof orderIdOrNumber === "string" && mongoose14.isValidObjectId(orderIdOrNumber)) {
+  if (typeof orderIdOrNumber === "string" && mongoose15.isValidObjectId(orderIdOrNumber)) {
     conditions.push({ _id: Types8.ObjectId.createFromHexString(orderIdOrNumber) });
   }
   return conditions.length === 1 ? conditions[0] : { $or: conditions };
@@ -507,6 +540,7 @@ var init_models = __esm({
     init_SiteSettings();
     init_Subscriber();
     init_OfferBanner();
+    init_Coupon();
     init_helpers();
   }
 });
@@ -2143,13 +2177,217 @@ var wishlistRouter = router({
 
 // server/routers/orders.ts
 import { z as z3 } from "zod";
-import { TRPCError as TRPCError12 } from "@trpc/server";
+import { TRPCError as TRPCError13 } from "@trpc/server";
 
 // server/orderService.ts
 init_db();
 init_models();
-import { TRPCError as TRPCError11 } from "@trpc/server";
+import { TRPCError as TRPCError12 } from "@trpc/server";
 import { nanoid as nanoid2 } from "nanoid";
+
+// server/couponService.ts
+init_db();
+init_Coupon();
+import { TRPCError as TRPCError11 } from "@trpc/server";
+function isOnlinePayment(method) {
+  const normalized = method.trim().toLowerCase();
+  return normalized === "bkash" || normalized === "nagad" || normalized === "rocket";
+}
+function normalizePaymentMethodName(method) {
+  const normalized = method.trim().toLowerCase();
+  if (normalized === "bkash") return "bKash";
+  if (normalized === "nagad") return "Nagad";
+  if (normalized === "rocket") return "Rocket";
+  if (normalized === "cash on delivery" || normalized === "cod") return "Cash on Delivery";
+  return method.trim();
+}
+async function ensureDefaultCoupons() {
+  const count = await CouponModel.countDocuments();
+  if (count === 0) {
+    await CouponModel.create([
+      {
+        code: "RABIORA10",
+        discountType: "percentage",
+        discountValue: 10,
+        isActive: true,
+        allowedPaymentMethods: ["bKash", "Nagad", "Rocket"],
+        minOrderAmount: 0
+      },
+      {
+        code: "BKASH10",
+        discountType: "percentage",
+        discountValue: 10,
+        isActive: true,
+        allowedPaymentMethods: ["bKash", "Nagad", "Rocket"],
+        minOrderAmount: 0
+      }
+    ]);
+  }
+}
+async function validateCoupon(code, subtotalTaka, paymentMethod) {
+  await connectMongo();
+  await ensureDefaultCoupons();
+  const normalizedCode = (code || "").trim().toUpperCase();
+  if (!normalizedCode) {
+    throw new TRPCError11({ code: "BAD_REQUEST", message: "Please enter a coupon code." });
+  }
+  if (!isOnlinePayment(paymentMethod)) {
+    throw new TRPCError11({
+      code: "BAD_REQUEST",
+      message: "Coupons are available exclusively for online payment methods (bKash, Nagad, Rocket)."
+    });
+  }
+  const coupon = await CouponModel.findOne({ code: normalizedCode }).lean();
+  if (!coupon) {
+    throw new TRPCError11({ code: "BAD_REQUEST", message: "Invalid coupon code." });
+  }
+  if (!coupon.isActive) {
+    throw new TRPCError11({ code: "BAD_REQUEST", message: "This coupon is currently inactive." });
+  }
+  if (coupon.expiryDate && /* @__PURE__ */ new Date() > new Date(coupon.expiryDate)) {
+    throw new TRPCError11({ code: "BAD_REQUEST", message: "This coupon code has expired." });
+  }
+  if (coupon.minOrderAmount && subtotalTaka < coupon.minOrderAmount) {
+    throw new TRPCError11({
+      code: "BAD_REQUEST",
+      message: `Minimum order amount of \u09F3${coupon.minOrderAmount.toLocaleString("en-BD")} required to use this coupon.`
+    });
+  }
+  if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) {
+    throw new TRPCError11({
+      code: "BAD_REQUEST",
+      message: "This coupon has reached its maximum redemption limit."
+    });
+  }
+  const normalizedMethod = normalizePaymentMethodName(paymentMethod);
+  const allowed = coupon.allowedPaymentMethods || ["bKash", "Nagad", "Rocket"];
+  const isMethodAllowed = allowed.some(
+    (m) => m.toLowerCase() === normalizedMethod.toLowerCase()
+  );
+  if (!isMethodAllowed) {
+    throw new TRPCError11({
+      code: "BAD_REQUEST",
+      message: `This coupon is only valid for: ${allowed.join(", ")}.`
+    });
+  }
+  const discountPercent = coupon.discountValue;
+  const discountAmount = Math.min(
+    subtotalTaka,
+    Math.round(subtotalTaka * discountPercent / 100)
+  );
+  const payableSubtotal = Math.max(0, subtotalTaka - discountAmount);
+  return {
+    valid: true,
+    code: coupon.code,
+    discountType: coupon.discountType,
+    discountPercent,
+    discountAmount,
+    payableSubtotal,
+    message: `${discountPercent}% discount applied successfully!`
+  };
+}
+async function incrementCouponUsage(code) {
+  await connectMongo();
+  const normalizedCode = (code || "").trim().toUpperCase();
+  if (!normalizedCode) return;
+  await CouponModel.updateOne(
+    { code: normalizedCode },
+    { $inc: { usedCount: 1 } }
+  );
+}
+async function listAdminCoupons() {
+  await connectMongo();
+  await ensureDefaultCoupons();
+  const coupons = await CouponModel.find().sort({ createdAt: -1 }).lean();
+  return coupons.map((c) => ({
+    id: c._id.toString(),
+    code: c.code,
+    discountType: c.discountType,
+    discountValue: c.discountValue,
+    isActive: c.isActive,
+    expiryDate: c.expiryDate,
+    minOrderAmount: c.minOrderAmount || 0,
+    usageLimit: c.usageLimit,
+    usedCount: c.usedCount || 0,
+    allowedPaymentMethods: c.allowedPaymentMethods || ["bKash", "Nagad", "Rocket"],
+    createdAt: c.createdAt
+  }));
+}
+async function createAdminCoupon(input) {
+  await connectMongo();
+  const normalizedCode = input.code.trim().toUpperCase();
+  if (!normalizedCode) {
+    throw new TRPCError11({ code: "BAD_REQUEST", message: "Coupon code is required." });
+  }
+  const existing = await CouponModel.findOne({ code: normalizedCode });
+  if (existing) {
+    throw new TRPCError11({ code: "BAD_REQUEST", message: `Coupon with code "${normalizedCode}" already exists.` });
+  }
+  if (input.discountValue < 1 || input.discountValue > 100) {
+    throw new TRPCError11({ code: "BAD_REQUEST", message: "Discount percentage must be between 1 and 100." });
+  }
+  const created = await CouponModel.create({
+    code: normalizedCode,
+    discountType: input.discountType || "percentage",
+    discountValue: input.discountValue,
+    isActive: input.isActive ?? true,
+    expiryDate: input.expiryDate ? new Date(input.expiryDate) : null,
+    minOrderAmount: input.minOrderAmount ?? 0,
+    usageLimit: input.usageLimit ?? null,
+    allowedPaymentMethods: input.allowedPaymentMethods && input.allowedPaymentMethods.length > 0 ? input.allowedPaymentMethods : ["bKash", "Nagad", "Rocket"]
+  });
+  return {
+    id: created._id.toString(),
+    code: created.code,
+    discountValue: created.discountValue,
+    isActive: created.isActive
+  };
+}
+async function updateAdminCoupon(id, input) {
+  await connectMongo();
+  const normalizedCode = input.code ? input.code.trim().toUpperCase() : void 0;
+  if (normalizedCode) {
+    const existing = await CouponModel.findOne({ code: normalizedCode, _id: { $ne: id } });
+    if (existing) {
+      throw new TRPCError11({ code: "BAD_REQUEST", message: `Another coupon with code "${normalizedCode}" already exists.` });
+    }
+  }
+  if (input.discountValue !== void 0 && (input.discountValue < 1 || input.discountValue > 100)) {
+    throw new TRPCError11({ code: "BAD_REQUEST", message: "Discount percentage must be between 1 and 100." });
+  }
+  const updated = await CouponModel.findByIdAndUpdate(
+    id,
+    {
+      $set: {
+        ...normalizedCode !== void 0 && { code: normalizedCode },
+        ...input.discountType !== void 0 && { discountType: input.discountType },
+        ...input.discountValue !== void 0 && { discountValue: input.discountValue },
+        ...input.isActive !== void 0 && { isActive: input.isActive },
+        ...input.expiryDate !== void 0 && { expiryDate: input.expiryDate ? new Date(input.expiryDate) : null },
+        ...input.minOrderAmount !== void 0 && { minOrderAmount: input.minOrderAmount },
+        ...input.usageLimit !== void 0 && { usageLimit: input.usageLimit },
+        ...input.allowedPaymentMethods !== void 0 && { allowedPaymentMethods: input.allowedPaymentMethods }
+      }
+    },
+    { new: true }
+  ).lean();
+  if (!updated) {
+    throw new TRPCError11({ code: "NOT_FOUND", message: "Coupon not found." });
+  }
+  return {
+    id: updated._id.toString(),
+    code: updated.code,
+    discountValue: updated.discountValue,
+    isActive: updated.isActive
+  };
+}
+async function deleteAdminCoupon(id) {
+  await connectMongo();
+  await CouponModel.findByIdAndDelete(id);
+  return { success: true };
+}
+
+// server/orderService.ts
 var PAYMENT_METHODS2 = ["bKash", "Nagad", "Rocket", "Cash on Delivery"];
 function calculateDeliveryCharge(districtArea) {
   return /dhaka/i.test(districtArea) ? 0 : 120;
@@ -2159,7 +2397,7 @@ function manualPaymentRequired(method) {
 }
 function assertManualPaymentEvidence(method, transactionId, submittedAmountTaka) {
   if (manualPaymentRequired(method) && (!transactionId?.trim() || !submittedAmountTaka || submittedAmountTaka < 1)) {
-    throw new TRPCError11({
+    throw new TRPCError12({
       code: "BAD_REQUEST",
       message: "Transaction ID and submitted amount are required for this payment method."
     });
@@ -2175,12 +2413,12 @@ async function createOrder(identity, input) {
     userDoc = await UserModel.findOne(findUserQuery(identity.userId));
   }
   const orderItems = [];
-  let subtotalTaka = 0;
+  let rawSubtotalTaka = 0;
   if (input.buyNowItem) {
     const product = await ProductModel.findOne(findProductQuery(input.buyNowItem.productId));
     const qty = Math.max(1, input.buyNowItem.quantity || 1);
     if (!product || !product.isInStock || (product.stockQuantity || 0) < qty) {
-      throw new TRPCError11({
+      throw new TRPCError12({
         code: "BAD_REQUEST",
         message: `Product ${product?.name || "selected"} is out of stock.`
       });
@@ -2188,7 +2426,7 @@ async function createOrder(identity, input) {
     const coverImage = (product.images || []).find((img) => img.isCover) || (product.images || [])[0];
     const unitPrice = product.priceTaka || 0;
     const lineTotal = unitPrice * qty;
-    subtotalTaka += lineTotal;
+    rawSubtotalTaka += lineTotal;
     orderItems.push({
       productId: product._id,
       productName: product.name,
@@ -2205,16 +2443,16 @@ async function createOrder(identity, input) {
     } else if (identity.anonymousToken) {
       cartQuery = { anonymousToken: identity.anonymousToken };
     } else {
-      throw new TRPCError11({ code: "BAD_REQUEST", message: "Your cart is empty." });
+      throw new TRPCError12({ code: "BAD_REQUEST", message: "Your cart is empty." });
     }
     const cart = await CartModel.findOne(cartQuery).populate("items.productId");
     if (!cart || !cart.items || cart.items.length === 0) {
-      throw new TRPCError11({ code: "BAD_REQUEST", message: "Your cart is empty." });
+      throw new TRPCError12({ code: "BAD_REQUEST", message: "Your cart is empty." });
     }
     for (const item of cart.items) {
       const product = item.productId;
       if (!product || !product.isInStock || (product.stockQuantity || 0) < item.quantity) {
-        throw new TRPCError11({
+        throw new TRPCError12({
           code: "BAD_REQUEST",
           message: `Product ${product?.name || "in cart"} is out of stock.`
         });
@@ -2222,7 +2460,7 @@ async function createOrder(identity, input) {
       const coverImage = (product.images || []).find((img) => img.isCover) || (product.images || [])[0];
       const unitPrice = product.priceTaka || 0;
       const lineTotal = unitPrice * item.quantity;
-      subtotalTaka += lineTotal;
+      rawSubtotalTaka += lineTotal;
       orderItems.push({
         productId: product._id,
         productName: product.name,
@@ -2234,8 +2472,26 @@ async function createOrder(identity, input) {
       });
     }
   }
+  let appliedCouponCode = void 0;
+  let originalSubtotalTaka = void 0;
+  let discountPercent = void 0;
+  let discountAmountTaka = void 0;
+  let finalSubtotalTaka = rawSubtotalTaka;
+  if (input.couponCode && input.couponCode.trim()) {
+    const couponValidation = await validateCoupon(
+      input.couponCode,
+      rawSubtotalTaka,
+      input.paymentMethod
+    );
+    appliedCouponCode = couponValidation.code;
+    originalSubtotalTaka = rawSubtotalTaka;
+    discountPercent = couponValidation.discountPercent;
+    discountAmountTaka = couponValidation.discountAmount;
+    finalSubtotalTaka = couponValidation.payableSubtotal;
+    await incrementCouponUsage(couponValidation.code);
+  }
   const deliveryChargeTaka = calculateDeliveryCharge(input.districtArea);
-  const totalTaka = subtotalTaka + deliveryChargeTaka;
+  const totalTaka = finalSubtotalTaka + deliveryChargeTaka;
   assertManualPaymentEvidence(input.paymentMethod, input.transactionId, input.submittedAmountTaka);
   const orderNum = generateOrderNumber();
   const paymentRecord = {
@@ -2259,9 +2515,13 @@ async function createOrder(identity, input) {
     customerPhone: input.customerPhone,
     districtArea: input.districtArea,
     fullAddress: input.fullAddress,
-    subtotalTaka,
+    subtotalTaka: finalSubtotalTaka,
     deliveryChargeTaka,
     totalTaka,
+    couponCode: appliedCouponCode,
+    originalSubtotalTaka,
+    discountPercent,
+    discountAmountTaka,
     paymentMethod: input.paymentMethod,
     status: "pending",
     items: orderItems,
@@ -2321,12 +2581,17 @@ async function getOrderConfirmation(orderNumberValue) {
   await connectMongo();
   const order = await OrderModel.findOne(findOrderQuery(orderNumberValue)).lean();
   if (!order) {
-    throw new TRPCError11({ code: "NOT_FOUND", message: "Order not found." });
+    throw new TRPCError12({ code: "NOT_FOUND", message: "Order not found." });
   }
   return {
     orderNumber: order.orderNumber,
+    subtotalTaka: order.subtotalTaka,
     totalTaka: order.totalTaka,
     deliveryChargeTaka: order.deliveryChargeTaka,
+    couponCode: order.couponCode,
+    originalSubtotalTaka: order.originalSubtotalTaka,
+    discountPercent: order.discountPercent,
+    discountAmountTaka: order.discountAmountTaka,
     paymentMethod: order.paymentMethod,
     status: order.status,
     createdAt: order.createdAt
@@ -2340,12 +2605,17 @@ async function getCustomerOrderConfirmation(userId, orderNumberValue) {
     ...user ? { userId: user._id } : {}
   }).lean();
   if (!order) {
-    throw new TRPCError11({ code: "NOT_FOUND", message: "Order not found." });
+    throw new TRPCError12({ code: "NOT_FOUND", message: "Order not found." });
   }
   return {
     orderNumber: order.orderNumber,
+    subtotalTaka: order.subtotalTaka,
     totalTaka: order.totalTaka,
     deliveryChargeTaka: order.deliveryChargeTaka,
+    couponCode: order.couponCode,
+    originalSubtotalTaka: order.originalSubtotalTaka,
+    discountPercent: order.discountPercent,
+    discountAmountTaka: order.discountAmountTaka,
     paymentMethod: order.paymentMethod,
     status: order.status,
     createdAt: order.createdAt
@@ -2359,7 +2629,7 @@ async function getCustomerOrderDetail(userId, orderNumberValue) {
     ...user ? { userId: user._id } : {}
   }).lean();
   if (!order) {
-    throw new TRPCError11({ code: "NOT_FOUND", message: "Order not found." });
+    throw new TRPCError12({ code: "NOT_FOUND", message: "Order not found." });
   }
   return {
     id: order._id.toString(),
@@ -2371,6 +2641,10 @@ async function getCustomerOrderDetail(userId, orderNumberValue) {
     subtotalTaka: order.subtotalTaka,
     deliveryChargeTaka: order.deliveryChargeTaka,
     totalTaka: order.totalTaka,
+    couponCode: order.couponCode,
+    originalSubtotalTaka: order.originalSubtotalTaka,
+    discountPercent: order.discountPercent,
+    discountAmountTaka: order.discountAmountTaka,
     paymentMethod: order.paymentMethod,
     status: order.status,
     adminNote: order.adminNote,
@@ -2409,6 +2683,10 @@ async function listCustomerOrders(userId) {
     subtotalTaka: order.subtotalTaka,
     deliveryChargeTaka: order.deliveryChargeTaka,
     totalTaka: order.totalTaka,
+    couponCode: order.couponCode,
+    originalSubtotalTaka: order.originalSubtotalTaka,
+    discountPercent: order.discountPercent,
+    discountAmountTaka: order.discountAmountTaka,
     paymentMethod: order.paymentMethod,
     status: order.status,
     adminNote: order.adminNote,
@@ -2472,6 +2750,7 @@ var orderRouter = router({
     paymentMethod: z3.enum(PAYMENT_METHODS2),
     transactionId: z3.string().trim().min(3).max(120).optional(),
     submittedAmountTaka: z3.number().int().positive().max(1e6).optional(),
+    couponCode: z3.string().trim().max(50).optional(),
     buyNowItem: z3.object({
       productId: z3.union([z3.string(), z3.number()]),
       quantity: z3.number().int().positive().max(100)
@@ -2479,7 +2758,7 @@ var orderRouter = router({
   })).mutation(async ({ ctx, input }) => {
     const customer = ctx.user ?? await getCustomerFromRequest(ctx.req);
     if (!customer) {
-      throw new TRPCError12({
+      throw new TRPCError13({
         code: "UNAUTHORIZED",
         message: "Please sign in to your Rabiora account to complete your order."
       });
@@ -2503,17 +2782,17 @@ var orderRouter = router({
   confirmation: publicProcedure.input(z3.object({ orderNumber: z3.string().trim().regex(/^RAB-[A-Z0-9_-]+$/) })).query(async ({ ctx, input }) => {
     const customer = ctx.user ?? await getCustomerFromRequest(ctx.req);
     if (customer) return getCustomerOrderConfirmation(customer.id, input.orderNumber);
-    if (!await hasGuestOrderConfirmationAccess(ctx.req, input.orderNumber)) throw new TRPCError12({ code: "FORBIDDEN", message: "This order confirmation is not available in the current session." });
+    if (!await hasGuestOrderConfirmationAccess(ctx.req, input.orderNumber)) throw new TRPCError13({ code: "FORBIDDEN", message: "This order confirmation is not available in the current session." });
     return getOrderConfirmation(input.orderNumber);
   }),
   mine: publicProcedure.query(async ({ ctx }) => {
     const customer = ctx.user ?? await getCustomerFromRequest(ctx.req);
-    if (!customer) throw new TRPCError12({ code: "UNAUTHORIZED", message: "Sign in to view order history." });
+    if (!customer) throw new TRPCError13({ code: "UNAUTHORIZED", message: "Sign in to view order history." });
     return listCustomerOrders(customer.id);
   }),
   detail: publicProcedure.input(z3.object({ orderNumber: z3.string().trim().regex(/^RAB-[A-Z0-9_-]+$/) })).query(async ({ ctx, input }) => {
     const customer = ctx.user ?? await getCustomerFromRequest(ctx.req);
-    if (!customer) throw new TRPCError12({ code: "UNAUTHORIZED", message: "Sign in to view order details." });
+    if (!customer) throw new TRPCError13({ code: "UNAUTHORIZED", message: "Sign in to view order details." });
     return getCustomerOrderDetail(customer.id, input.orderNumber);
   }),
   paymentRules: publicProcedure.query(() => ({ methods: PAYMENT_METHODS2, manualPaymentRequired }))
@@ -2525,12 +2804,12 @@ import { z as z4 } from "zod";
 // server/adminService.ts
 init_db();
 init_models();
-import { TRPCError as TRPCError14 } from "@trpc/server";
+import { TRPCError as TRPCError15 } from "@trpc/server";
 
 // server/storage.ts
 import { v2 as cloudinary } from "cloudinary";
 import path2 from "node:path";
-import { TRPCError as TRPCError13 } from "@trpc/server";
+import { TRPCError as TRPCError14 } from "@trpc/server";
 var allowedExtensions2 = {
   "image/jpeg": ".jpg",
   "image/png": ".png",
@@ -2601,7 +2880,7 @@ async function uploadToCloudinary(bytes, mimeType, fileName, productId) {
 async function saveProductImage(productId, bytes, mimeType, fileName) {
   const extension = allowedExtensions2[mimeType];
   if (!extension) {
-    throw new TRPCError13({
+    throw new TRPCError14({
       code: "BAD_REQUEST",
       message: "Use a JPEG, PNG, or WebP image."
     });
@@ -2613,7 +2892,7 @@ async function saveProductImage(productId, bytes, mimeType, fileName) {
     } catch (error) {
       console.error("[Storage] Cloudinary upload failed:", error);
       if (process.env.NODE_ENV === "production") {
-        throw new TRPCError13({
+        throw new TRPCError14({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to upload image to Cloudinary storage."
         });
@@ -2669,14 +2948,14 @@ async function createAdminCategory(input) {
   const name = input.name.trim();
   const slug = normalizedSlug(input.slug || name);
   if (!name || !slug) {
-    throw new TRPCError14({
+    throw new TRPCError15({
       code: "BAD_REQUEST",
       message: "Category name and slug are required."
     });
   }
   const existing = await CategoryModel.findOne({ slug });
   if (existing) {
-    throw new TRPCError14({
+    throw new TRPCError15({
       code: "CONFLICT",
       message: "A category with this URL slug already exists."
     });
@@ -2696,16 +2975,16 @@ async function updateAdminCategory(categoryId, input) {
   const query = isValidObjectId(categoryId) ? { _id: toObjectId(String(categoryId)) } : { slug: String(categoryId) };
   const category = await CategoryModel.findOne(query);
   if (!category) {
-    throw new TRPCError14({ code: "NOT_FOUND", message: "Category not found." });
+    throw new TRPCError15({ code: "NOT_FOUND", message: "Category not found." });
   }
   const name = input.name.trim();
   const slug = normalizedSlug(input.slug || name);
   if (!name || !slug) {
-    throw new TRPCError14({ code: "BAD_REQUEST", message: "Category name and slug are required." });
+    throw new TRPCError15({ code: "BAD_REQUEST", message: "Category name and slug are required." });
   }
   const existingSlug = await CategoryModel.findOne({ slug });
   if (existingSlug && existingSlug._id.toString() !== category._id.toString()) {
-    throw new TRPCError14({ code: "CONFLICT", message: "Another category already uses this slug." });
+    throw new TRPCError15({ code: "CONFLICT", message: "Another category already uses this slug." });
   }
   category.name = name;
   category.slug = slug;
@@ -2728,7 +3007,7 @@ async function deleteAdminCategory(categoryId) {
   const query = isValidObjectId(categoryId) ? { _id: toObjectId(String(categoryId)) } : { slug: String(categoryId) };
   const category = await CategoryModel.findOne(query);
   if (!category) {
-    throw new TRPCError14({ code: "NOT_FOUND", message: "Category not found." });
+    throw new TRPCError15({ code: "NOT_FOUND", message: "Category not found." });
   }
   let fallbackCategory = await CategoryModel.findOne({ _id: { $ne: category._id } });
   if (!fallbackCategory) {
@@ -2795,14 +3074,14 @@ async function createAdminProduct(input) {
   const legacyId = currentCount + 1;
   const slug = normalizedSlug(input.slug || input.name);
   if (!slug) {
-    throw new TRPCError14({
+    throw new TRPCError15({
       code: "BAD_REQUEST",
       message: "Product slug is required."
     });
   }
   const existingSlug = await ProductModel.findOne({ slug });
   if (existingSlug) {
-    throw new TRPCError14({
+    throw new TRPCError15({
       code: "CONFLICT",
       message: "A product with this URL slug already exists."
     });
@@ -2850,21 +3129,21 @@ async function updateAdminProduct(productId, input) {
   await connectMongo();
   const product = await ProductModel.findOne(findProductQuery(productId));
   if (!product) {
-    throw new TRPCError14({
+    throw new TRPCError15({
       code: "NOT_FOUND",
       message: "Product not found."
     });
   }
   const slug = normalizedSlug(input.slug || input.name);
   if (!slug) {
-    throw new TRPCError14({
+    throw new TRPCError15({
       code: "BAD_REQUEST",
       message: "Product slug is required."
     });
   }
   const slugOwner = await ProductModel.findOne({ slug });
   if (slugOwner && slugOwner._id.toString() !== product._id.toString()) {
-    throw new TRPCError14({
+    throw new TRPCError15({
       code: "CONFLICT",
       message: "Another product already uses this URL slug."
     });
@@ -2910,7 +3189,7 @@ async function uploadAdminProductImage(productId, input) {
   await connectMongo();
   const product = await ProductModel.findOne(findProductQuery(productId));
   if (!product) {
-    throw new TRPCError14({
+    throw new TRPCError15({
       code: "NOT_FOUND",
       message: "Product not found."
     });
@@ -2919,14 +3198,14 @@ async function uploadAdminProductImage(productId, input) {
     /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/
   );
   if (!dataMatch) {
-    throw new TRPCError14({
+    throw new TRPCError15({
       code: "BAD_REQUEST",
       message: "Use a JPEG, PNG, or WebP image."
     });
   }
   const bytes = Buffer.from(dataMatch[2], "base64");
   if (bytes.byteLength > 5 * 1024 * 1024) {
-    throw new TRPCError14({
+    throw new TRPCError15({
       code: "PAYLOAD_TOO_LARGE",
       message: "Images must be 5 MB or smaller."
     });
@@ -2957,7 +3236,7 @@ async function setAdminProductCover(productId, imageId) {
   await connectMongo();
   const product = await ProductModel.findOne(findProductQuery(productId));
   if (!product) {
-    throw new TRPCError14({ code: "NOT_FOUND", message: "Product not found." });
+    throw new TRPCError15({ code: "NOT_FOUND", message: "Product not found." });
   }
   const targetIdx = typeof imageId === "number" ? imageId - 1 : product.images.findIndex((img) => img._id?.toString() === String(imageId));
   if (targetIdx >= 0 && targetIdx < product.images.length) {
@@ -2972,7 +3251,7 @@ async function removeAdminProductImage(productId, imageId) {
   await connectMongo();
   const product = await ProductModel.findOne(findProductQuery(productId));
   if (!product) {
-    throw new TRPCError14({ code: "NOT_FOUND", message: "Product not found." });
+    throw new TRPCError15({ code: "NOT_FOUND", message: "Product not found." });
   }
   const targetIdx = typeof imageId === "number" ? imageId - 1 : product.images.findIndex((img) => img._id?.toString() === String(imageId));
   if (targetIdx >= 0 && targetIdx < product.images.length) {
@@ -2998,6 +3277,10 @@ async function listAdminOrders() {
     subtotalTaka: o.subtotalTaka,
     deliveryChargeTaka: o.deliveryChargeTaka,
     totalTaka: o.totalTaka,
+    couponCode: o.couponCode,
+    originalSubtotalTaka: o.originalSubtotalTaka,
+    discountPercent: o.discountPercent,
+    discountAmountTaka: o.discountAmountTaka,
     paymentMethod: o.paymentMethod,
     status: o.status,
     adminNote: o.adminNote,
@@ -3038,7 +3321,7 @@ async function getAdminCustomerDetail(customerId) {
   await connectMongo();
   const customer = await UserModel.findOne(findUserQuery(customerId)).lean();
   if (!customer) {
-    throw new TRPCError14({
+    throw new TRPCError15({
       code: "NOT_FOUND",
       message: "Customer not found."
     });
@@ -3075,7 +3358,7 @@ async function updateAdminCustomerRole(customerId, role) {
     { new: true }
   ).lean();
   if (!updated) {
-    throw new TRPCError14({
+    throw new TRPCError15({
       code: "NOT_FOUND",
       message: "Customer not found."
     });
@@ -3092,13 +3375,13 @@ async function advanceOrderStatus(orderId, nextStatus, actorUserId, adminNote) {
   await connectMongo();
   const order = await OrderModel.findOne(findOrderQuery(orderId));
   if (!order) {
-    throw new TRPCError14({
+    throw new TRPCError15({
       code: "NOT_FOUND",
       message: "Order not found."
     });
   }
   if (!canAdvanceOrderStatus(order.status, nextStatus)) {
-    throw new TRPCError14({
+    throw new TRPCError15({
       code: "BAD_REQUEST",
       message: "Order statuses must move forward through pending, confirmed, shipped, and delivered."
     });
@@ -3127,7 +3410,7 @@ async function advanceOrderStatus(orderId, nextStatus, actorUserId, adminNote) {
 init_db();
 init_models();
 init_customerSession();
-import { TRPCError as TRPCError15 } from "@trpc/server";
+import { TRPCError as TRPCError16 } from "@trpc/server";
 async function getPublicSiteSettings() {
   await connectMongo();
   let settings = await SiteSettingsModel.findOne({ key: "default" }).lean();
@@ -3185,7 +3468,7 @@ async function subscribeCustomer(input) {
   const email = input.email.trim().toLowerCase();
   const phoneInput = input.phone.trim();
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw new TRPCError15({
+    throw new TRPCError16({
       code: "BAD_REQUEST",
       message: "Please enter a valid email address."
     });
@@ -3194,7 +3477,7 @@ async function subscribeCustomer(input) {
   if (input.residency === "inside_bangladesh") {
     const bd = normalizeBangladeshPhone(phoneInput);
     if (!bd) {
-      throw new TRPCError15({
+      throw new TRPCError16({
         code: "BAD_REQUEST",
         message: "Please enter a valid 11-digit Bangladesh mobile number."
       });
@@ -3202,7 +3485,7 @@ async function subscribeCustomer(input) {
     normalizedPhone = bd;
   } else {
     if (phoneInput.length < 7 || phoneInput.length > 20) {
-      throw new TRPCError15({
+      throw new TRPCError16({
         code: "BAD_REQUEST",
         message: "Please enter a valid international mobile number."
       });
@@ -3309,7 +3592,7 @@ async function createAdminOfferBanner(input) {
   await connectMongo();
   const offerType = input.offerType || "image_banner";
   if (offerType === "image_banner" && !input.imageUrl?.trim()) {
-    throw new TRPCError15({ code: "BAD_REQUEST", message: "An image is required for Image Banner offers." });
+    throw new TRPCError16({ code: "BAD_REQUEST", message: "An image is required for Image Banner offers." });
   }
   const created = await OfferBannerModel.create({
     offerType,
@@ -3338,7 +3621,7 @@ async function createAdminOfferBanner(input) {
 async function updateAdminOfferBanner(id, input) {
   await connectMongo();
   if (input.offerType === "image_banner" && input.imageUrl !== void 0 && !input.imageUrl.trim()) {
-    throw new TRPCError15({ code: "BAD_REQUEST", message: "An image is required for Image Banner offers." });
+    throw new TRPCError16({ code: "BAD_REQUEST", message: "An image is required for Image Banner offers." });
   }
   const updated = await OfferBannerModel.findByIdAndUpdate(
     id,
@@ -3358,7 +3641,7 @@ async function updateAdminOfferBanner(id, input) {
     { new: true }
   ).lean();
   if (!updated) {
-    throw new TRPCError15({ code: "NOT_FOUND", message: "Offer banner not found." });
+    throw new TRPCError16({ code: "NOT_FOUND", message: "Offer banner not found." });
   }
   return {
     id: updated._id.toString(),
@@ -3381,7 +3664,7 @@ async function deleteAdminOfferBanner(id) {
 async function uploadAdminOfferImage(dataUri, fileName) {
   const match = dataUri.match(/^data:([^;]+);base64,(.+)$/);
   if (!match) {
-    throw new TRPCError15({ code: "BAD_REQUEST", message: "Invalid image format." });
+    throw new TRPCError16({ code: "BAD_REQUEST", message: "Invalid image format." });
   }
   const mimeType = match[1];
   const buffer = Buffer.from(match[2], "base64");
@@ -3579,6 +3862,35 @@ var adminRouter = router({
         fileName: z4.string().optional()
       })
     ).mutation(({ input }) => uploadAdminOfferImage(input.dataUri, input.fileName))
+  }),
+  coupons: router({
+    list: adminProcedure.query(() => listAdminCoupons()),
+    create: adminProcedure.input(
+      z4.object({
+        code: z4.string().trim().min(2).max(50),
+        discountType: z4.enum(["percentage"]).optional(),
+        discountValue: z4.number().int().min(1).max(100),
+        isActive: z4.boolean().optional(),
+        expiryDate: z4.string().nullable().optional(),
+        minOrderAmount: z4.number().int().nonnegative().optional(),
+        usageLimit: z4.number().int().positive().nullable().optional(),
+        allowedPaymentMethods: z4.array(z4.string()).optional()
+      })
+    ).mutation(({ input }) => createAdminCoupon(input)),
+    update: adminProcedure.input(
+      z4.object({
+        id: z4.string(),
+        code: z4.string().trim().min(2).max(50).optional(),
+        discountType: z4.enum(["percentage"]).optional(),
+        discountValue: z4.number().int().min(1).max(100).optional(),
+        isActive: z4.boolean().optional(),
+        expiryDate: z4.string().nullable().optional(),
+        minOrderAmount: z4.number().int().nonnegative().optional(),
+        usageLimit: z4.number().int().positive().nullable().optional(),
+        allowedPaymentMethods: z4.array(z4.string()).optional()
+      })
+    ).mutation(({ input }) => updateAdminCoupon(input.id, input)),
+    delete: adminProcedure.input(z4.object({ id: z4.string() })).mutation(({ input }) => deleteAdminCoupon(input.id))
   })
 });
 
@@ -3586,7 +3898,7 @@ var adminRouter = router({
 import { z as z5 } from "zod";
 
 // server/_core/notification.ts
-import { TRPCError as TRPCError16 } from "@trpc/server";
+import { TRPCError as TRPCError17 } from "@trpc/server";
 var TITLE_MAX_LENGTH = 1200;
 var CONTENT_MAX_LENGTH = 2e4;
 var trimValue = (value) => value.trim();
@@ -3600,13 +3912,13 @@ var buildEndpointUrl = (baseUrl) => {
 };
 var validatePayload = (input) => {
   if (!isNonEmptyString2(input.title)) {
-    throw new TRPCError16({
+    throw new TRPCError17({
       code: "BAD_REQUEST",
       message: "Notification title is required."
     });
   }
   if (!isNonEmptyString2(input.content)) {
-    throw new TRPCError16({
+    throw new TRPCError17({
       code: "BAD_REQUEST",
       message: "Notification content is required."
     });
@@ -3614,13 +3926,13 @@ var validatePayload = (input) => {
   const title = trimValue(input.title);
   const content = trimValue(input.content);
   if (title.length > TITLE_MAX_LENGTH) {
-    throw new TRPCError16({
+    throw new TRPCError17({
       code: "BAD_REQUEST",
       message: `Notification title must be at most ${TITLE_MAX_LENGTH} characters.`
     });
   }
   if (content.length > CONTENT_MAX_LENGTH) {
-    throw new TRPCError16({
+    throw new TRPCError17({
       code: "BAD_REQUEST",
       message: `Notification content must be at most ${CONTENT_MAX_LENGTH} characters.`
     });
@@ -3630,13 +3942,13 @@ var validatePayload = (input) => {
 async function notifyOwner(payload) {
   const { title, content } = validatePayload(payload);
   if (!ENV.forgeApiUrl) {
-    throw new TRPCError16({
+    throw new TRPCError17({
       code: "INTERNAL_SERVER_ERROR",
       message: "Notification service URL is not configured."
     });
   }
   if (!ENV.forgeApiKey) {
-    throw new TRPCError16({
+    throw new TRPCError17({
       code: "INTERNAL_SERVER_ERROR",
       message: "Notification service API key is not configured."
     });
@@ -3697,6 +4009,15 @@ var appRouter = router({
   }),
   offers: router({
     list: publicProcedure.query(() => listActiveOfferBanners())
+  }),
+  coupon: router({
+    validate: publicProcedure.input(
+      z6.object({
+        code: z6.string().trim().min(1).max(50),
+        subtotalTaka: z6.number().int().nonnegative(),
+        paymentMethod: z6.string().trim()
+      })
+    ).mutation(({ input }) => validateCoupon(input.code, input.subtotalTaka, input.paymentMethod))
   }),
   subscribe: publicProcedure.input(
     z6.object({

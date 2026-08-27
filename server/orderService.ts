@@ -3,6 +3,7 @@ import { connectMongo } from "./config/db";
 import { CartModel, OrderModel, ProductModel, UserModel, findOrderQuery, findProductQuery, findUserQuery } from "./models";
 import type { CartIdentity } from "./cartService";
 import { nanoid } from "nanoid";
+import { validateCoupon, incrementCouponUsage } from "./couponService";
 
 export const PAYMENT_METHODS = ["bKash", "Nagad", "Rocket", "Cash on Delivery"] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
@@ -67,6 +68,7 @@ export async function createOrder(
     paymentMethod: PaymentMethod;
     transactionId?: string;
     submittedAmountTaka?: number;
+    couponCode?: string;
     buyNowItem?: { productId: number | string; quantity: number };
   }
 ) {
@@ -78,7 +80,7 @@ export async function createOrder(
   }
 
   const orderItems = [];
-  let subtotalTaka = 0;
+  let rawSubtotalTaka = 0;
 
   if (input.buyNowItem) {
     const product: any = await ProductModel.findOne(findProductQuery(input.buyNowItem.productId));
@@ -93,7 +95,7 @@ export async function createOrder(
     const coverImage = (product.images || []).find((img: any) => img.isCover) || (product.images || [])[0];
     const unitPrice = product.priceTaka || 0;
     const lineTotal = unitPrice * qty;
-    subtotalTaka += lineTotal;
+    rawSubtotalTaka += lineTotal;
 
     orderItems.push({
       productId: product._id,
@@ -131,7 +133,7 @@ export async function createOrder(
       const coverImage = (product.images || []).find((img: any) => img.isCover) || (product.images || [])[0];
       const unitPrice = product.priceTaka || 0;
       const lineTotal = unitPrice * item.quantity;
-      subtotalTaka += lineTotal;
+      rawSubtotalTaka += lineTotal;
 
       orderItems.push({
         productId: product._id,
@@ -145,8 +147,29 @@ export async function createOrder(
     }
   }
 
+  // 1. Coupon validation and discount calculation
+  let appliedCouponCode: string | undefined = undefined;
+  let originalSubtotalTaka: number | undefined = undefined;
+  let discountPercent: number | undefined = undefined;
+  let discountAmountTaka: number | undefined = undefined;
+  let finalSubtotalTaka = rawSubtotalTaka;
+
+  if (input.couponCode && input.couponCode.trim()) {
+    const couponValidation = await validateCoupon(
+      input.couponCode,
+      rawSubtotalTaka,
+      input.paymentMethod
+    );
+    appliedCouponCode = couponValidation.code;
+    originalSubtotalTaka = rawSubtotalTaka;
+    discountPercent = couponValidation.discountPercent;
+    discountAmountTaka = couponValidation.discountAmount;
+    finalSubtotalTaka = couponValidation.payableSubtotal;
+    await incrementCouponUsage(couponValidation.code);
+  }
+
   const deliveryChargeTaka = calculateDeliveryCharge(input.districtArea);
-  const totalTaka = subtotalTaka + deliveryChargeTaka;
+  const totalTaka = finalSubtotalTaka + deliveryChargeTaka;
 
   assertManualPaymentEvidence(input.paymentMethod, input.transactionId, input.submittedAmountTaka);
 
@@ -175,9 +198,13 @@ export async function createOrder(
     customerPhone: input.customerPhone,
     districtArea: input.districtArea,
     fullAddress: input.fullAddress,
-    subtotalTaka,
+    subtotalTaka: finalSubtotalTaka,
     deliveryChargeTaka,
     totalTaka,
+    couponCode: appliedCouponCode,
+    originalSubtotalTaka,
+    discountPercent,
+    discountAmountTaka,
     paymentMethod: input.paymentMethod,
     status: "pending",
     items: orderItems,
@@ -246,8 +273,13 @@ export async function getOrderConfirmation(orderNumberValue: string) {
 
   return {
     orderNumber: order.orderNumber,
+    subtotalTaka: order.subtotalTaka,
     totalTaka: order.totalTaka,
     deliveryChargeTaka: order.deliveryChargeTaka,
+    couponCode: order.couponCode,
+    originalSubtotalTaka: order.originalSubtotalTaka,
+    discountPercent: order.discountPercent,
+    discountAmountTaka: order.discountAmountTaka,
     paymentMethod: order.paymentMethod,
     status: order.status,
     createdAt: order.createdAt,
@@ -269,8 +301,13 @@ export async function getCustomerOrderConfirmation(userId: string | number, orde
 
   return {
     orderNumber: order.orderNumber,
+    subtotalTaka: order.subtotalTaka,
     totalTaka: order.totalTaka,
     deliveryChargeTaka: order.deliveryChargeTaka,
+    couponCode: order.couponCode,
+    originalSubtotalTaka: order.originalSubtotalTaka,
+    discountPercent: order.discountPercent,
+    discountAmountTaka: order.discountAmountTaka,
     paymentMethod: order.paymentMethod,
     status: order.status,
     createdAt: order.createdAt,
@@ -300,6 +337,10 @@ export async function getCustomerOrderDetail(userId: string | number, orderNumbe
     subtotalTaka: order.subtotalTaka,
     deliveryChargeTaka: order.deliveryChargeTaka,
     totalTaka: order.totalTaka,
+    couponCode: order.couponCode,
+    originalSubtotalTaka: order.originalSubtotalTaka,
+    discountPercent: order.discountPercent,
+    discountAmountTaka: order.discountAmountTaka,
     paymentMethod: order.paymentMethod,
     status: order.status,
     adminNote: order.adminNote,
@@ -344,6 +385,10 @@ export async function listCustomerOrders(userId: string | number) {
     subtotalTaka: order.subtotalTaka,
     deliveryChargeTaka: order.deliveryChargeTaka,
     totalTaka: order.totalTaka,
+    couponCode: order.couponCode,
+    originalSubtotalTaka: order.originalSubtotalTaka,
+    discountPercent: order.discountPercent,
+    discountAmountTaka: order.discountAmountTaka,
     paymentMethod: order.paymentMethod,
     status: order.status,
     adminNote: order.adminNote,

@@ -450,10 +450,22 @@ export default function OrderDetail() {
 
                   <strong>
                     {taka(
-                      order.subtotalTaka,
+                      (order as any).originalSubtotalTaka || order.subtotalTaka
                     )}
                   </strong>
                 </p>
+
+                {(order as any).couponCode && (order as any).discountAmountTaka && (
+                  <p>
+                    <span style={{ color: "#16a34a" }}>
+                      Discount ({(order as any).couponCode})
+                    </span>
+
+                    <strong style={{ color: "#16a34a" }}>
+                      -{taka((order as any).discountAmountTaka)}
+                    </strong>
+                  </p>
+                )}
 
                 <p>
                   <span>
@@ -471,7 +483,7 @@ export default function OrderDetail() {
                 </p>
 
                 <p className="order-detail-total">
-                  <span>{t("total")}</span>
+                  <span>Payable Total</span>
 
                   <strong>
                     {taka(order.totalTaka)}

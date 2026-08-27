@@ -18,6 +18,7 @@ export const orderRouter = router({
     paymentMethod: z.enum(PAYMENT_METHODS),
     transactionId: z.string().trim().min(3).max(120).optional(),
     submittedAmountTaka: z.number().int().positive().max(1_000_000).optional(),
+    couponCode: z.string().trim().max(50).optional(),
     buyNowItem: z.object({
       productId: z.union([z.string(), z.number()]),
       quantity: z.number().int().positive().max(100),
