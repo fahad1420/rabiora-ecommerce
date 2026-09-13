@@ -26,4 +26,14 @@ describe("customer authentication route guards", () => {
   it("requires a customer session to update a profile", async () => {
     await expect(caller().updateProfile({ name: "Acceptance Customer", email: "customer@example.test" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
+
+  it("validates email formatting on email password reset request", async () => {
+    await expect(caller().requestEmailPasswordReset({ email: "invalid-email" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("handles email password reset for valid email input safely", async () => {
+    const res = await caller().requestEmailPasswordReset({ email: "test.customer@example.com" });
+    expect(res).toBeDefined();
+    expect(res.success).toBe(true);
+  });
 });

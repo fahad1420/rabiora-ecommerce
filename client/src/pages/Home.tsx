@@ -69,6 +69,7 @@ export default function Home() {
   });
 
   const reviewsQuery = trpc.customer.homeReviews.useQuery();
+  const settingsQuery = trpc.settings.get.useQuery();
 
   useEffect(() => {
     let ticking = false;
@@ -182,6 +183,36 @@ export default function Home() {
 
         {/* Promotional Offer Banner Slider */}
         <OfferBannerSlider />
+
+        {/* Admin Configured Featured Spotlight Picture / Product */}
+        {settingsQuery.data?.featuredPictureUrl && (
+          <section className="featured-spotlight-section">
+            <div className="container">
+              <a
+                href={
+                  settingsQuery.data.featuredPictureLink ||
+                  (settingsQuery.data.featuredProductId ? `/products/${settingsQuery.data.featuredProductId}` : "#products")
+                }
+                className="featured-spotlight-card"
+                title={settingsQuery.data.featuredTitle || "Featured Collection"}
+              >
+                <img
+                  src={settingsQuery.data.featuredPictureUrl}
+                  alt={settingsQuery.data.featuredTitle || "Featured Luxury Collection"}
+                  className="featured-spotlight-image"
+                  loading="lazy"
+                />
+                {settingsQuery.data.featuredTitle && (
+                  <div className="featured-spotlight-overlay">
+                    <span className="badge">Featured Spotlight</span>
+                    <h3>{settingsQuery.data.featuredTitle}</h3>
+                    <span className="featured-spotlight-btn">Explore Now →</span>
+                  </div>
+                )}
+              </a>
+            </div>
+          </section>
+        )}
 
         {/* Featured Collection Slider */}
         <section className="featured-section">

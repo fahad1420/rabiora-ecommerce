@@ -27,9 +27,14 @@ export function useAuth(options?: UseAuthOptions) {
     },
   });
 
+  const customerLogoutMutation = trpc.customer.logout.useMutation();
+
   const logout = useCallback(async () => {
     try {
-      await logoutMutation.mutateAsync();
+      await Promise.allSettled([
+        logoutMutation.mutateAsync(),
+        customerLogoutMutation.mutateAsync(),
+      ]);
     } catch (error: unknown) {
       if (
         error instanceof TRPCClientError &&
@@ -37,18 +42,20 @@ export function useAuth(options?: UseAuthOptions) {
       ) {
         return;
       }
-      throw error;
     } finally {
-      // Clear the Preview auto-login token mirrored into sessionStorage, so
-      // header-based sessions (Safari ITP / WebView) are logged out too. The
-      // backend cookie is cleared by the logout mutation.
       try {
         sessionStorage.removeItem("manus-cookie");
+        localStorage.removeItem("rabiora_customer_token");
+        localStorage.removeItem("manus-runtime-user-info");
       } catch {}
       utils.auth.me.setData(undefined, null);
-      await utils.auth.me.invalidate();
+      utils.customer.me.setData(undefined, null);
+      await Promise.allSettled([
+        utils.auth.me.invalidate(),
+        utils.customer.me.invalidate(),
+      ]);
     }
-  }, [logoutMutation, utils]);
+  }, [logoutMutation, customerLogoutMutation, utils]);
 
   const state = useMemo(() => {
     localStorage.setItem(

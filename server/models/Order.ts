@@ -43,6 +43,8 @@ export interface IOrder extends Document {
   customerName: string;
   customerPhone: string;
   districtArea: string;
+  upazila?: string;
+  thana?: string;
   fullAddress: string;
   subtotalTaka: number;
   deliveryChargeTaka: number;
@@ -103,6 +105,8 @@ const OrderSchema = new Schema<IOrder>(
     customerName: { type: String, required: true },
     customerPhone: { type: String, required: true, index: true },
     districtArea: { type: String, required: true },
+    upazila: { type: String, trim: true },
+    thana: { type: String, trim: true },
     fullAddress: { type: String, required: true },
     subtotalTaka: { type: Number, required: true },
     deliveryChargeTaka: { type: Number, required: true },

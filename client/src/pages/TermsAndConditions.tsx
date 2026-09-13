@@ -98,7 +98,7 @@ export default function TermsAndConditions() {
                 </p>
                 <ul>
                   <li><strong>WhatsApp:</strong> <a href="https://wa.me/8801349529274" target="_blank" rel="noopener noreferrer">+880 1349-529274</a></li>
-                  <li><strong>Messenger:</strong> <a href="https://www.facebook.com/share/14wjzGNSqz8/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer">Rabiora Official Facebook Support</a></li>
+                  <li><strong>Facebook:</strong> <a href="https://www.facebook.com/share/1FCh6KH9pJ/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer">Rabiora Official Facebook</a></li>
                   <li><strong>Email:</strong> support@rabiora.com</li>
                 </ul>
               </section>

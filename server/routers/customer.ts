@@ -5,12 +5,14 @@ import {
   clearCustomerSession,
   createCustomer,
   createPasswordResetRequest,
+  createEmailPasswordResetRequest,
   findCustomerByIdentifier,
   findCustomerByPhone,
   getCustomerFromRequest,
   isValidCustomerPassword,
   normalizeBangladeshPhone,
   resetCustomerPassword,
+  resetCustomerPasswordByEmail,
   setCustomerSession,
   signCustomerSession,
   updateCustomerProfile,
@@ -227,6 +229,16 @@ export const customerRouter = router({
       );
     }),
 
+  requestEmailPasswordReset: publicProcedure
+    .input(
+      z.object({
+        email: z.string().trim().email("Please enter a valid email address."),
+      })
+    )
+    .mutation(async ({ input }) => {
+      return createEmailPasswordResetRequest(input.email);
+    }),
+
   resetPassword: publicProcedure
     .input(
       z.object({
@@ -248,6 +260,32 @@ export const customerRouter = router({
     .mutation(async ({ input }) => {
       return resetCustomerPassword({
         phone: input.phone,
+        otpCode: input.otpCode,
+        newPassword: input.newPassword,
+      });
+    }),
+
+  resetPasswordByEmail: publicProcedure
+    .input(
+      z.object({
+        email: z.string().trim().email("Please enter a valid email address."),
+        otpCode: z
+          .string()
+          .regex(
+            /^\d{6}$/,
+            "Enter the 6-digit verification code."
+          ),
+        newPassword: z
+          .string()
+          .refine(
+            isValidCustomerPassword,
+            "Password must contain 8–72 characters."
+          ),
+      })
+    )
+    .mutation(async ({ input }) => {
+      return resetCustomerPasswordByEmail({
+        email: input.email,
         otpCode: input.otpCode,
         newPassword: input.newPassword,
       });

@@ -182,7 +182,7 @@ export async function listAdminProducts() {
   await connectMongo();
   const products = await ProductModel.find()
     .populate("categoryId")
-    .sort({ updatedAt: -1 })
+    .sort({ createdAt: -1, _id: -1 })
     .lean();
 
   return products.map((p) => {
@@ -361,6 +361,74 @@ export async function deleteAdminProduct(productId: string | number) {
   return {
     success: true as const,
   };
+}
+
+export async function uploadMultipleAdminProductImages(
+  productId: string | number,
+  images: Array<{
+    dataUrl: string;
+    fileName: string;
+    altText?: string;
+    isCover?: boolean;
+  }>
+) {
+  await connectMongo();
+
+  const product = await ProductModel.findOne(findProductQuery(productId));
+
+  if (!product) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Product not found.",
+    });
+  }
+
+  const uploadedResults = [];
+
+  for (let i = 0; i < images.length; i++) {
+    const item = images[i];
+    const dataMatch = item.dataUrl.match(
+      /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/
+    );
+
+    if (!dataMatch) continue;
+
+    const bytes = Buffer.from(dataMatch[2], "base64");
+    if (bytes.byteLength > 8 * 1024 * 1024) continue;
+
+    const safeName =
+      item.fileName.replace(/[^a-zA-Z0-9._-]/g, "_") || `product-image-${i + 1}`;
+
+    const uploaded = await saveProductImage(
+      product.legacyId ?? product._id.toString(),
+      bytes,
+      dataMatch[1],
+      safeName
+    );
+
+    const isCover =
+      (product.images.length === 0 && uploadedResults.length === 0) ||
+      Boolean(item.isCover);
+
+    if (isCover) {
+      product.images.forEach((img) => {
+        img.isCover = false;
+      });
+    }
+
+    product.images.push({
+      storageKey: uploaded.key,
+      storageUrl: uploaded.url,
+      altText: item.altText || `${product.name} — Rabiora`,
+      position: product.images.length,
+      isCover,
+    });
+
+    uploadedResults.push(uploaded);
+  }
+
+  await product.save();
+  return uploadedResults;
 }
 
 export async function uploadAdminProductImage(

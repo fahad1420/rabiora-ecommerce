@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import Home from "./pages/Home";
 import NotFound from "./pages/NotFound";
+import { MobileNavbar } from "./components/MobileNavbar";
 
 const ProductDetail = lazy(() => import("./pages/ProductDetail"));
 const Cart = lazy(() => import("./pages/Cart"));
@@ -166,6 +167,7 @@ export default function App() {
         <LanguageProvider>
           <TooltipProvider>
             <Router />
+            <MobileNavbar />
             <Toaster />
           </TooltipProvider>
         </LanguageProvider>

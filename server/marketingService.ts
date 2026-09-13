@@ -13,6 +13,12 @@ export async function getPublicSiteSettings() {
       bkashNumber: "+8801349529274",
       nagadNumber: "+8801349529274",
       rocketNumber: "+8801349529274",
+      deliveryChargeDhaka: 0,
+      deliveryChargeOutsideDhaka: 120,
+      featuredProductId: "",
+      featuredPictureUrl: "",
+      featuredPictureLink: "/#products",
+      featuredTitle: "Featured Collection",
       heroBadge: "Premium Collection",
       heroHeading: "RABIORA",
       heroTagline: "Elegance • Comfort • Confidence",
@@ -24,6 +30,12 @@ export async function getPublicSiteSettings() {
     bkashNumber: settings.bkashNumber || "+8801349529274",
     nagadNumber: settings.nagadNumber || "+8801349529274",
     rocketNumber: settings.rocketNumber || "+8801349529274",
+    deliveryChargeDhaka: settings.deliveryChargeDhaka ?? 0,
+    deliveryChargeOutsideDhaka: settings.deliveryChargeOutsideDhaka ?? 120,
+    featuredProductId: settings.featuredProductId || "",
+    featuredPictureUrl: settings.featuredPictureUrl || "",
+    featuredPictureLink: settings.featuredPictureLink || "/#products",
+    featuredTitle: settings.featuredTitle || "Featured Collection",
     heroBadge: settings.heroBadge || "Premium Collection",
     heroHeading: settings.heroHeading || "RABIORA",
     heroTagline: settings.heroTagline || "Elegance • Comfort • Confidence",
@@ -35,6 +47,12 @@ export async function updateAdminSiteSettings(input: {
   bkashNumber?: string;
   nagadNumber?: string;
   rocketNumber?: string;
+  deliveryChargeDhaka?: number;
+  deliveryChargeOutsideDhaka?: number;
+  featuredProductId?: string;
+  featuredPictureUrl?: string;
+  featuredPictureLink?: string;
+  featuredTitle?: string;
   heroBadge?: string;
   heroHeading?: string;
   heroTagline?: string;
@@ -48,6 +66,12 @@ export async function updateAdminSiteSettings(input: {
         ...(input.bkashNumber !== undefined && { bkashNumber: input.bkashNumber.trim() }),
         ...(input.nagadNumber !== undefined && { nagadNumber: input.nagadNumber.trim() }),
         ...(input.rocketNumber !== undefined && { rocketNumber: input.rocketNumber.trim() }),
+        ...(input.deliveryChargeDhaka !== undefined && { deliveryChargeDhaka: Math.max(0, Number(input.deliveryChargeDhaka)) }),
+        ...(input.deliveryChargeOutsideDhaka !== undefined && { deliveryChargeOutsideDhaka: Math.max(0, Number(input.deliveryChargeOutsideDhaka)) }),
+        ...(input.featuredProductId !== undefined && { featuredProductId: input.featuredProductId.trim() }),
+        ...(input.featuredPictureUrl !== undefined && { featuredPictureUrl: input.featuredPictureUrl.trim() }),
+        ...(input.featuredPictureLink !== undefined && { featuredPictureLink: input.featuredPictureLink.trim() }),
+        ...(input.featuredTitle !== undefined && { featuredTitle: input.featuredTitle.trim() }),
         ...(input.heroBadge !== undefined && { heroBadge: input.heroBadge.trim() }),
         ...(input.heroHeading !== undefined && { heroHeading: input.heroHeading.trim() }),
         ...(input.heroTagline !== undefined && { heroTagline: input.heroTagline.trim() }),
@@ -61,6 +85,12 @@ export async function updateAdminSiteSettings(input: {
     bkashNumber: updated.bkashNumber,
     nagadNumber: updated.nagadNumber,
     rocketNumber: updated.rocketNumber,
+    deliveryChargeDhaka: updated.deliveryChargeDhaka ?? 0,
+    deliveryChargeOutsideDhaka: updated.deliveryChargeOutsideDhaka ?? 120,
+    featuredProductId: updated.featuredProductId || "",
+    featuredPictureUrl: updated.featuredPictureUrl || "",
+    featuredPictureLink: updated.featuredPictureLink || "/#products",
+    featuredTitle: updated.featuredTitle || "Featured Collection",
     heroBadge: updated.heroBadge,
     heroHeading: updated.heroHeading,
     heroTagline: updated.heroTagline,

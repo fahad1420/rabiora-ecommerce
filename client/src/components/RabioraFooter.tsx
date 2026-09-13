@@ -151,22 +151,9 @@ export function RabioraFooter() {
               <span>WhatsApp</span>
             </a>
 
-            {/* Messenger */}
-            <a
-              href="https://www.facebook.com/share/14wjzGNSqz8/?mibextid=wwXIfr"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="social-pill messenger"
-              aria-label="Message on Facebook Messenger"
-              title="Facebook Messenger"
-            >
-              <MessageCircle size={15} />
-              <span>Messenger</span>
-            </a>
-
             {/* Facebook */}
             <a
-              href="https://www.facebook.com/share/14wjzGNSqz8/?mibextid=wwXIfr"
+              href="https://www.facebook.com/share/1FCh6KH9pJ/?mibextid=wwXIfr"
               target="_blank"
               rel="noopener noreferrer"
               className="social-icon facebook"
@@ -180,7 +167,7 @@ export function RabioraFooter() {
 
             {/* Instagram */}
             <a
-              href="https://www.instagram.com"
+              href="https://www.instagram.com/rabiora001?stkn=MTVrd2JlYjZ5eW1qdg=="
               target="_blank"
               rel="noopener noreferrer"
               className="social-icon instagram"
@@ -194,7 +181,7 @@ export function RabioraFooter() {
 
             {/* TikTok */}
             <a
-              href="https://www.tiktok.com"
+              href="https://www.tiktok.com/@rabiora001?_r=1&_t=ZS-99Xc50zI6EP"
               target="_blank"
               rel="noopener noreferrer"
               className="social-icon tiktok"
@@ -213,24 +200,32 @@ export function RabioraFooter() {
       <div className="container footer-bottom">
         <p>© {new Date().getFullYear()} Rabiora. {t("allRightsReserved")}</p>
         <p>
-          {t("designedDevelopedBy")} <strong>Fahad Hossain</strong>
+          {t("designedDevelopedBy")}{" "}
+          <a
+            href="https://www.fiaus.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "var(--primary)", fontWeight: 700 }}
+          >
+            FIAUS Tech
+          </a>
         </p>
         <div className="developer-links" aria-label="Developer profiles">
           <a
-            href="https://github.com/fahad1420"
+            href="https://github.com/fiaus"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Fahad Hossain on GitHub"
-            title="GitHub"
+            aria-label="FIAUS Tech on GitHub"
+            title="GitHub: FIAUS Tech"
           >
             <Github size={14} strokeWidth={1.9} aria-hidden="true" />
           </a>
           <a
-            href="https://www.linkedin.com/in/fahad-hossain1420"
+            href="https://www.linkedin.com/company/fiaustech"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Fahad Hossain on LinkedIn"
-            title="LinkedIn"
+            aria-label="FIAUS Tech on LinkedIn"
+            title="LinkedIn: FIAUS Tech"
           >
             <Linkedin size={14} strokeWidth={1.9} aria-hidden="true" />
           </a>

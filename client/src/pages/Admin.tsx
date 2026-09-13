@@ -92,6 +92,12 @@ function ProductManager() {
         utils.admin.products.list.invalidate(),
     });
 
+  const uploadMultipleImages =
+    trpc.admin.products.uploadMultipleImages.useMutation({
+      onSuccess: () =>
+        utils.admin.products.list.invalidate(),
+    });
+
   const [form, setForm] =
     useState<ProductForm>(emptyProduct);
 
@@ -99,8 +105,9 @@ function ProductManager() {
     useState<number | string | null>(null);
 
   const [error, setError] = useState("");
-  const [selectedImage, setSelectedImage] =
-    useState<File | null>(null);
+  const [selectedImages, setSelectedImages] =
+    useState<File[]>([]);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
 
   const updateField = (
     field: keyof ProductForm,
@@ -117,7 +124,7 @@ function ProductManager() {
     >[number],
   ) => {
     setEditingId(product.id);
-    setSelectedImage(null);
+    setSelectedImages([]);
     setError("");
 
     setForm({
@@ -137,6 +144,14 @@ function ProductManager() {
     });
   };
 
+  const fileToDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error(`Failed to read image: ${file.name}`));
+      reader.readAsDataURL(file);
+    });
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
@@ -151,45 +166,40 @@ function ProductManager() {
             toProductInput(form),
           );
 
-      if (selectedImage) {
-        const dataUrl = await new Promise<string>(
-          (resolve, reject) => {
-            const reader = new FileReader();
+      if (selectedImages.length > 0) {
+        setIsUploadingImages(true);
+        const existingImageCount =
+          products.data?.find((item) => item.id === product.id)?.images.length ?? 0;
 
-            reader.onload = () =>
-              resolve(String(reader.result));
-
-            reader.onerror = () =>
-              reject(
-                new Error("Image could not be read."),
-              );
-
-            reader.readAsDataURL(selectedImage);
-          },
+        const payloadImages = await Promise.all(
+          selectedImages.map(async (file, idx) => {
+            const dataUrl = await fileToDataUrl(file);
+            return {
+              dataUrl,
+              fileName: file.name,
+              altText: `${form.name} — Rabiora`,
+              isCover: existingImageCount === 0 && idx === 0,
+            };
+          })
         );
 
-        await uploadImage.mutateAsync({
+        await uploadMultipleImages.mutateAsync({
           productId: product.id,
-          dataUrl,
-          fileName: selectedImage.name,
-          altText: `${form.name} — Rabiora`,
-          isCover:
-            !editingId ||
-            (products.data?.find(
-              (item) => item.id === product.id,
-            )?.images.length ?? 0) === 0,
+          images: payloadImages,
         });
       }
 
       setEditingId(null);
       setForm(emptyProduct);
-      setSelectedImage(null);
+      setSelectedImages([]);
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
           : "Unable to save the product.",
       );
+    } finally {
+      setIsUploadingImages(false);
     }
   };
 
@@ -212,7 +222,7 @@ function ProductManager() {
           onClick={() => {
             setEditingId(null);
             setForm(emptyProduct);
-            setSelectedImage(null);
+            setSelectedImages([]);
             setError("");
           }}
         >
@@ -409,18 +419,22 @@ function ProductManager() {
           </label>
 
           <label>
-            Cover or Gallery Image
+            Upload Product Images (Single or Multiple)
             <input
               accept="image/jpeg,image/png,image/webp"
               type="file"
-              onChange={(
-                event: ChangeEvent<HTMLInputElement>,
-              ) =>
-                setSelectedImage(
-                  event.target.files?.[0] ?? null,
-                )
-              }
+              multiple
+              onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                if (event.target.files) {
+                  setSelectedImages(Array.from(event.target.files));
+                }
+              }}
             />
+            {selectedImages.length > 0 && (
+              <span className="selected-files-note" style={{ display: "block", marginTop: "4px", fontSize: "12px", color: "#16a34a" }}>
+                ✓ {selectedImages.length} image{selectedImages.length > 1 ? "s" : ""} selected for upload: {selectedImages.map((f) => f.name).join(", ")}
+              </span>
+            )}
           </label>
 
           {editedProduct && (
@@ -1446,10 +1460,11 @@ function CustomerDetailManager() {
 function PaymentSettingsManager() {
   const utils = trpc.useUtils();
   const settings = trpc.settings.get.useQuery();
+  const products = trpc.admin.products.list.useQuery();
   const updateSettings = trpc.admin.settings.update.useMutation({
     onSuccess: () => {
       utils.settings.get.invalidate();
-      setSavedStatus("Payment & Hero settings updated successfully!");
+      setSavedStatus("Payment, Delivery & Site settings updated successfully!");
       setTimeout(() => setSavedStatus(""), 4000);
     },
   });
@@ -1457,6 +1472,12 @@ function PaymentSettingsManager() {
   const [bkashNumber, setBkashNumber] = useState("+8801349529274");
   const [nagadNumber, setNagadNumber] = useState("+8801349529274");
   const [rocketNumber, setRocketNumber] = useState("+8801349529274");
+  const [deliveryChargeDhaka, setDeliveryChargeDhaka] = useState("0");
+  const [deliveryChargeOutsideDhaka, setDeliveryChargeOutsideDhaka] = useState("120");
+  const [featuredPictureUrl, setFeaturedPictureUrl] = useState("");
+  const [featuredTitle, setFeaturedTitle] = useState("");
+  const [featuredPictureLink, setFeaturedPictureLink] = useState("");
+  const [featuredProductId, setFeaturedProductId] = useState("");
   const [heroBadge, setHeroBadge] = useState("Premium Collection");
   const [heroHeading, setHeroHeading] = useState("RABIORA");
   const [heroTagline, setHeroTagline] = useState("Elegance • Comfort • Confidence");
@@ -1467,6 +1488,12 @@ function PaymentSettingsManager() {
       setBkashNumber(settings.data.bkashNumber || "+8801349529274");
       setNagadNumber(settings.data.nagadNumber || "+8801349529274");
       setRocketNumber(settings.data.rocketNumber || "+8801349529274");
+      setDeliveryChargeDhaka(String(settings.data.deliveryChargeDhaka ?? 0));
+      setDeliveryChargeOutsideDhaka(String(settings.data.deliveryChargeOutsideDhaka ?? 120));
+      setFeaturedPictureUrl(settings.data.featuredPictureUrl || "");
+      setFeaturedTitle(settings.data.featuredTitle || "");
+      setFeaturedPictureLink(settings.data.featuredPictureLink || "");
+      setFeaturedProductId(settings.data.featuredProductId || "");
       setHeroBadge(settings.data.heroBadge || "Premium Collection");
       setHeroHeading(settings.data.heroHeading || "RABIORA");
       setHeroTagline(settings.data.heroTagline || "Elegance • Comfort • Confidence");
@@ -1479,6 +1506,12 @@ function PaymentSettingsManager() {
       bkashNumber,
       nagadNumber,
       rocketNumber,
+      deliveryChargeDhaka: Number(deliveryChargeDhaka) || 0,
+      deliveryChargeOutsideDhaka: Number(deliveryChargeOutsideDhaka) || 120,
+      featuredPictureUrl: featuredPictureUrl.trim() || undefined,
+      featuredTitle: featuredTitle.trim() || undefined,
+      featuredPictureLink: featuredPictureLink.trim() || undefined,
+      featuredProductId: featuredProductId.trim() || undefined,
       heroBadge,
       heroHeading,
       heroTagline,
@@ -1490,12 +1523,93 @@ function PaymentSettingsManager() {
       <section className="admin-heading">
         <div>
           <p>System Configuration</p>
-          <h1>Payment & Site Settings</h1>
+          <h1>Payment, Delivery & Site Settings</h1>
         </div>
       </section>
 
       <form className="admin-form" onSubmit={handleSubmit}>
-        <h2>Payment Wallet Numbers</h2>
+        <h2>Delivery Charges (৳ BDT)</h2>
+        <p className="muted">These fees will automatically apply at checkout based on the customer's selected district.</p>
+
+        <div className="admin-field-pair">
+          <label>
+            Inside Dhaka Delivery Charge (৳)
+            <input
+              required
+              type="number"
+              min="0"
+              value={deliveryChargeDhaka}
+              onChange={(e) => setDeliveryChargeDhaka(e.target.value)}
+              placeholder="0 (Free)"
+            />
+          </label>
+
+          <label>
+            Outside Dhaka Delivery Charge (৳)
+            <input
+              required
+              type="number"
+              min="0"
+              value={deliveryChargeOutsideDhaka}
+              onChange={(e) => setDeliveryChargeOutsideDhaka(e.target.value)}
+              placeholder="120"
+            />
+          </label>
+        </div>
+
+        <h2 style={{ marginTop: "1rem" }}>Featured Spotlight Picture / Product</h2>
+        <p className="muted">Set a prominent featured spotlight image and product link on the storefront homepage.</p>
+
+        <label>
+          Featured Picture / Banner Image URL
+          <input
+            value={featuredPictureUrl}
+            onChange={(e) => setFeaturedPictureUrl(e.target.value)}
+            placeholder="https://... or /uploads/images/..."
+          />
+        </label>
+
+        <div className="admin-field-pair">
+          <label>
+            Spotlight Title
+            <input
+              value={featuredTitle}
+              onChange={(e) => setFeaturedTitle(e.target.value)}
+              placeholder="e.g. Royal Embroidered Velvet Collection"
+            />
+          </label>
+
+          <label>
+            Link to Product (Optional Dropdown)
+            <select
+              value={featuredProductId}
+              onChange={(e) => {
+                setFeaturedProductId(e.target.value);
+                if (e.target.value) {
+                  setFeaturedPictureLink(`/products/${e.target.value}`);
+                }
+              }}
+            >
+              <option value="">-- None or Custom Link --</option>
+              {products.data?.map((p) => (
+                <option key={p.id} value={p.slug || String(p.id)}>
+                  {p.name} ({p.sku || p.slug})
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <label>
+          Spotlight Destination Link (Custom URL or Product Path)
+          <input
+            value={featuredPictureLink}
+            onChange={(e) => setFeaturedPictureLink(e.target.value)}
+            placeholder="/#products or /products/your-slug"
+          />
+        </label>
+
+        <h2 style={{ marginTop: "1rem" }}>Payment Wallet Numbers</h2>
         <p className="muted">These numbers are displayed live at checkout for customer transfers.</p>
 
         <div className="admin-field-pair">
@@ -2374,4 +2488,4 @@ export default function Admin() {
       <div className="admin-page">{page}</div>
     </DashboardLayout>
   );
-}
+}

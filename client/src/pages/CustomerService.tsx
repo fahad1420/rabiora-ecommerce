@@ -97,10 +97,10 @@ export default function CustomerService() {
                       </div>
                       <div className="contact-method-card">
                         <div className="cm-icon"><Headphones size={22} /></div>
-                        <strong>Facebook Messenger</strong>
-                        <p>Fast responses via our official Facebook page</p>
-                        <a href="https://www.facebook.com/share/14wjzGNSqz8/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer" className="btn-sm">
-                          Message on Facebook
+                        <strong>Official Facebook</strong>
+                        <p>Stay connected via our official Facebook page</p>
+                        <a href="https://www.facebook.com/share/1FCh6KH9pJ/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer" className="btn-sm">
+                          Visit Facebook Page
                         </a>
                       </div>
                     </div>

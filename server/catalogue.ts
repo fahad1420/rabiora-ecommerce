@@ -37,7 +37,7 @@ export async function listCatalogue(filters: CatalogueFilters = {}) {
   }
 
   const products = await ProductModel.find(filterQuery)
-    .sort({ featured: -1, legacyId: 1, createdAt: -1 })
+    .sort({ createdAt: -1, _id: -1 })
     .lean();
 
   return products.map((p) => ({

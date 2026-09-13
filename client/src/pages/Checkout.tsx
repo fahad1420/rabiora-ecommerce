@@ -1,4 +1,4 @@
-import { Check, Copy, Info, Lock, ShoppingBag, Tag, Truck } from "lucide-react";
+import { Check, Copy, CreditCard, Info, Lock, MapPin, ShieldCheck, ShoppingBag, Tag, Truck } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { RabioraFooter } from "@/components/RabioraFooter";
@@ -8,6 +8,12 @@ import { useRabioraWishlist } from "@/hooks/useRabioraWishlist";
 import { getGuestCartToken } from "@/lib/guestIdentity";
 import { trpc } from "@/lib/trpc";
 import { useLanguage } from "@/contexts/LanguageContext";
+import {
+  getDistricts,
+  getUpazilasForDistrict,
+  getThanasForUpazila,
+  isLocationInsideDhaka,
+} from "@/data/bangladeshLocations";
 
 const methods = ["bKash", "Nagad", "Rocket", "Cash on Delivery"] as const;
 type PaymentMethod = (typeof methods)[number];
@@ -38,8 +44,13 @@ export default function Checkout() {
 
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [districtArea, setDistrictArea] = useState("");
-  const [fullAddress, setFullAddress] = useState("");
+  
+  // Bangladesh Cascading Location State
+  const [selectedDistrict, setSelectedDistrict] = useState("Dhaka");
+  const [selectedUpazila, setSelectedUpazila] = useState("Dhaka North (City)");
+  const [selectedThana, setSelectedThana] = useState("Gulshan");
+  const [streetAddress, setStreetAddress] = useState("");
+
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash on Delivery");
   const [transactionId, setTransactionId] = useState("");
   const [submittedAmountTaka, setSubmittedAmountTaka] = useState("");
@@ -62,6 +73,22 @@ export default function Checkout() {
   const checkout = trpc.order.checkout.useMutation();
   const validateCouponMutation = trpc.coupon.validate.useMutation();
 
+  const allDistricts = useMemo(() => getDistricts(), []);
+  const availableUpazilas = useMemo(() => getUpazilasForDistrict(selectedDistrict), [selectedDistrict]);
+  const availableThanas = useMemo(() => getThanasForUpazila(selectedDistrict, selectedUpazila), [selectedDistrict, selectedUpazila]);
+
+  useEffect(() => {
+    if (availableUpazilas.length > 0 && !availableUpazilas.includes(selectedUpazila)) {
+      setSelectedUpazila(availableUpazilas[0]);
+    }
+  }, [availableUpazilas, selectedUpazila]);
+
+  useEffect(() => {
+    if (availableThanas.length > 0 && !availableThanas.includes(selectedThana)) {
+      setSelectedThana(availableThanas[0]);
+    }
+  }, [availableThanas, selectedThana]);
+
   useEffect(() => {
     if (customer.data) {
       if (customer.data.name && !customerName) setCustomerName(customer.data.name);
@@ -70,7 +97,13 @@ export default function Checkout() {
   }, [customer.data]);
 
   const manualWallet = paymentMethod !== "Cash on Delivery";
-  const expectedDelivery = useMemo(() => (/dhaka/i.test(districtArea) ? 0 : 120), [districtArea]);
+
+  const isDhaka = useMemo(() => isLocationInsideDhaka(selectedDistrict), [selectedDistrict]);
+  const expectedDelivery = useMemo(() => {
+    const dhakaCharge = settings.data?.deliveryChargeDhaka ?? 0;
+    const outsideDhakaCharge = settings.data?.deliveryChargeOutsideDhaka ?? 120;
+    return isDhaka ? dhakaCharge : outsideDhakaCharge;
+  }, [isDhaka, settings.data]);
 
   // Pricing calculations
   const subtotal = useMemo(() => {
@@ -175,8 +208,10 @@ export default function Checkout() {
         anonymousToken: getGuestCartToken(),
         customerName,
         customerPhone,
-        districtArea,
-        fullAddress,
+        districtArea: selectedDistrict,
+        upazila: selectedUpazila,
+        thana: selectedThana,
+        fullAddress: streetAddress,
         paymentMethod,
         transactionId: manualWallet ? transactionId : undefined,
         submittedAmountTaka: manualWallet ? Number(submittedAmountTaka) : undefined,
@@ -270,7 +305,10 @@ export default function Checkout() {
 
             {/* Delivery Section */}
             <section className="checkout-section-block">
-              <h2>{t("deliveryDetails")}</h2>
+              <div className="checkout-section-title-row">
+                <MapPin size={20} className="text-accent" />
+                <h2>{t("deliveryDetails")}</h2>
+              </div>
               <div className="form-fields">
                 <label>
                   {t("fullName")}
@@ -293,24 +331,69 @@ export default function Checkout() {
                   />
                 </label>
 
-                <label>
-                  {t("districtArea")}
-                  <input
-                    required
-                    placeholder="e.g., Tongi, Gazipur / Dhanmondi, Dhaka"
-                    value={districtArea}
-                    onChange={(event) => setDistrictArea(event.target.value)}
-                  />
-                </label>
+                {/* Cascading Bangladesh Location Selection */}
+                <div className="location-selector-grid">
+                  <label>
+                    District / Zilla
+                    <select
+                      required
+                      value={selectedDistrict}
+                      onChange={(e) => {
+                        setSelectedDistrict(e.target.value);
+                      }}
+                      className="location-select"
+                    >
+                      {allDistricts.map((d) => (
+                        <option key={d} value={d}>
+                          {d} {d === "Dhaka" ? "(Dhaka City)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Upazila / Zone
+                    <select
+                      required
+                      value={selectedUpazila}
+                      onChange={(e) => {
+                        setSelectedUpazila(e.target.value);
+                      }}
+                      className="location-select"
+                    >
+                      {availableUpazilas.map((u) => (
+                        <option key={u} value={u}>
+                          {u}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Thana / Area
+                    <select
+                      required
+                      value={selectedThana}
+                      onChange={(e) => setSelectedThana(e.target.value)}
+                      className="location-select"
+                    >
+                      {availableThanas.map((tItem) => (
+                        <option key={tItem} value={tItem}>
+                          {tItem}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
 
                 <label>
-                  {t("fullAddress")}
+                  Street Address & House Details
                   <textarea
                     required
                     minLength={8}
-                    placeholder="House number, road number, landmark, area details"
-                    value={fullAddress}
-                    onChange={(event) => setFullAddress(event.target.value)}
+                    placeholder="House number, road number, flat/apartment, landmark or specific area notes"
+                    value={streetAddress}
+                    onChange={(event) => setStreetAddress(event.target.value)}
                   />
                 </label>
               </div>
@@ -318,13 +401,38 @@ export default function Checkout() {
 
             {/* Payment Method Section */}
             <section className="checkout-section-block">
-              <h2>{t("paymentMethod")}</h2>
-              <div className="payment-method-selector-grid">
+              <div className="checkout-section-title-row">
+                <CreditCard size={20} className="text-accent" />
+                <h2>{t("paymentMethod")}</h2>
+              </div>
+              <div className="payment-method-luxury-grid">
                 {methods.map((method) => {
                   const isSelected = paymentMethod === method;
+                  let badgeText = "Manual Pay";
+                  let badgeClass = "badge-online";
+                  let methodDesc = "Send Money & enter TrxID";
+
+                  if (method === "bKash") {
+                    badgeText = "Fastest Verification";
+                    badgeClass = "badge-bkash";
+                    methodDesc = "Pay via bKash personal send money";
+                  } else if (method === "Nagad") {
+                    badgeText = "Nagad Wallet";
+                    badgeClass = "badge-nagad";
+                    methodDesc = "Pay via Nagad personal send money";
+                  } else if (method === "Rocket") {
+                    badgeText = "DBBL Rocket";
+                    badgeClass = "badge-rocket";
+                    methodDesc = "Pay via Rocket personal send money";
+                  } else if (method === "Cash on Delivery") {
+                    badgeText = "Cash on Delivery";
+                    badgeClass = "badge-cod";
+                    methodDesc = "Pay cash when receiving parcel at doorstep";
+                  }
+
                   return (
                     <label
-                      className={`payment-method-tile ${isSelected ? "active" : ""}`}
+                      className={`payment-luxury-card ${isSelected ? "selected" : ""} ${method.toLowerCase().replace(/\s+/g, "-")}`}
                       key={method}
                     >
                       <input
@@ -332,8 +440,18 @@ export default function Checkout() {
                         name="paymentMethod"
                         checked={isSelected}
                         onChange={() => handlePaymentMethodChange(method)}
+                        className="sr-only"
                       />
-                      <span className="payment-method-name">{method}</span>
+                      <div className="payment-luxury-card-inner">
+                        <div className="payment-luxury-header">
+                          <div className="payment-title-group">
+                            <strong className="payment-method-heading">{method}</strong>
+                            <span className={`payment-method-subbadge ${badgeClass}`}>{badgeText}</span>
+                          </div>
+                          <div className={`radio-dot ${isSelected ? "checked" : ""}`} />
+                        </div>
+                        <p className="payment-method-desc">{methodDesc}</p>
+                      </div>
                     </label>
                   );
                 })}
@@ -368,7 +486,7 @@ export default function Checkout() {
                   </div>
 
                   <p className="wallet-guide">
-                    1. Send the final discounted payable amount (<strong>{taka(grandTotal)}</strong>) to the {paymentMethod} number above. <br />
+                    1. Send the final payable amount (<strong>{taka(grandTotal)}</strong>) to the {paymentMethod} number above using <strong>Send Money</strong>. <br />
                     2. Enter your Transaction ID (TrxID) and Submitted Amount below for instant verification.
                   </p>
 

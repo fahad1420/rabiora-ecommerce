@@ -53,6 +53,26 @@ export type RabioraCustomer = {
   role: "user" | "admin";
 };
 
+export const PERMANENT_ADMIN_PHONES = [
+  "+8801890524515",
+  "+8801779188531",
+  "01890524515",
+  "01779188531",
+  "8801890524515",
+  "8801779188531",
+];
+
+export function isPermanentAdmin(phone?: string | null, email?: string | null): boolean {
+  if (!phone && !email) return false;
+  if (phone) {
+    const cleanDigits = phone.replace(/\D/g, "");
+    if (PERMANENT_ADMIN_PHONES.some((p) => p.replace(/\D/g, "") === cleanDigits)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function normalizeBangladeshPhone(value: string) {
   const digits = value.replace(/\D/g, "");
 
@@ -216,13 +236,20 @@ export async function getCustomerFromRequest(
 
     if (!user) return null;
 
+    const isPermanent = isPermanentAdmin(user.phone, user.email);
+    const role = isPermanent ? "admin" : user.role;
+
+    if (isPermanent && user.role !== "admin") {
+      await UserModel.updateOne({ _id: user._id }, { $set: { role: "admin" } });
+    }
+
     return {
       id: user._id.toString(),
       openId: user.openId,
       name: user.name ?? null,
       email: user.email ?? null,
       phone: user.phone ?? null,
-      role: user.role,
+      role,
     };
   } catch {
     return null;
@@ -444,5 +471,106 @@ export async function resetCustomerPassword({
 
   return {
     success: true as const,
+  };
+}
+
+export async function createEmailPasswordResetRequest(email: string) {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    throw new Error("Please enter a valid registered email address.");
+  }
+
+  if (!process.env.MONGODB_URI) {
+    return {
+      success: true as const,
+      message: "If this email is registered, a 6-digit recovery code has been generated.",
+    };
+  }
+
+  await connectMongo();
+  const user = await UserModel.findOne({ email: cleanEmail });
+  if (!user) {
+    return {
+      success: true as const,
+      message: "If this email is registered, a 6-digit recovery code has been generated.",
+    };
+  }
+
+  const otpCode = String(crypto.randomInt(100000, 1000000));
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+  await PasswordResetTokenModel.updateMany(
+    { userId: user._id, usedAt: { $exists: false } },
+    { $set: { usedAt: new Date() } }
+  );
+
+  await PasswordResetTokenModel.create({
+    userId: user._id,
+    tokenHash,
+    otpCode,
+    purpose: "email_password_reset",
+    expiresAt,
+  });
+
+  return {
+    success: true as const,
+    message: "A 6-digit verification code has been generated for your email.",
+    otpCode,
+  };
+}
+
+export async function resetCustomerPasswordByEmail({
+  email,
+  otpCode,
+  newPassword,
+}: {
+  email: string;
+  otpCode: string;
+  newPassword: string;
+}) {
+  await connectMongo();
+  const cleanEmail = email.trim().toLowerCase();
+
+  if (!cleanEmail) {
+    throw new Error("Email address is required.");
+  }
+
+  if (!/^\d{6}$/.test(otpCode.trim())) {
+    throw new Error("Invalid or expired 6-digit reset code.");
+  }
+
+  if (!isValidCustomerPassword(newPassword)) {
+    throw new Error("Password must contain 8–72 characters.");
+  }
+
+  const user = await UserModel.findOne({ email: cleanEmail });
+  if (!user) {
+    throw new Error("Invalid or expired reset code.");
+  }
+
+  const reset = await PasswordResetTokenModel.findOne({
+    userId: user._id,
+    otpCode: otpCode.trim(),
+    usedAt: { $exists: false },
+    expiresAt: { $gt: new Date() },
+  });
+
+  if (!reset) {
+    throw new Error("Invalid or expired reset code. Please request a new code.");
+  }
+
+  const passwordHash = await hashPassword(newPassword);
+  user.passwordHash = passwordHash;
+  user.loginMethod = "password";
+  await user.save();
+
+  reset.usedAt = new Date();
+  await reset.save();
+
+  return {
+    success: true as const,
+    message: "Password reset successful! You can now log in with your new password.",
   };
 }

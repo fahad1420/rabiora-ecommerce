@@ -1,0 +1,22 @@
+{
+  "name": "Rabiora | Premium Pakistani Three Piece",
+  "short_name": "Rabiora",
+  "description": "Authentic luxury Pakistani Three-Piece collections handcrafted with pure lawn, premium cotton, and intricate embroidery.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0D1B1C",
+  "theme_color": "#0D1B1C",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

@@ -31,9 +31,8 @@ export function AuthPage({
   const [showForgotPassword, setShowForgotPassword] =
     useState(false);
 
-  const [resetStep, setResetStep] =
-    useState<ResetStep>("request");
-
+  const [resetIdentifier, setResetIdentifier] = useState("");
+  const [resetStep, setResetStep] = useState<ResetStep>("request");
   const [otpCode, setOtpCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [resetMessage, setResetMessage] = useState("");
@@ -45,16 +44,15 @@ export function AuthPage({
   const register = trpc.customer.register.useMutation();
   const login = trpc.customer.login.useMutation();
 
-  const requestPasswordReset =
-    trpc.customer.requestPasswordReset.useMutation();
+  const requestPasswordReset = trpc.customer.requestPasswordReset.useMutation();
+  const requestEmailPasswordReset = trpc.customer.requestEmailPasswordReset.useMutation();
+  const resetPassword = trpc.customer.resetPassword.useMutation();
+  const resetPasswordByEmail = trpc.customer.resetPasswordByEmail.useMutation();
 
-  const resetPassword =
-    trpc.customer.resetPassword.useMutation();
-
-  const mergeGuestWishlist =
-    trpc.wishlist.mergeGuest.useMutation();
-
+  const mergeGuestWishlist = trpc.wishlist.mergeGuest.useMutation();
   const utils = trpc.useUtils();
+
+  const isEmailIdentifier = (val: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -111,32 +109,42 @@ export function AuthPage({
     }
   };
 
-  const handleRequestReset = async (
-    event: FormEvent,
-  ) => {
+  const handleRequestReset = async (event: FormEvent) => {
     event.preventDefault();
 
     setResetError("");
     setResetMessage("");
     setDevOtp("");
 
+    const target = (resetIdentifier || phone).trim();
+    if (!target) {
+      setResetError("Please enter your registered email address.");
+      return;
+    }
+
     try {
-      const result =
-        await requestPasswordReset.mutateAsync({
-          phone,
+      if (isEmailIdentifier(target)) {
+        const result = await requestEmailPasswordReset.mutateAsync({
+          email: target,
         });
 
-      setResetStep("verify");
-
-      if (result.devOtp) {
-        setDevOtp(result.devOtp);
-        setResetMessage(
-          "Verification code generated. Use the code shown below.",
-        );
+        setResetStep("verify");
+        if (result.otpCode) {
+          setDevOtp(result.otpCode);
+        }
+        setResetMessage(result.message || "A 6-digit verification code has been generated for your email.");
       } else {
-        setResetMessage(
-          "If an account exists for this phone number, a verification code has been sent.",
-        );
+        const result = await requestPasswordReset.mutateAsync({
+          phone: target,
+        });
+
+        setResetStep("verify");
+        if (result.devOtp) {
+          setDevOtp(result.devOtp);
+          setResetMessage("Verification code generated. Use the code shown below.");
+        } else {
+          setResetMessage("If an account exists for this phone number, a verification code has been sent.");
+        }
       }
     } catch (cause) {
       setResetError(
@@ -147,31 +155,35 @@ export function AuthPage({
     }
   };
 
-  const handleResetPassword = async (
-    event: FormEvent,
-  ) => {
+  const handleResetPassword = async (event: FormEvent) => {
     event.preventDefault();
 
     setResetError("");
     setResetMessage("");
 
     if (newPassword.length < 8) {
-      setResetError(
-        "Password must contain at least 8 characters.",
-      );
+      setResetError("Password must contain at least 8 characters.");
       return;
     }
 
-    try {
-      await resetPassword.mutateAsync({
-        phone,
-        otpCode,
-        newPassword,
-      });
+    const target = (resetIdentifier || phone).trim();
 
-      setResetMessage(
-        "Password reset successfully. You can now log in with your new password.",
-      );
+    try {
+      if (isEmailIdentifier(target)) {
+        const res = await resetPasswordByEmail.mutateAsync({
+          email: target,
+          otpCode: otpCode.trim(),
+          newPassword,
+        });
+        setResetMessage(res.message || "Password reset successfully. You can now log in.");
+      } else {
+        await resetPassword.mutateAsync({
+          phone: target,
+          otpCode: otpCode.trim(),
+          newPassword,
+        });
+        setResetMessage("Password reset successfully. You can now log in with your new password.");
+      }
 
       setPassword("");
       setOtpCode("");
@@ -187,17 +199,17 @@ export function AuthPage({
       setResetError(
         cause instanceof Error
           ? cause.message
-          : "Unable to reset password.",
+          : "Unable to reset password. Please check your verification code.",
       );
     }
   };
 
-  const pending =
-    register.isPending || login.isPending;
-
+  const pending = register.isPending || login.isPending;
   const resetPending =
     requestPasswordReset.isPending ||
-    resetPassword.isPending;
+    requestEmailPasswordReset.isPending ||
+    resetPassword.isPending ||
+    resetPasswordByEmail.isPending;
 
   if (showForgotPassword && mode === "login") {
     return (
@@ -217,44 +229,45 @@ export function AuthPage({
             }
           >
             <span className="badge">
-              Reset Password
+              Password Recovery
             </span>
 
             <h1>
               {resetStep === "request"
                 ? "Forgot your password?"
-                : "Create a new password"}
+                : "Enter Verification Code"}
             </h1>
 
             <p>
               {resetStep === "request"
-                ? "Enter your registered Bangladesh phone number to reset your password."
-                : "Enter the verification code and choose a new password."}
+                ? "Enter your registered email address or phone number to receive a 6-digit recovery code."
+                : "Enter the 6-digit verification code sent to your email and set your new password."}
             </p>
 
             <label>
-              {t("bangladeshPhone")}
+              Email Address / Mobile Number
               <input
                 required
-                inputMode="tel"
-                placeholder="01XXXXXXXXX"
-                value={phone}
+                type="text"
+                placeholder="name@example.com or 01XXXXXXXXX"
+                value={resetIdentifier || phone}
                 disabled={resetStep === "verify"}
-                onChange={(event) =>
-                  setPhone(event.target.value)
-                }
+                onChange={(event) => {
+                  setResetIdentifier(event.target.value);
+                  setPhone(event.target.value);
+                }}
               />
             </label>
 
             {resetStep === "verify" && (
               <>
                 <label>
-                  Verification Code
+                  6-Digit Verification Code
                   <input
                     required
                     inputMode="numeric"
                     maxLength={6}
-                    placeholder="6-digit code"
+                    placeholder="Enter 6-digit code"
                     value={otpCode}
                     onChange={(event) =>
                       setOtpCode(
@@ -267,9 +280,8 @@ export function AuthPage({
                 </label>
 
                 {devOtp && (
-                  <div className="form-success">
-                    <strong>Development OTP:</strong>{" "}
-                    {devOtp}
+                  <div className="form-success" style={{ margin: "4px 0", fontSize: "12px" }}>
+                    <strong>Verification Code:</strong> {devOtp}
                   </div>
                 )}
 
@@ -280,6 +292,7 @@ export function AuthPage({
                     type="password"
                     minLength={8}
                     maxLength={72}
+                    placeholder="Minimum 8 characters"
                     value={newPassword}
                     onChange={(event) =>
                       setNewPassword(
@@ -292,19 +305,13 @@ export function AuthPage({
             )}
 
             {resetError && (
-              <p
-                className="form-error"
-                role="alert"
-              >
+              <p className="form-error" role="alert">
                 {resetError}
               </p>
             )}
 
             {resetMessage && (
-              <p
-                className="form-success"
-                role="status"
-              >
+              <p className="form-success" role="status">
                 {resetMessage}
               </p>
             )}
@@ -316,26 +323,38 @@ export function AuthPage({
               {resetPending
                 ? t("pleaseWait")
                 : resetStep === "request"
-                  ? "Send Verification Code"
-                  : "Reset Password"}
+                  ? "Send Recovery Code"
+                  : "Set New Password & Login"}
             </button>
 
             {resetStep === "verify" && (
-              <button
-                type="button"
-                className="btn"
-                disabled={resetPending}
-                onClick={() => {
-                  setResetStep("request");
-                  setResetMessage("");
-                  setResetError("");
-                  setDevOtp("");
-                  setOtpCode("");
-                  setNewPassword("");
-                }}
-              >
-                Change Phone Number
-              </button>
+              <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
+                <button
+                  type="button"
+                  className="btn-outline"
+                  style={{ flex: 1, fontSize: "12px", padding: "8px 4px" }}
+                  disabled={resetPending}
+                  onClick={handleRequestReset}
+                >
+                  Resend Code
+                </button>
+                <button
+                  type="button"
+                  className="btn-outline"
+                  style={{ flex: 1, fontSize: "12px", padding: "8px 4px" }}
+                  disabled={resetPending}
+                  onClick={() => {
+                    setResetStep("request");
+                    setResetMessage("");
+                    setResetError("");
+                    setDevOtp("");
+                    setOtpCode("");
+                    setNewPassword("");
+                  }}
+                >
+                  Change Email
+                </button>
+              </div>
             )}
 
             <p className="auth-switch">
@@ -350,7 +369,7 @@ export function AuthPage({
                   setDevOtp("");
                 }}
               >
-                Back to Login
+                Back to Sign In
               </button>
             </p>
           </form>

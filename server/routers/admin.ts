@@ -17,6 +17,7 @@ import {
   updateAdminCustomerRole,
   updateAdminProduct,
   uploadAdminProductImage,
+  uploadMultipleAdminProductImages,
 } from "../adminService";
 
 import {
@@ -121,7 +122,7 @@ export const adminRouter = router({
       .input(
         z.object({
           productId: idSchema,
-          dataUrl: z.string().max(7_100_000),
+          dataUrl: z.string().max(10_000_000),
           fileName: z.string().max(240),
           altText: z.string().trim().max(280),
           isCover: z.boolean(),
@@ -129,6 +130,24 @@ export const adminRouter = router({
       )
       .mutation(({ input }) =>
         uploadAdminProductImage(input.productId, input)
+      ),
+
+    uploadMultipleImages: adminProcedure
+      .input(
+        z.object({
+          productId: idSchema,
+          images: z.array(
+            z.object({
+              dataUrl: z.string().max(10_000_000),
+              fileName: z.string().max(240),
+              altText: z.string().trim().max(280).optional(),
+              isCover: z.boolean().optional(),
+            })
+          ),
+        })
+      )
+      .mutation(({ input }) =>
+        uploadMultipleAdminProductImages(input.productId, input.images)
       ),
 
     setCover: adminProcedure
@@ -235,6 +254,12 @@ export const adminRouter = router({
           bkashNumber: z.string().trim().optional(),
           nagadNumber: z.string().trim().optional(),
           rocketNumber: z.string().trim().optional(),
+          deliveryChargeDhaka: z.number().int().nonnegative().optional(),
+          deliveryChargeOutsideDhaka: z.number().int().nonnegative().optional(),
+          featuredProductId: z.string().trim().optional(),
+          featuredPictureUrl: z.string().trim().optional(),
+          featuredPictureLink: z.string().trim().optional(),
+          featuredTitle: z.string().trim().optional(),
           heroBadge: z.string().trim().optional(),
           heroHeading: z.string().trim().optional(),
           heroTagline: z.string().trim().optional(),

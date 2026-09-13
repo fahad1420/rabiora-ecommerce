@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { connectMongo } from "./config/db";
-import { CartModel, OrderModel, ProductModel, UserModel, findOrderQuery, findProductQuery, findUserQuery } from "./models";
+import { CartModel, OrderModel, ProductModel, UserModel, SiteSettingsModel, findOrderQuery, findProductQuery, findUserQuery } from "./models";
 import type { CartIdentity } from "./cartService";
 import { nanoid } from "nanoid";
 import { validateCoupon, incrementCouponUsage } from "./couponService";
@@ -8,8 +8,20 @@ import { validateCoupon, incrementCouponUsage } from "./couponService";
 export const PAYMENT_METHODS = ["bKash", "Nagad", "Rocket", "Cash on Delivery"] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
+export async function calculateDeliveryChargeAsync(districtArea: string) {
+  try {
+    await connectMongo();
+    const settings = await SiteSettingsModel.findOne({ key: "default" }).lean();
+    const isDhaka = /dhaka|gazipur|narayanganj/i.test(districtArea);
+    if (settings) {
+      return isDhaka ? (settings.deliveryChargeDhaka ?? 0) : (settings.deliveryChargeOutsideDhaka ?? 120);
+    }
+  } catch {}
+  return /dhaka|gazipur|narayanganj/i.test(districtArea) ? 0 : 120;
+}
+
 export function calculateDeliveryCharge(districtArea: string) {
-  return /dhaka/i.test(districtArea) ? 0 : 120;
+  return /dhaka|gazipur|narayanganj/i.test(districtArea) ? 0 : 120;
 }
 
 export function manualPaymentRequired(method: PaymentMethod) {
@@ -64,6 +76,8 @@ export async function createOrder(
     customerName: string;
     customerPhone: string;
     districtArea: string;
+    upazila?: string;
+    thana?: string;
     fullAddress: string;
     paymentMethod: PaymentMethod;
     transactionId?: string;
@@ -126,7 +140,7 @@ export async function createOrder(
       if (!product || !product.isInStock || (product.stockQuantity || 0) < item.quantity) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `Product ${product?.name || "in cart"} is out of stock.`,
+          message: `Product ${product?.name || "in cart"} is out of stock or does not have enough quantity.`,
         });
       }
 
@@ -168,7 +182,7 @@ export async function createOrder(
     await incrementCouponUsage(couponValidation.code);
   }
 
-  const deliveryChargeTaka = calculateDeliveryCharge(input.districtArea);
+  const deliveryChargeTaka = await calculateDeliveryChargeAsync(input.districtArea);
   const totalTaka = finalSubtotalTaka + deliveryChargeTaka;
 
   assertManualPaymentEvidence(input.paymentMethod, input.transactionId, input.submittedAmountTaka);
@@ -197,6 +211,8 @@ export async function createOrder(
     customerName: input.customerName,
     customerPhone: input.customerPhone,
     districtArea: input.districtArea,
+    upazila: input.upazila,
+    thana: input.thana,
     fullAddress: input.fullAddress,
     subtotalTaka: finalSubtotalTaka,
     deliveryChargeTaka,

@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { trpc } from "@/lib/trpc";
+import { MobileSearchModal } from "./MobileSearchModal";
 
 type RabioraHeaderProps = {
   searchValue?: string;
@@ -16,6 +17,7 @@ const logoUrl = "/uploads/images/branding/rabiora-logo.jpeg";
 
 export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wishlistCount = 0 }: RabioraHeaderProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const { t, toggleLanguage } = useLanguage();
   const customer = trpc.customer.me.useQuery();
@@ -106,6 +108,16 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
               </Link>
             )}
 
+            {/* Mobile Search Trigger Icon */}
+            <button
+              className="mobile-header-search-btn"
+              type="button"
+              aria-label="Search"
+              onClick={() => setIsSearchModalOpen(true)}
+            >
+              <Search size={20} />
+            </button>
+
             <Link href="/wishlist" className="header-icon" aria-label={t("wishlist")}>
               <Heart size={21} />
               {wishlistCount > 0 && <span>{wishlistCount}</span>}
@@ -128,6 +140,12 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
           </div>
         </div>
       </header>
+
+      {/* Mobile Search Modal */}
+      <MobileSearchModal
+        isOpen={isSearchModalOpen}
+        onClose={() => setIsSearchModalOpen(false)}
+      />
 
       {drawerOpen && (
         <>

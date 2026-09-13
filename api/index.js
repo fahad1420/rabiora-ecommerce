@@ -251,6 +251,8 @@ var init_Order = __esm({
         customerName: { type: String, required: true },
         customerPhone: { type: String, required: true, index: true },
         districtArea: { type: String, required: true },
+        upazila: { type: String, trim: true },
+        thana: { type: String, trim: true },
         fullAddress: { type: String, required: true },
         subtotalTaka: { type: Number, required: true },
         deliveryChargeTaka: { type: Number, required: true },
@@ -378,6 +380,12 @@ var init_SiteSettings = __esm({
         bkashNumber: { type: String, default: "+8801349529274" },
         nagadNumber: { type: String, default: "+8801349529274" },
         rocketNumber: { type: String, default: "+8801349529274" },
+        deliveryChargeDhaka: { type: Number, default: 0 },
+        deliveryChargeOutsideDhaka: { type: Number, default: 120 },
+        featuredProductId: { type: String, default: "" },
+        featuredPictureUrl: { type: String, default: "" },
+        featuredPictureLink: { type: String, default: "/#products" },
+        featuredTitle: { type: String, default: "Featured Collection" },
         heroBadge: { type: String, default: "Premium Collection" },
         heroHeading: { type: String, default: "RABIORA" },
         heroTagline: { type: String, default: "Elegance \u2022 Comfort \u2022 Confidence" },
@@ -575,6 +583,16 @@ function getJwtSecret() {
   }
   return process.env.NODE_ENV === "production" ? "rabiora-prod-session-key-fallback-sec-2026-auth" : "rabiora-development-session-key-change-in-production";
 }
+function isPermanentAdmin(phone, email) {
+  if (!phone && !email) return false;
+  if (phone) {
+    const cleanDigits = phone.replace(/\D/g, "");
+    if (PERMANENT_ADMIN_PHONES.some((p) => p.replace(/\D/g, "") === cleanDigits)) {
+      return true;
+    }
+  }
+  return false;
+}
 function normalizeBangladeshPhone(value) {
   const digits = value.replace(/\D/g, "");
   if (/^8801[3-9]\d{8}$/.test(digits)) {
@@ -676,13 +694,18 @@ async function getCustomerFromRequest(req) {
     await connectMongo();
     const user = await UserModel.findOne(findUserQuery(payload.sub)).lean();
     if (!user) return null;
+    const isPermanent = isPermanentAdmin(user.phone, user.email);
+    const role = isPermanent ? "admin" : user.role;
+    if (isPermanent && user.role !== "admin") {
+      await UserModel.updateOne({ _id: user._id }, { $set: { role: "admin" } });
+    }
     return {
       id: user._id.toString(),
       openId: user.openId,
       name: user.name ?? null,
       email: user.email ?? null,
       phone: user.phone ?? null,
-      role: user.role
+      role
     };
   } catch {
     return null;
@@ -847,7 +870,87 @@ async function resetCustomerPassword({
     success: true
   };
 }
-var CUSTOMER_COOKIE, ORDER_CONFIRMATION_COOKIE, encoder, sessionKey, findCustomerByPhone;
+async function createEmailPasswordResetRequest(email) {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    throw new Error("Please enter a valid registered email address.");
+  }
+  if (!process.env.MONGODB_URI) {
+    return {
+      success: true,
+      message: "If this email is registered, a 6-digit recovery code has been generated."
+    };
+  }
+  await connectMongo();
+  const user = await UserModel.findOne({ email: cleanEmail });
+  if (!user) {
+    return {
+      success: true,
+      message: "If this email is registered, a 6-digit recovery code has been generated."
+    };
+  }
+  const otpCode = String(crypto2.randomInt(1e5, 1e6));
+  const rawToken = crypto2.randomBytes(32).toString("hex");
+  const tokenHash = crypto2.createHash("sha256").update(rawToken).digest("hex");
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1e3);
+  await PasswordResetTokenModel.updateMany(
+    { userId: user._id, usedAt: { $exists: false } },
+    { $set: { usedAt: /* @__PURE__ */ new Date() } }
+  );
+  await PasswordResetTokenModel.create({
+    userId: user._id,
+    tokenHash,
+    otpCode,
+    purpose: "email_password_reset",
+    expiresAt
+  });
+  return {
+    success: true,
+    message: "A 6-digit verification code has been generated for your email.",
+    otpCode
+  };
+}
+async function resetCustomerPasswordByEmail({
+  email,
+  otpCode,
+  newPassword
+}) {
+  await connectMongo();
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail) {
+    throw new Error("Email address is required.");
+  }
+  if (!/^\d{6}$/.test(otpCode.trim())) {
+    throw new Error("Invalid or expired 6-digit reset code.");
+  }
+  if (!isValidCustomerPassword(newPassword)) {
+    throw new Error("Password must contain 8\u201372 characters.");
+  }
+  const user = await UserModel.findOne({ email: cleanEmail });
+  if (!user) {
+    throw new Error("Invalid or expired reset code.");
+  }
+  const reset = await PasswordResetTokenModel.findOne({
+    userId: user._id,
+    otpCode: otpCode.trim(),
+    usedAt: { $exists: false },
+    expiresAt: { $gt: /* @__PURE__ */ new Date() }
+  });
+  if (!reset) {
+    throw new Error("Invalid or expired reset code. Please request a new code.");
+  }
+  const passwordHash = await hashPassword(newPassword);
+  user.passwordHash = passwordHash;
+  user.loginMethod = "password";
+  await user.save();
+  reset.usedAt = /* @__PURE__ */ new Date();
+  await reset.save();
+  return {
+    success: true,
+    message: "Password reset successful! You can now log in with your new password."
+  };
+}
+var CUSTOMER_COOKIE, ORDER_CONFIRMATION_COOKIE, encoder, sessionKey, PERMANENT_ADMIN_PHONES, findCustomerByPhone;
 var init_customerSession = __esm({
   "server/customerSession.ts"() {
     "use strict";
@@ -857,6 +960,14 @@ var init_customerSession = __esm({
     ORDER_CONFIRMATION_COOKIE = "rabiora_order_confirmation";
     encoder = new TextEncoder();
     sessionKey = () => encoder.encode(getJwtSecret());
+    PERMANENT_ADMIN_PHONES = [
+      "+8801890524515",
+      "+8801779188531",
+      "01890524515",
+      "01779188531",
+      "8801890524515",
+      "8801779188531"
+    ];
     findCustomerByPhone = findCustomerByIdentifier;
   }
 });
@@ -1528,7 +1639,7 @@ async function listCatalogue(filters = {}) {
       { details: regex }
     ];
   }
-  const products = await ProductModel.find(filterQuery).sort({ featured: -1, legacyId: 1, createdAt: -1 }).lean();
+  const products = await ProductModel.find(filterQuery).sort({ createdAt: -1, _id: -1 }).lean();
   return products.map((p) => ({
     id: p.legacyId ?? p._id.toString(),
     _id: p._id.toString(),
@@ -1990,6 +2101,13 @@ var customerRouter = router({
       input.phone
     );
   }),
+  requestEmailPasswordReset: publicProcedure.input(
+    z.object({
+      email: z.string().trim().email("Please enter a valid email address.")
+    })
+  ).mutation(async ({ input }) => {
+    return createEmailPasswordResetRequest(input.email);
+  }),
   resetPassword: publicProcedure.input(
     z.object({
       phone: phoneSchema,
@@ -2005,6 +2123,25 @@ var customerRouter = router({
   ).mutation(async ({ input }) => {
     return resetCustomerPassword({
       phone: input.phone,
+      otpCode: input.otpCode,
+      newPassword: input.newPassword
+    });
+  }),
+  resetPasswordByEmail: publicProcedure.input(
+    z.object({
+      email: z.string().trim().email("Please enter a valid email address."),
+      otpCode: z.string().regex(
+        /^\d{6}$/,
+        "Enter the 6-digit verification code."
+      ),
+      newPassword: z.string().refine(
+        isValidCustomerPassword,
+        "Password must contain 8\u201372 characters."
+      )
+    })
+  ).mutation(async ({ input }) => {
+    return resetCustomerPasswordByEmail({
+      email: input.email,
       otpCode: input.otpCode,
       newPassword: input.newPassword
     });
@@ -2389,8 +2526,17 @@ async function deleteAdminCoupon(id) {
 
 // server/orderService.ts
 var PAYMENT_METHODS2 = ["bKash", "Nagad", "Rocket", "Cash on Delivery"];
-function calculateDeliveryCharge(districtArea) {
-  return /dhaka/i.test(districtArea) ? 0 : 120;
+async function calculateDeliveryChargeAsync(districtArea) {
+  try {
+    await connectMongo();
+    const settings = await SiteSettingsModel.findOne({ key: "default" }).lean();
+    const isDhaka = /dhaka|gazipur|narayanganj/i.test(districtArea);
+    if (settings) {
+      return isDhaka ? settings.deliveryChargeDhaka ?? 0 : settings.deliveryChargeOutsideDhaka ?? 120;
+    }
+  } catch {
+  }
+  return /dhaka|gazipur|narayanganj/i.test(districtArea) ? 0 : 120;
 }
 function manualPaymentRequired(method) {
   return method === "bKash" || method === "Nagad" || method === "Rocket";
@@ -2454,7 +2600,7 @@ async function createOrder(identity, input) {
       if (!product || !product.isInStock || (product.stockQuantity || 0) < item.quantity) {
         throw new TRPCError12({
           code: "BAD_REQUEST",
-          message: `Product ${product?.name || "in cart"} is out of stock.`
+          message: `Product ${product?.name || "in cart"} is out of stock or does not have enough quantity.`
         });
       }
       const coverImage = (product.images || []).find((img) => img.isCover) || (product.images || [])[0];
@@ -2490,7 +2636,7 @@ async function createOrder(identity, input) {
     finalSubtotalTaka = couponValidation.payableSubtotal;
     await incrementCouponUsage(couponValidation.code);
   }
-  const deliveryChargeTaka = calculateDeliveryCharge(input.districtArea);
+  const deliveryChargeTaka = await calculateDeliveryChargeAsync(input.districtArea);
   const totalTaka = finalSubtotalTaka + deliveryChargeTaka;
   assertManualPaymentEvidence(input.paymentMethod, input.transactionId, input.submittedAmountTaka);
   const orderNum = generateOrderNumber();
@@ -2514,6 +2660,8 @@ async function createOrder(identity, input) {
     customerName: input.customerName,
     customerPhone: input.customerPhone,
     districtArea: input.districtArea,
+    upazila: input.upazila,
+    thana: input.thana,
     fullAddress: input.fullAddress,
     subtotalTaka: finalSubtotalTaka,
     deliveryChargeTaka,
@@ -2746,7 +2894,9 @@ var orderRouter = router({
     customerName: z3.string().trim().min(2).max(160),
     customerPhone: z3.string().trim().min(11).max(20).refine((value) => Boolean(normalizeBangladeshPhone(value)), "Enter a valid Bangladesh phone number."),
     districtArea: z3.string().trim().min(2).max(180),
-    fullAddress: z3.string().trim().min(8).max(1e3),
+    upazila: z3.string().trim().max(180).optional(),
+    thana: z3.string().trim().max(180).optional(),
+    fullAddress: z3.string().trim().min(5).max(1e3),
     paymentMethod: z3.enum(PAYMENT_METHODS2),
     transactionId: z3.string().trim().min(3).max(120).optional(),
     submittedAmountTaka: z3.number().int().positive().max(1e6).optional(),
@@ -3031,7 +3181,7 @@ async function deleteAdminCategory(categoryId) {
 }
 async function listAdminProducts() {
   await connectMongo();
-  const products = await ProductModel.find().populate("categoryId").sort({ updatedAt: -1 }).lean();
+  const products = await ProductModel.find().populate("categoryId").sort({ createdAt: -1, _id: -1 }).lean();
   return products.map((p) => {
     const cat = p.categoryId;
     return {
@@ -3184,6 +3334,49 @@ async function deleteAdminProduct(productId) {
   return {
     success: true
   };
+}
+async function uploadMultipleAdminProductImages(productId, images) {
+  await connectMongo();
+  const product = await ProductModel.findOne(findProductQuery(productId));
+  if (!product) {
+    throw new TRPCError15({
+      code: "NOT_FOUND",
+      message: "Product not found."
+    });
+  }
+  const uploadedResults = [];
+  for (let i = 0; i < images.length; i++) {
+    const item = images[i];
+    const dataMatch = item.dataUrl.match(
+      /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/
+    );
+    if (!dataMatch) continue;
+    const bytes = Buffer.from(dataMatch[2], "base64");
+    if (bytes.byteLength > 8 * 1024 * 1024) continue;
+    const safeName = item.fileName.replace(/[^a-zA-Z0-9._-]/g, "_") || `product-image-${i + 1}`;
+    const uploaded = await saveProductImage(
+      product.legacyId ?? product._id.toString(),
+      bytes,
+      dataMatch[1],
+      safeName
+    );
+    const isCover = product.images.length === 0 && uploadedResults.length === 0 || Boolean(item.isCover);
+    if (isCover) {
+      product.images.forEach((img) => {
+        img.isCover = false;
+      });
+    }
+    product.images.push({
+      storageKey: uploaded.key,
+      storageUrl: uploaded.url,
+      altText: item.altText || `${product.name} \u2014 Rabiora`,
+      position: product.images.length,
+      isCover
+    });
+    uploadedResults.push(uploaded);
+  }
+  await product.save();
+  return uploadedResults;
 }
 async function uploadAdminProductImage(productId, input) {
   await connectMongo();
@@ -3420,6 +3613,12 @@ async function getPublicSiteSettings() {
       bkashNumber: "+8801349529274",
       nagadNumber: "+8801349529274",
       rocketNumber: "+8801349529274",
+      deliveryChargeDhaka: 0,
+      deliveryChargeOutsideDhaka: 120,
+      featuredProductId: "",
+      featuredPictureUrl: "",
+      featuredPictureLink: "/#products",
+      featuredTitle: "Featured Collection",
       heroBadge: "Premium Collection",
       heroHeading: "RABIORA",
       heroTagline: "Elegance \u2022 Comfort \u2022 Confidence",
@@ -3430,6 +3629,12 @@ async function getPublicSiteSettings() {
     bkashNumber: settings.bkashNumber || "+8801349529274",
     nagadNumber: settings.nagadNumber || "+8801349529274",
     rocketNumber: settings.rocketNumber || "+8801349529274",
+    deliveryChargeDhaka: settings.deliveryChargeDhaka ?? 0,
+    deliveryChargeOutsideDhaka: settings.deliveryChargeOutsideDhaka ?? 120,
+    featuredProductId: settings.featuredProductId || "",
+    featuredPictureUrl: settings.featuredPictureUrl || "",
+    featuredPictureLink: settings.featuredPictureLink || "/#products",
+    featuredTitle: settings.featuredTitle || "Featured Collection",
     heroBadge: settings.heroBadge || "Premium Collection",
     heroHeading: settings.heroHeading || "RABIORA",
     heroTagline: settings.heroTagline || "Elegance \u2022 Comfort \u2022 Confidence",
@@ -3445,6 +3650,12 @@ async function updateAdminSiteSettings(input) {
         ...input.bkashNumber !== void 0 && { bkashNumber: input.bkashNumber.trim() },
         ...input.nagadNumber !== void 0 && { nagadNumber: input.nagadNumber.trim() },
         ...input.rocketNumber !== void 0 && { rocketNumber: input.rocketNumber.trim() },
+        ...input.deliveryChargeDhaka !== void 0 && { deliveryChargeDhaka: Math.max(0, Number(input.deliveryChargeDhaka)) },
+        ...input.deliveryChargeOutsideDhaka !== void 0 && { deliveryChargeOutsideDhaka: Math.max(0, Number(input.deliveryChargeOutsideDhaka)) },
+        ...input.featuredProductId !== void 0 && { featuredProductId: input.featuredProductId.trim() },
+        ...input.featuredPictureUrl !== void 0 && { featuredPictureUrl: input.featuredPictureUrl.trim() },
+        ...input.featuredPictureLink !== void 0 && { featuredPictureLink: input.featuredPictureLink.trim() },
+        ...input.featuredTitle !== void 0 && { featuredTitle: input.featuredTitle.trim() },
         ...input.heroBadge !== void 0 && { heroBadge: input.heroBadge.trim() },
         ...input.heroHeading !== void 0 && { heroHeading: input.heroHeading.trim() },
         ...input.heroTagline !== void 0 && { heroTagline: input.heroTagline.trim() },
@@ -3457,6 +3668,12 @@ async function updateAdminSiteSettings(input) {
     bkashNumber: updated.bkashNumber,
     nagadNumber: updated.nagadNumber,
     rocketNumber: updated.rocketNumber,
+    deliveryChargeDhaka: updated.deliveryChargeDhaka ?? 0,
+    deliveryChargeOutsideDhaka: updated.deliveryChargeOutsideDhaka ?? 120,
+    featuredProductId: updated.featuredProductId || "",
+    featuredPictureUrl: updated.featuredPictureUrl || "",
+    featuredPictureLink: updated.featuredPictureLink || "/#products",
+    featuredTitle: updated.featuredTitle || "Featured Collection",
     heroBadge: updated.heroBadge,
     heroHeading: updated.heroHeading,
     heroTagline: updated.heroTagline,
@@ -3728,13 +3945,28 @@ var adminRouter = router({
     uploadImage: adminProcedure.input(
       z4.object({
         productId: idSchema3,
-        dataUrl: z4.string().max(71e5),
+        dataUrl: z4.string().max(1e7),
         fileName: z4.string().max(240),
         altText: z4.string().trim().max(280),
         isCover: z4.boolean()
       })
     ).mutation(
       ({ input }) => uploadAdminProductImage(input.productId, input)
+    ),
+    uploadMultipleImages: adminProcedure.input(
+      z4.object({
+        productId: idSchema3,
+        images: z4.array(
+          z4.object({
+            dataUrl: z4.string().max(1e7),
+            fileName: z4.string().max(240),
+            altText: z4.string().trim().max(280).optional(),
+            isCover: z4.boolean().optional()
+          })
+        )
+      })
+    ).mutation(
+      ({ input }) => uploadMultipleAdminProductImages(input.productId, input.images)
     ),
     setCover: adminProcedure.input(
       z4.object({
@@ -3815,6 +4047,12 @@ var adminRouter = router({
         bkashNumber: z4.string().trim().optional(),
         nagadNumber: z4.string().trim().optional(),
         rocketNumber: z4.string().trim().optional(),
+        deliveryChargeDhaka: z4.number().int().nonnegative().optional(),
+        deliveryChargeOutsideDhaka: z4.number().int().nonnegative().optional(),
+        featuredProductId: z4.string().trim().optional(),
+        featuredPictureUrl: z4.string().trim().optional(),
+        featuredPictureLink: z4.string().trim().optional(),
+        featuredTitle: z4.string().trim().optional(),
         heroBadge: z4.string().trim().optional(),
         heroHeading: z4.string().trim().optional(),
         heroTagline: z4.string().trim().optional(),
