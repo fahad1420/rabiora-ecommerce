@@ -1,5 +1,6 @@
 import {
   Award,
+  CheckCircle2,
   ChevronRight,
   Headphones,
   HeartHandshake,
@@ -291,35 +292,47 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Compact Why Customers Love Us Section */}
+        {/* Luxury Why Rabiora Section */}
         <section className="why-us">
           <div className="container">
             <div className="section-title">
-              <span>{t("whyRabiora")}</span>
+              <span className="section-kicker">{t("whyRabiora")}</span>
               <h2>{t("whyLove")}</h2>
+              <p className="section-subtitle">Experience timeless craftsmanship and unmatched luxury with our curated collection of authentic Pakistani attire.</p>
             </div>
 
             <div className="why-grid">
-              <WhyCard
-                icon={<Shirt size={26} />}
-                title={t("premiumFabric")}
-                text={t("premiumFabricCopy")}
-              />
-              <WhyCard
-                icon={<Truck size={26} />}
-                title={t("fastDelivery")}
-                text={t("fastDeliveryCopy")}
-              />
-              <WhyCard
-                icon={<Award size={26} />}
-                title={t("trustedQuality")}
-                text={t("trustedQualityCopy")}
-              />
-              <WhyCard
-                icon={<Headphones size={26} />}
-                title={t("support")}
-                text={t("supportCopy")}
-              />
+              <article className="why-card luxury-why-card">
+                <div className="why-icon-wrap">
+                  <Shirt size={24} className="why-icon-svg" />
+                </div>
+                <h3>{t("premiumFabric")}</h3>
+                <p>{t("premiumFabricCopy")}</p>
+              </article>
+
+              <article className="why-card luxury-why-card">
+                <div className="why-icon-wrap">
+                  <Truck size={24} className="why-icon-svg" />
+                </div>
+                <h3>{t("fastDelivery")}</h3>
+                <p>{t("fastDeliveryCopy")}</p>
+              </article>
+
+              <article className="why-card luxury-why-card">
+                <div className="why-icon-wrap">
+                  <Award size={24} className="why-icon-svg" />
+                </div>
+                <h3>{t("trustedQuality")}</h3>
+                <p>{t("trustedQualityCopy")}</p>
+              </article>
+
+              <article className="why-card luxury-why-card">
+                <div className="why-icon-wrap">
+                  <Headphones size={24} className="why-icon-svg" />
+                </div>
+                <h3>{t("support")}</h3>
+                <p>{t("supportCopy")}</p>
+              </article>
             </div>
           </div>
         </section>
@@ -328,7 +341,7 @@ export default function Home() {
         <section id="reviews" className="reviews">
           <div className="container">
             <div className="section-title">
-              <span>{t("customerReviews")}</span>
+              <span className="section-kicker">{t("customerReviews")}</span>
               <h2>{t("whatCustomersSay")}</h2>
             </div>
 
@@ -379,14 +392,49 @@ export default function Home() {
           </div>
         </section>
 
-        {/* About Section */}
-        <section id="about" className="about">
+        {/* Luxury About Section */}
+        <section id="about" className="about luxury-about-section">
           <div className="container">
-            <div className="section-title">
-              <span>{t("about")}</span>
-              <h2>{t("aboutStore")}</h2>
+            <div className="about-luxury-card">
+              <div className="about-luxury-content">
+                <span className="badge about-badge">
+                  <Sparkles size={13} className="mr-1.5" />
+                  Our Heritage & Passion
+                </span>
+                <h2>{t("aboutStore")}</h2>
+                <div className="about-gold-divider" />
+                <p className="about-lead-text">
+                  Rabiora represents the pinnacle of luxury Pakistani fashion in Bangladesh. Every piece in our collection is curated for the discerning woman who appreciates fine craftsmanship, authentic heritage, and timeless elegance.
+                </p>
+                <p className="about-secondary-text">
+                  {t("aboutCopy")}
+                </p>
+                
+                <div className="about-pillars-grid">
+                  <div className="about-pillar-item">
+                    <span className="pillar-number">01</span>
+                    <div>
+                      <strong>Authentic Lawn & Silk</strong>
+                      <p>Imported pure fabrications with soft feel and durable weave.</p>
+                    </div>
+                  </div>
+                  <div className="about-pillar-item">
+                    <span className="pillar-number">02</span>
+                    <div>
+                      <strong>Artisanal Embroidery</strong>
+                      <p>Intricate needlework with gold thread, sequins, and organza cutwork.</p>
+                    </div>
+                  </div>
+                  <div className="about-pillar-item">
+                    <span className="pillar-number">03</span>
+                    <div>
+                      <strong>VIP Customer Care</strong>
+                      <p>Direct WhatsApp styling advice and hassle-free exchange policy.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <p>{t("aboutCopy")}</p>
           </div>
         </section>
 
@@ -394,7 +442,7 @@ export default function Home() {
         <section className="payment">
           <div className="container">
             <div className="section-title">
-              <span>{t("paymentMethods")}</span>
+              <span className="section-kicker">{t("paymentMethods")}</span>
               <h2>{t("easyPayment")}</h2>
             </div>
 
@@ -409,22 +457,25 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Stay Tuned / Subscription Section */}
+        {/* Compact & Proportional Stay Tuned / Subscription Section */}
         <section className="stay-tuned-section">
           <div className="container">
-            <div className="stay-tuned-card">
+            <div className="stay-tuned-card luxury-stay-tuned">
               <div className="stay-tuned-header">
-                <span className="badge">Newsletter</span>
+                <span className="badge stay-tuned-badge">
+                  <Mail size={12} className="mr-1.5" />
+                  Exclusive Updates
+                </span>
                 <h2>STAY TUNED WITH RABIORA</h2>
                 <p>
-                  Subscribe to receive exclusive collection drops, VIP discounts, and luxury Pakistani fashion updates directly to your inbox.
+                  Subscribe for new seasonal arrivals, VIP discount codes, and curated Pakistani fashion drops.
                 </p>
               </div>
 
               <form className="stay-tuned-form" onSubmit={handleSubscribe}>
                 <div className="stay-tuned-inputs">
                   <div className="form-input-group">
-                    <Mail size={17} className="input-icon" />
+                    <Mail size={16} className="input-icon" />
                     <input
                       type="email"
                       required
@@ -435,7 +486,7 @@ export default function Home() {
                   </div>
 
                   <div className="form-input-group">
-                    <Phone size={17} className="input-icon" />
+                    <Phone size={16} className="input-icon" />
                     <input
                       type="tel"
                       required
@@ -474,15 +525,18 @@ export default function Home() {
                   <p className="form-error" role="alert">{subscribeError}</p>
                 )}
                 {subscribeSuccess && (
-                  <p className="form-success" role="status">{subscribeSuccess}</p>
+                  <p className="form-success" role="status">
+                    <CheckCircle2 size={16} className="inline mr-1" />
+                    {subscribeSuccess}
+                  </p>
                 )}
 
                 <button
                   type="submit"
-                  className="btn stay-tuned-btn"
+                  className="btn btn-luxury-primary stay-tuned-btn"
                   disabled={subscribeMutation.isPending}
                 >
-                  <Send size={16} />
+                  <Send size={15} />
                   <span>{subscribeMutation.isPending ? "Subscribing..." : "SUBSCRIBE"}</span>
                 </button>
               </form>

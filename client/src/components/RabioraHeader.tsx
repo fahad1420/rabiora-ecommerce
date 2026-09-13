@@ -90,7 +90,7 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
 
             <Link
               href={isLoggedIn ? "/account" : "/login"}
-              className={`header-user-icon-btn ${isLoggedIn ? "logged-in" : ""}`}
+              className={`header-user-icon-btn desktop-only-action ${isLoggedIn ? "logged-in" : ""}`}
               aria-label={accountTooltip}
               title={accountTooltip}
             >
@@ -108,22 +108,12 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
               </Link>
             )}
 
-            {/* Mobile Search Trigger Icon */}
-            <button
-              className="mobile-header-search-btn"
-              type="button"
-              aria-label="Search"
-              onClick={() => setIsSearchModalOpen(true)}
-            >
-              <Search size={20} />
-            </button>
-
-            <Link href="/wishlist" className="header-icon" aria-label={t("wishlist")}>
+            <Link href="/wishlist" className="header-icon desktop-only-action" aria-label={t("wishlist")}>
               <Heart size={21} />
               {wishlistCount > 0 && <span>{wishlistCount}</span>}
             </Link>
 
-            <Link href="/cart" className="header-icon" aria-label={t("cart", { count: cartCount })}>
+            <Link href="/cart" className="header-icon desktop-only-action" aria-label={t("cart", { count: cartCount })}>
               <ShoppingCart size={21} />
               {cartCount > 0 && <span>{cartCount}</span>}
             </Link>

@@ -819,15 +819,9 @@ async function createPasswordResetRequest(phone) {
     purpose: "password_reset",
     expiresAt
   });
-  if (process.env.NODE_ENV !== "production") {
-    return {
-      success: true,
-      devOtp: otpCode,
-      devToken: rawToken
-    };
-  }
   return {
-    success: true
+    success: true,
+    message: "If this account exists, password recovery instructions have been sent."
   };
 }
 async function resetCustomerPassword({
@@ -906,8 +900,7 @@ async function createEmailPasswordResetRequest(email) {
   });
   return {
     success: true,
-    message: "A 6-digit verification code has been generated for your email.",
-    otpCode
+    message: "If this email is registered, a password recovery code has been sent to your email."
   };
 }
 async function resetCustomerPasswordByEmail({

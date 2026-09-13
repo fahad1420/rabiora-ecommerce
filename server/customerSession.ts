@@ -404,16 +404,9 @@ export async function createPasswordResetRequest(phone: string) {
     expiresAt,
   });
 
-  if (process.env.NODE_ENV !== "production") {
-    return {
-      success: true as const,
-      devOtp: otpCode,
-      devToken: rawToken,
-    };
-  }
-
   return {
     success: true as const,
+    message: "If this account exists, password recovery instructions have been sent.",
   };
 }
 
@@ -516,8 +509,7 @@ export async function createEmailPasswordResetRequest(email: string) {
 
   return {
     success: true as const,
-    message: "A 6-digit verification code has been generated for your email.",
-    otpCode,
+    message: "If this email is registered, a password recovery code has been sent to your email.",
   };
 }
 

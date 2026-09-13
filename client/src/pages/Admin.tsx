@@ -2423,6 +2423,145 @@ function SubscribersManager() {
   );
 }
 
+function FeaturedCollectionManager() {
+  const utils = trpc.useUtils();
+  const products = trpc.admin.products.list.useQuery();
+  const updateProduct = trpc.admin.products.update.useMutation({
+    onSuccess: () => {
+      utils.admin.products.list.invalidate();
+      utils.catalogue.list.invalidate();
+    },
+  });
+
+  const [search, setSearch] = useState("");
+  const [filterMode, setFilterMode] = useState<"all" | "featured_only">("all");
+
+  const filteredProducts = useMemo(() => {
+    let list = products.data ?? [];
+    if (filterMode === "featured_only") {
+      list = list.filter((p) => p.featured);
+    }
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter((p) => p.name.toLowerCase().includes(q) || p.categoryName.toLowerCase().includes(q) || p.fabric.toLowerCase().includes(q));
+    }
+    return list;
+  }, [products.data, filterMode, search]);
+
+  const featuredCount = useMemo(() => (products.data ?? []).filter((p) => p.featured).length, [products.data]);
+
+  const toggleFeatured = async (product: any) => {
+    const isCurrentlyFeatured = product.featured;
+    await updateProduct.mutateAsync({
+      id: product.id,
+      product: {
+        categoryId: product.categoryId,
+        name: product.name,
+        slug: product.slug,
+        sku: product.sku || undefined,
+        details: product.details,
+        fabric: product.fabric,
+        color: product.color,
+        priceTaka: product.priceTaka,
+        oldPriceTaka: product.oldPriceTaka || undefined,
+        stockQuantity: product.stockQuantity,
+        featured: !isCurrentlyFeatured,
+      },
+    });
+  };
+
+  return (
+    <div className="admin-stack">
+      <section className="admin-heading">
+        <div>
+          <p>Storefront Merchandising</p>
+          <h1>Featured Showcase Collection</h1>
+        </div>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <span className="status-pill status-confirmed">
+            ★ {featuredCount} Featured on Storefront
+          </span>
+        </div>
+      </section>
+
+      <section className="admin-list-card">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "16px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              type="button"
+              className={`btn-filter ${filterMode === "all" ? "active" : ""}`}
+              onClick={() => setFilterMode("all")}
+            >
+              All Products ({products.data?.length ?? 0})
+            </button>
+            <button
+              type="button"
+              className={`btn-filter ${filterMode === "featured_only" ? "active" : ""}`}
+              onClick={() => setFilterMode("featured_only")}
+            >
+              Featured Only ({featuredCount})
+            </button>
+          </div>
+          <input
+            type="text"
+            placeholder="Search products..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ maxWidth: "260px", padding: "8px 14px", borderRadius: "8px", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)" }}
+          />
+        </div>
+
+        {products.isLoading ? (
+          <p>Loading products...</p>
+        ) : filteredProducts.length === 0 ? (
+          <p>No matching products found.</p>
+        ) : (
+          <div className="admin-product-list">
+            {filteredProducts.map((p) => {
+              const coverImg = p.images.find((img: any) => img.isCover) || p.images[0];
+              return (
+                <article key={p.id} className="admin-product-row" style={{ borderLeft: p.featured ? "4px solid #C9A96E" : "1px solid var(--border)" }}>
+                  {coverImg ? (
+                    <img src={coverImg.storageUrl} alt={p.name} className="product-thumbnail" />
+                  ) : (
+                    <div className="product-thumbnail image-fallback">No Img</div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                      <strong>{p.name}</strong>
+                      {p.featured ? (
+                        <span className="badge" style={{ background: "#C9A96E", color: "#fff", fontSize: "11px", padding: "2px 8px" }}>
+                          ★ Featured on Storefront
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: "11px", color: "var(--gray)" }}>Standard Catalogue</span>
+                      )}
+                    </div>
+                    <p style={{ margin: "4px 0", fontSize: "13px", color: "var(--gray)" }}>
+                      {p.categoryName} • ৳{p.priceTaka.toLocaleString("en-BD")} • Fabric: {p.fabric} • Stock: {p.stockQuantity}
+                    </p>
+                  </div>
+                  <div className="row-actions">
+                    <button
+                      type="button"
+                      disabled={updateProduct.isPending}
+                      className={p.featured ? "danger" : "btn"}
+                      style={{ minWidth: "140px", fontSize: "12px", padding: "8px 12px" }}
+                      onClick={() => toggleFeatured(p)}
+                    >
+                      {p.featured ? "Remove from Featured" : "★ Mark as Featured"}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 export default function Admin() {
   const [location] = useLocation();
   const [matchCustomerDetail] = useRoute("/admin/customers/:id");
@@ -2463,6 +2602,8 @@ export default function Admin() {
     <CustomerDetailManager />
   ) : location === "/admin/products" ? (
     <ProductManager />
+  ) : location === "/admin/featured" ? (
+    <FeaturedCollectionManager />
   ) : location === "/admin/categories" ? (
     <CategoryManager />
   ) : location === "/admin/orders" ? (

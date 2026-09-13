@@ -52,6 +52,11 @@ const menuItems = [
     path: "/admin/products",
   },
   {
+    icon: Sparkles,
+    label: "Featured Collection",
+    path: "/admin/featured",
+  },
+  {
     icon: Tags,
     label: "Categories",
     path: "/admin/categories",
