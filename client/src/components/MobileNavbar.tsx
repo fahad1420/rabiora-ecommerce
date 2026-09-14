@@ -24,7 +24,7 @@ export function MobileNavbar() {
   return (
     <>
       <nav className="mobile-bottom-nav" aria-label="Mobile Navigation">
-        <div className="mobile-nav-pill">
+        <div className="mobile-nav-bar">
           {/* Home */}
           <Link
             href="/"
