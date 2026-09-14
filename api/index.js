@@ -183,7 +183,7 @@ var init_auth0Service = __esm({
   "server/auth0Service.ts"() {
     "use strict";
     AUTH0_DOMAIN = process.env.AUTH0_DOMAIN || process.env.VITE_AUTH0_DOMAIN || "rabiora.us.auth0.com";
-    AUTH0_CLIENT_ID = process.env.AUTH0_CLIENT_ID || process.env.VITE_AUTH0_CLIENT_ID || "";
+    AUTH0_CLIENT_ID = process.env.AUTH0_CLIENT_ID || process.env.VITE_AUTH0_CLIENT_ID || "0CBUoLtRgdbI9jpHSLwiJUfM6IjSwOiO";
     AUTH0_CLIENT_SECRET = process.env.AUTH0_CLIENT_SECRET || "";
   }
 });

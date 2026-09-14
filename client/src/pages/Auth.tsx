@@ -14,7 +14,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { startSocialLogin } from "@/const";
 import { ArrowLeft, CheckCircle2, Lock, Mail, Phone, ShieldCheck, Sparkles, User } from "lucide-react";
 
-type ResetStep = "request" | "verify";
+type ResetStep = "request" | "sent";
 
 function GoogleIcon() {
   return (
@@ -65,8 +65,6 @@ export function AuthPage({
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetStep, setResetStep] = useState<ResetStep>("request");
-  const [otpCode, setOtpCode] = useState("");
-  const [newPassword, setNewPassword] = useState("");
   const [resetMessage, setResetMessage] = useState("");
   const [resetError, setResetError] = useState("");
 
@@ -76,7 +74,6 @@ export function AuthPage({
   const login = trpc.customer.login.useMutation();
 
   const requestEmailPasswordReset = trpc.customer.requestEmailPasswordReset.useMutation();
-  const resetPasswordByEmail = trpc.customer.resetPasswordByEmail.useMutation();
 
   const mergeGuestWishlist = trpc.wishlist.mergeGuest.useMutation();
   const utils = trpc.useUtils();
@@ -158,59 +155,19 @@ export function AuthPage({
       const result = await requestEmailPasswordReset.mutateAsync({
         email: targetEmail,
       });
-      setResetStep("verify");
-      setResetMessage(result.message || "Password recovery instructions and code have been sent to your email.");
+      setResetStep("sent");
+      setResetMessage(result.message || "Password reset instructions have been sent to your email.");
     } catch (cause) {
       setResetError(
         cause instanceof Error
           ? cause.message
-          : "Unable to request password recovery.",
+          : "Unable to request password reset. Please try again.",
       );
     }
   };
 
-  const handleResetPassword = async (event: FormEvent) => {
-    event.preventDefault();
-
-    setResetError("");
-    setResetMessage("");
-
-    if (newPassword.length < 8) {
-      setResetError("Password must contain at least 8 characters.");
-      return;
-    }
-
-    const targetEmail = resetEmail.trim().toLowerCase();
-
-    try {
-      const res = await resetPasswordByEmail.mutateAsync({
-        email: targetEmail,
-        otpCode: otpCode.trim(),
-        newPassword,
-      });
-      setResetMessage(res.message || "Password reset successfully. You can now log in.");
-
-      setPassword("");
-      setOtpCode("");
-      setNewPassword("");
-
-      setTimeout(() => {
-        setShowForgotPassword(false);
-        setResetStep("request");
-        setResetMessage("");
-      }, 1800);
-    } catch (cause) {
-      setResetError(
-        cause instanceof Error
-          ? cause.message
-          : "Unable to reset password. Please verify your 6-digit recovery code.",
-      );
-    }
-  };
   const pending = register.isPending || login.isPending;
-  const resetPending =
-    requestEmailPasswordReset.isPending ||
-    resetPasswordByEmail.isPending;
+  const resetPending = requestEmailPasswordReset.isPending;
 
   return (
     <div className="page-shell auth-page-shell">
@@ -229,11 +186,7 @@ export function AuthPage({
         {showForgotPassword && mode === "login" ? (
           <form
             className="auth-card luxury-auth-card"
-            onSubmit={
-              resetStep === "request"
-                ? handleRequestReset
-                : handleResetPassword
-            }
+            onSubmit={handleRequestReset}
           >
             <div className="auth-card-top-accent" />
 
@@ -245,78 +198,32 @@ export function AuthPage({
             </div>
 
             <h1 className="auth-title">
-              {resetStep === "request"
-                ? "Forgot Password?"
-                : "Reset Your Password"}
+              {resetStep === "sent" ? "Check Your Inbox" : "Forgot Password?"}
             </h1>
 
             <p className="auth-subtitle">
-              {resetStep === "request"
-                ? "Enter your registered email address to receive password recovery instructions and a secure 6-digit recovery code."
-                : "Enter the 6-digit verification code sent to your email and create a new secure password."}
+              {resetStep === "sent"
+                ? `We have sent password reset instructions to ${resetEmail}. Please check your email inbox and click the reset link.`
+                : "Enter your registered email address and we will send you a secure link to reset your password."}
             </p>
 
-            <div className="auth-fields-group">
-              <label className="auth-field-label">
-                <span>Registered Email Address</span>
-                <div className="auth-input-wrapper">
-                  <Mail size={16} className="auth-input-icon" />
-                  <input
-                    required
-                    type="email"
-                    placeholder="name@example.com"
-                    value={resetEmail}
-                    disabled={resetStep === "verify"}
-                    onChange={(event) => setResetEmail(event.target.value)}
-                  />
-                </div>
-              </label>
-
-              {resetStep === "verify" && (
-                <>
-                  <label className="auth-field-label">
-                    <span>6-Digit Verification Code</span>
-                    <div className="auth-input-wrapper">
-                      <ShieldCheck size={16} className="auth-input-icon" />
-                      <input
-                        required
-                        inputMode="numeric"
-                        maxLength={6}
-                        placeholder="Enter 6-digit code"
-                        value={otpCode}
-                        onChange={(event) =>
-                          setOtpCode(
-                            event.target.value
-                              .replace(/\D/g, "")
-                              .slice(0, 6),
-                          )
-                        }
-                      />
-                    </div>
-                  </label>
-
-                  <label className="auth-field-label">
-                    <span>New Password</span>
-                    <div className="auth-input-wrapper">
-                      <Lock size={16} className="auth-input-icon" />
-                      <input
-                        required
-                        type="password"
-                        minLength={8}
-                        maxLength={72}
-                        placeholder="Minimum 8 characters"
-                        value={newPassword}
-                        onChange={(event) =>
-                          setNewPassword(
-                            event.target.value,
-                          )
-                        }
-                      />
-                    </div>
-                  </label>
-                </>
-              )}
-            </div>
+            {resetStep !== "sent" && (
+              <div className="auth-fields-group">
+                <label className="auth-field-label">
+                  <span>Registered Email Address</span>
+                  <div className="auth-input-wrapper">
+                    <Mail size={16} className="auth-input-icon" />
+                    <input
+                      required
+                      type="email"
+                      placeholder="name@example.com"
+                      value={resetEmail}
+                      onChange={(event) => setResetEmail(event.target.value)}
+                    />
+                  </div>
+                </label>
+              </div>
+            )}
 
             {resetError && (
               <p className="form-error auth-alert" role="alert">
@@ -331,43 +238,28 @@ export function AuthPage({
               </p>
             )}
 
-            <button
-              className="btn btn-luxury-primary auth-submit-btn"
-              disabled={resetPending}
-            >
-              {resetPending
-                ? t("pleaseWait")
-                : resetStep === "request"
-                  ? "Send Recovery Code"
-                  : "Set New Password & Sign In"}
-            </button>
-
-            {resetStep === "verify" && (
-              <div className="auth-resend-row">
-                <button
-                  type="button"
-                  className="auth-link-secondary"
-                  disabled={resetPending}
-                  onClick={handleRequestReset}
-                >
-                  Resend Code
-                </button>
-                <span className="auth-divider-dot">•</span>
-                <button
-                  type="button"
-                  className="auth-link-secondary"
-                  disabled={resetPending}
-                  onClick={() => {
-                    setResetStep("request");
-                    setResetMessage("");
-                    setResetError("");
-                    setOtpCode("");
-                    setNewPassword("");
-                  }}
-                >
-                  Change Email
-                </button>
-              </div>
+            {resetStep !== "sent" ? (
+              <button
+                type="submit"
+                className="btn btn-luxury-primary auth-submit-btn"
+                disabled={resetPending}
+              >
+                {resetPending ? t("pleaseWait") : "Send Password Reset Email"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-luxury-primary auth-submit-btn"
+                onClick={() => {
+                  setShowForgotPassword(false);
+                  setResetStep("request");
+                  setResetMessage("");
+                  setResetError("");
+                  setResetEmail("");
+                }}
+              >
+                Return to Sign In
+              </button>
             )}
 
             <p className="auth-switch">

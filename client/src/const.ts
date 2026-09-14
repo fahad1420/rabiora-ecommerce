@@ -14,7 +14,7 @@ export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 // stash across renders.
 export const startLogin = (options?: { connection?: "google" | "facebook" }) => {
   const auth0Domain = import.meta.env.VITE_AUTH0_DOMAIN || "rabiora.us.auth0.com";
-  const auth0ClientId = import.meta.env.VITE_AUTH0_CLIENT_ID || "rabiora-app-client";
+  const auth0ClientId = import.meta.env.VITE_AUTH0_CLIENT_ID || "0CBUoLtRgdbI9jpHSLwiJUfM6IjSwOiO";
   const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL || "";
   const appId = import.meta.env.VITE_APP_ID || "";
   const redirectUri = `${window.location.origin}/api/oauth/callback`;
