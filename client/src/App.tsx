@@ -8,6 +8,7 @@ import { LanguageProvider } from "./contexts/LanguageContext";
 import Home from "./pages/Home";
 import NotFound from "./pages/NotFound";
 import { MobileNavbar } from "./components/MobileNavbar";
+import { WhatsAppFloatingButton } from "./components/WhatsAppFloatingButton";
 
 const ProductDetail = lazy(() => import("./pages/ProductDetail"));
 const Cart = lazy(() => import("./pages/Cart"));
@@ -105,6 +106,16 @@ function Router() {
         />
 
         <Route
+          path="/admin/featured"
+          component={Admin}
+        />
+
+        <Route
+          path="/admin/announcements"
+          component={Admin}
+        />
+
+        <Route
           path="/admin/categories"
           component={Admin}
         />
@@ -167,6 +178,7 @@ export default function App() {
         <LanguageProvider>
           <TooltipProvider>
             <Router />
+            <WhatsAppFloatingButton />
             <MobileNavbar />
             <Toaster />
           </TooltipProvider>

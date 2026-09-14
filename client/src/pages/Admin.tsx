@@ -1557,59 +1557,7 @@ function PaymentSettingsManager() {
           </label>
         </div>
 
-        <h2 style={{ marginTop: "1rem" }}>Featured Spotlight Picture / Product</h2>
-        <p className="muted">Set a prominent featured spotlight image and product link on the storefront homepage.</p>
-
-        <label>
-          Featured Picture / Banner Image URL
-          <input
-            value={featuredPictureUrl}
-            onChange={(e) => setFeaturedPictureUrl(e.target.value)}
-            placeholder="https://... or /uploads/images/..."
-          />
-        </label>
-
-        <div className="admin-field-pair">
-          <label>
-            Spotlight Title
-            <input
-              value={featuredTitle}
-              onChange={(e) => setFeaturedTitle(e.target.value)}
-              placeholder="e.g. Royal Embroidered Velvet Collection"
-            />
-          </label>
-
-          <label>
-            Link to Product (Optional Dropdown)
-            <select
-              value={featuredProductId}
-              onChange={(e) => {
-                setFeaturedProductId(e.target.value);
-                if (e.target.value) {
-                  setFeaturedPictureLink(`/products/${e.target.value}`);
-                }
-              }}
-            >
-              <option value="">-- None or Custom Link --</option>
-              {products.data?.map((p) => (
-                <option key={p.id} value={p.slug || String(p.id)}>
-                  {p.name} ({p.sku || p.slug})
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <label>
-          Spotlight Destination Link (Custom URL or Product Path)
-          <input
-            value={featuredPictureLink}
-            onChange={(e) => setFeaturedPictureLink(e.target.value)}
-            placeholder="/#products or /products/your-slug"
-          />
-        </label>
-
-        <h2 style={{ marginTop: "1rem" }}>Payment Wallet Numbers</h2>
+        <h2 style={{ marginTop: "1.5rem" }}>Payment Wallet Numbers</h2>
         <p className="muted">These numbers are displayed live at checkout for customer transfers.</p>
 
         <div className="admin-field-pair">
@@ -1644,7 +1592,7 @@ function PaymentSettingsManager() {
           />
         </label>
 
-        <h2 style={{ marginTop: "1rem" }}>Hero Brand Messaging</h2>
+        <h2 style={{ marginTop: "1.5rem" }}>Hero Brand Messaging</h2>
 
         <div className="admin-field-pair">
           <label>
@@ -2425,7 +2373,17 @@ function SubscribersManager() {
 
 function FeaturedCollectionManager() {
   const utils = trpc.useUtils();
+  const settings = trpc.settings.get.useQuery();
   const products = trpc.admin.products.list.useQuery();
+
+  const updateSettings = trpc.admin.settings.update.useMutation({
+    onSuccess: () => {
+      utils.settings.get.invalidate();
+      setSpotlightSaved("Featured spotlight banner updated successfully!");
+      setTimeout(() => setSpotlightSaved(""), 4000);
+    },
+  });
+
   const updateProduct = trpc.admin.products.update.useMutation({
     onSuccess: () => {
       utils.admin.products.list.invalidate();
@@ -2433,8 +2391,35 @@ function FeaturedCollectionManager() {
     },
   });
 
+  // Spotlight State
+  const [featuredPictureUrl, setFeaturedPictureUrl] = useState("");
+  const [featuredTitle, setFeaturedTitle] = useState("");
+  const [featuredPictureLink, setFeaturedPictureLink] = useState("");
+  const [featuredProductId, setFeaturedProductId] = useState("");
+  const [spotlightSaved, setSpotlightSaved] = useState("");
+
+  // Product Catalogue Filter State
   const [search, setSearch] = useState("");
   const [filterMode, setFilterMode] = useState<"all" | "featured_only">("all");
+
+  useEffect(() => {
+    if (settings.data) {
+      setFeaturedPictureUrl(settings.data.featuredPictureUrl || "");
+      setFeaturedTitle(settings.data.featuredTitle || "");
+      setFeaturedPictureLink(settings.data.featuredPictureLink || "");
+      setFeaturedProductId(settings.data.featuredProductId || "");
+    }
+  }, [settings.data]);
+
+  const handleSpotlightSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    updateSettings.mutate({
+      featuredPictureUrl: featuredPictureUrl.trim() || undefined,
+      featuredTitle: featuredTitle.trim() || undefined,
+      featuredPictureLink: featuredPictureLink.trim() || undefined,
+      featuredProductId: featuredProductId.trim() || undefined,
+    });
+  };
 
   const filteredProducts = useMemo(() => {
     let list = products.data ?? [];
@@ -2481,10 +2466,80 @@ function FeaturedCollectionManager() {
           <span className="status-pill status-confirmed">
             ★ {featuredCount} Featured on Storefront
           </span>
+          <a href="/#products" target="_blank" rel="noopener noreferrer" className="btn-outline" style={{ fontSize: "12px", padding: "6px 12px" }}>
+            Preview Storefront ↗
+          </a>
         </div>
       </section>
 
+      {/* Featured Spotlight Banner Section */}
+      <form className="admin-form" onSubmit={handleSpotlightSubmit}>
+        <h2>✨ Featured Spotlight Hero Banner</h2>
+        <p className="muted">Set a high-visibility spotlight image banner and product destination link on the homepage.</p>
+
+        <label>
+          Spotlight Banner / Picture URL
+          <input
+            value={featuredPictureUrl}
+            onChange={(e) => setFeaturedPictureUrl(e.target.value)}
+            placeholder="https://... or /uploads/images/..."
+          />
+        </label>
+
+        <div className="admin-field-pair">
+          <label>
+            Spotlight Title / Headline
+            <input
+              value={featuredTitle}
+              onChange={(e) => setFeaturedTitle(e.target.value)}
+              placeholder="e.g. Royal Embroidered Velvet Collection"
+            />
+          </label>
+
+          <label>
+            Destination Product (Dropdown Selector)
+            <select
+              value={featuredProductId}
+              onChange={(e) => {
+                setFeaturedProductId(e.target.value);
+                if (e.target.value) {
+                  setFeaturedPictureLink(`/products/${e.target.value}`);
+                }
+              }}
+            >
+              <option value="">-- Custom Link or None --</option>
+              {products.data?.map((p) => (
+                <option key={p.id} value={p.slug || String(p.id)}>
+                  {p.name} ({p.sku || p.slug})
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <label>
+          Destination Link URL (Storefront path or custom route)
+          <input
+            value={featuredPictureLink}
+            onChange={(e) => setFeaturedPictureLink(e.target.value)}
+            placeholder="/#products or /products/your-slug"
+          />
+        </label>
+
+        {spotlightSaved && <p className="form-success" role="status">{spotlightSaved}</p>}
+
+        <button className="btn" disabled={updateSettings.isPending} style={{ width: "fit-content" }}>
+          {updateSettings.isPending ? "Saving Spotlight..." : "Save Spotlight Banner"}
+        </button>
+      </form>
+
+      {/* Product Featured Catalogue Toggles */}
       <section className="admin-list-card">
+        <h2 style={{ marginBottom: "12px" }}>Featured Products Grid</h2>
+        <p className="muted" style={{ marginBottom: "16px" }}>
+          Toggle products to feature them on the storefront homepage Featured Showcase section.
+        </p>
+
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "16px", flexWrap: "wrap" }}>
           <div style={{ display: "flex", gap: "8px" }}>
             <button
@@ -2562,6 +2617,218 @@ function FeaturedCollectionManager() {
   );
 }
 
+function AnnouncementsManager() {
+  const utils = trpc.useUtils();
+  const announcements = trpc.admin.announcements.list.useQuery();
+
+  const createMutation = trpc.admin.announcements.create.useMutation({
+    onSuccess: () => {
+      utils.admin.announcements.list.invalidate();
+      utils.announcements.list.invalidate();
+      resetForm();
+    },
+  });
+
+  const updateMutation = trpc.admin.announcements.update.useMutation({
+    onSuccess: () => {
+      utils.admin.announcements.list.invalidate();
+      utils.announcements.list.invalidate();
+      resetForm();
+    },
+  });
+
+  const deleteMutation = trpc.admin.announcements.delete.useMutation({
+    onSuccess: () => {
+      utils.admin.announcements.list.invalidate();
+      utils.announcements.list.invalidate();
+    },
+  });
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [text, setText] = useState("");
+  const [link, setLink] = useState("");
+  const [isActive, setIsActive] = useState(true);
+  const [displayOrder, setDisplayOrder] = useState("1");
+  const [error, setError] = useState("");
+
+  const resetForm = () => {
+    setEditingId(null);
+    setText("");
+    setLink("");
+    setIsActive(true);
+    setDisplayOrder("1");
+    setError("");
+  };
+
+  const handleEdit = (item: any) => {
+    setEditingId(item.id);
+    setText(item.text);
+    setLink(item.link || "");
+    setIsActive(item.isActive);
+    setDisplayOrder(String(item.displayOrder ?? 1));
+    setError("");
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!text.trim()) {
+      setError("Announcement text is required.");
+      return;
+    }
+
+    try {
+      if (editingId) {
+        await updateMutation.mutateAsync({
+          id: editingId,
+          text: text.trim(),
+          link: link.trim() || undefined,
+          isActive,
+          displayOrder: Number(displayOrder) || 0,
+        });
+      } else {
+        await createMutation.mutateAsync({
+          text: text.trim(),
+          link: link.trim() || undefined,
+          isActive,
+          displayOrder: Number(displayOrder) || 0,
+        });
+      }
+    } catch (err: any) {
+      setError(err?.message || "Failed to save announcement.");
+    }
+  };
+
+  const handleToggle = async (item: any) => {
+    await updateMutation.mutateAsync({
+      id: item.id,
+      isActive: !item.isActive,
+    });
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm("Are you sure you want to delete this announcement?")) {
+      await deleteMutation.mutateAsync({ id });
+    }
+  };
+
+  return (
+    <div className="admin-stack">
+      <section className="admin-heading">
+        <div>
+          <p>Storefront Communication</p>
+          <h1>Top Announcement Bar Manager</h1>
+        </div>
+      </section>
+
+      <form className="admin-form" onSubmit={handleSubmit}>
+        <h2>{editingId ? "Edit Announcement" : "Create New Announcement"}</h2>
+        <p className="muted">
+          Active announcements appear in the rotating/scrolling top bar across the storefront.
+        </p>
+
+        {error && <p className="form-error" role="alert">{error}</p>}
+
+        <label>
+          Announcement Text (Required)
+          <input
+            required
+            type="text"
+            placeholder="e.g. Free Delivery Inside Dhaka on all orders over ৳2,000"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+        </label>
+
+        <div className="admin-field-pair">
+          <label>
+            Destination Link (Optional)
+            <input
+              type="text"
+              placeholder="/#products or /customer-service/shipping"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+            />
+          </label>
+
+          <label>
+            Sort Order (Lower appears first)
+            <input
+              type="number"
+              min="0"
+              value={displayOrder}
+              onChange={(e) => setDisplayOrder(e.target.value)}
+            />
+          </label>
+        </div>
+
+        <label className="checkbox-label" style={{ display: "flex", alignItems: "center", gap: "8px", margin: "10px 0" }}>
+          <input
+            type="checkbox"
+            checked={isActive}
+            onChange={(e) => setIsActive(e.target.checked)}
+          />
+          <span>Active (Visible on Storefront)</span>
+        </label>
+
+        <div className="admin-actions" style={{ display: "flex", gap: "10px" }}>
+          <button className="btn" disabled={createMutation.isPending || updateMutation.isPending}>
+            {editingId ? "Update Announcement" : "Create Announcement"}
+          </button>
+          {editingId && (
+            <button type="button" className="btn-outline" onClick={resetForm}>
+              Cancel Edit
+            </button>
+          )}
+        </div>
+      </form>
+
+      <section className="admin-list-card">
+        <h2>Active Announcements ({announcements.data?.length ?? 0})</h2>
+
+        {announcements.isLoading ? (
+          <p>Loading announcements...</p>
+        ) : !announcements.data || announcements.data.length === 0 ? (
+          <p>No announcements configured yet.</p>
+        ) : (
+          <div className="admin-product-list">
+            {announcements.data.map((item) => (
+              <article key={item.id} className="admin-product-row" style={{ borderLeft: item.isActive ? "4px solid #18A89E" : "4px solid #91A5A4" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <strong>{item.text}</strong>
+                    <span className={`status-pill ${item.isActive ? "status-confirmed" : "status-pending"}`}>
+                      {item.isActive ? "✓ Live" : "Hidden"}
+                    </span>
+                    <span style={{ fontSize: "11px", color: "var(--gray)" }}>Order: {item.displayOrder}</span>
+                  </div>
+                  {item.link && (
+                    <p style={{ margin: "4px 0", fontSize: "12px", color: "var(--gray)" }}>
+                      Link: <code>{item.link}</code>
+                    </p>
+                  )}
+                </div>
+                <div className="row-actions">
+                  <button type="button" className="btn" onClick={() => handleToggle(item)}>
+                    {item.isActive ? "Disable" : "Enable"}
+                  </button>
+                  <button type="button" className="btn" onClick={() => handleEdit(item)}>
+                    Edit
+                  </button>
+                  <button type="button" className="danger" onClick={() => handleDelete(item.id)}>
+                    Delete
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 export default function Admin() {
   const [location] = useLocation();
   const [matchCustomerDetail] = useRoute("/admin/customers/:id");
@@ -2604,6 +2871,8 @@ export default function Admin() {
     <ProductManager />
   ) : location === "/admin/featured" ? (
     <FeaturedCollectionManager />
+  ) : location === "/admin/announcements" ? (
+    <AnnouncementsManager />
   ) : location === "/admin/categories" ? (
     <CategoryManager />
   ) : location === "/admin/orders" ? (

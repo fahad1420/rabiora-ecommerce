@@ -76,6 +76,7 @@ export const customerRouter = router({
       z.object({
         name: z.string().trim().min(2).max(160),
         phone: phoneSchema,
+        email: z.string().trim().email("A valid email address is required."),
         password: z
           .string()
           .refine(

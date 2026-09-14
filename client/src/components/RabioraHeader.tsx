@@ -34,14 +34,33 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
 
   const closeDrawer = () => setDrawerOpen(false);
 
+  const announcementsQuery = trpc.announcements.list.useQuery();
+
   return (
     <>
       <div className="announcement">
-        <span className="announcement-copy">{t("freeDelivery")}</span>
-        <span aria-hidden="true">|</span>
-        <span className="announcement-copy">{t("premiumCollection")}</span>
-        <span aria-hidden="true">|</span>
-        <span className="announcement-copy">{t("codAvailable")}</span>
+        {announcementsQuery.data && announcementsQuery.data.length > 0 ? (
+          announcementsQuery.data.map((item, index) => (
+            <span key={item.id} className="announcement-item-wrap">
+              {index > 0 && <span aria-hidden="true" className="announcement-sep">|</span>}
+              {item.link ? (
+                <a href={item.link} className="announcement-copy announcement-link">
+                  {item.text}
+                </a>
+              ) : (
+                <span className="announcement-copy">{item.text}</span>
+              )}
+            </span>
+          ))
+        ) : (
+          <>
+            <span className="announcement-copy">{t("freeDelivery")}</span>
+            <span aria-hidden="true">|</span>
+            <span className="announcement-copy">{t("premiumCollection")}</span>
+            <span aria-hidden="true">|</span>
+            <span className="announcement-copy">{t("codAvailable")}</span>
+          </>
+        )}
       </div>
 
       <header className="rabiora-header">

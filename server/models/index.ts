@@ -11,5 +11,6 @@ export * from "./SiteSettings";
 export * from "./Subscriber";
 export * from "./OfferBanner";
 export * from "./Coupon";
+export * from "./Announcement";
 export * from "./helpers";
 

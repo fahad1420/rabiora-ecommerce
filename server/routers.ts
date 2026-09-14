@@ -11,11 +11,15 @@ import { publicProcedure, router } from "./_core/trpc";
 
 import { getPublicSiteSettings, listActiveOfferBanners, subscribeCustomer } from "./marketingService";
 import { validateCoupon } from "./couponService";
+import { listActiveAnnouncements } from "./announcementService";
 
 export const appRouter = router({
   system: systemRouter,
   settings: router({
     get: publicProcedure.query(() => getPublicSiteSettings()),
+  }),
+  announcements: router({
+    list: publicProcedure.query(() => listActiveAnnouncements()),
   }),
   offers: router({
     list: publicProcedure.query(() => listActiveOfferBanners()),

@@ -296,356 +296,360 @@ export default function Checkout() {
       <RabioraHeader cartCount={cart.count} wishlistCount={wishlist.count} />
 
       <main className="checkout-page">
-        <div className="container checkout-layout">
-          <form className="checkout-form" onSubmit={submit}>
-            <div className="section-title align-left">
-              <span>{t("secureCheckout")}</span>
-              <h1>{isBuyNow ? "Direct Buy Now Checkout" : t("completeOrder")}</h1>
-            </div>
-
-            {/* Delivery Section */}
-            <section className="checkout-section-block">
-              <div className="checkout-section-title-row">
-                <MapPin size={20} className="text-accent" />
-                <h2>{t("deliveryDetails")}</h2>
+        <div className="container">
+          <form className="checkout-layout" onSubmit={submit}>
+            <div className="checkout-form">
+              <div className="section-title align-left">
+                <span>{t("secureCheckout")}</span>
+                <h1>{isBuyNow ? "Direct Buy Now Checkout" : t("completeOrder")}</h1>
               </div>
-              <div className="form-fields">
-                <label>
-                  {t("fullName")}
-                  <input
-                    required
-                    value={customerName}
-                    onChange={(event) => setCustomerName(event.target.value)}
-                    placeholder="Enter recipient full name"
-                  />
-                </label>
 
-                <label>
-                  {t("phoneNumber")}
-                  <input
-                    required
-                    inputMode="tel"
-                    placeholder="01XXXXXXXXX"
-                    value={customerPhone}
-                    onChange={(event) => setCustomerPhone(event.target.value)}
-                  />
-                </label>
-
-                {/* Cascading Bangladesh Location Selection */}
-                <div className="location-selector-grid">
-                  <label>
-                    District / Zilla
-                    <select
-                      required
-                      value={selectedDistrict}
-                      onChange={(e) => {
-                        setSelectedDistrict(e.target.value);
-                      }}
-                      className="location-select"
-                    >
-                      {allDistricts.map((d) => (
-                        <option key={d} value={d}>
-                          {d} {d === "Dhaka" ? "(Dhaka City)" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    Upazila / Zone
-                    <select
-                      required
-                      value={selectedUpazila}
-                      onChange={(e) => {
-                        setSelectedUpazila(e.target.value);
-                      }}
-                      className="location-select"
-                    >
-                      {availableUpazilas.map((u) => (
-                        <option key={u} value={u}>
-                          {u}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    Thana / Area
-                    <select
-                      required
-                      value={selectedThana}
-                      onChange={(e) => setSelectedThana(e.target.value)}
-                      className="location-select"
-                    >
-                      {availableThanas.map((tItem) => (
-                        <option key={tItem} value={tItem}>
-                          {tItem}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+              {/* 1. Delivery Details Section */}
+              <section className="checkout-section-block">
+                <div className="checkout-section-title-row">
+                  <MapPin size={20} className="text-accent" />
+                  <h2>{t("deliveryDetails")}</h2>
                 </div>
+                <div className="form-fields">
+                  <label>
+                    {t("fullName")}
+                    <input
+                      required
+                      value={customerName}
+                      onChange={(event) => setCustomerName(event.target.value)}
+                      placeholder="Enter recipient full name"
+                    />
+                  </label>
 
-                <label>
-                  Street Address & House Details
-                  <textarea
-                    required
-                    minLength={8}
-                    placeholder="House number, road number, flat/apartment, landmark or specific area notes"
-                    value={streetAddress}
-                    onChange={(event) => setStreetAddress(event.target.value)}
-                  />
-                </label>
-              </div>
-            </section>
+                  <label>
+                    {t("phoneNumber")}
+                    <input
+                      required
+                      inputMode="tel"
+                      placeholder="01XXXXXXXXX"
+                      value={customerPhone}
+                      onChange={(event) => setCustomerPhone(event.target.value)}
+                    />
+                  </label>
 
-            {/* Payment Method Section */}
-            <section className="checkout-section-block">
-              <div className="checkout-section-title-row">
-                <CreditCard size={20} className="text-accent" />
-                <h2>{t("paymentMethod")}</h2>
-              </div>
-              <div className="payment-method-luxury-grid">
-                {methods.map((method) => {
-                  const isSelected = paymentMethod === method;
-                  let badgeText = "Manual Pay";
-                  let badgeClass = "badge-online";
-                  let methodDesc = "Send Money & enter TrxID";
-
-                  if (method === "bKash") {
-                    badgeText = "Fastest Verification";
-                    badgeClass = "badge-bkash";
-                    methodDesc = "Pay via bKash personal send money";
-                  } else if (method === "Nagad") {
-                    badgeText = "Nagad Wallet";
-                    badgeClass = "badge-nagad";
-                    methodDesc = "Pay via Nagad personal send money";
-                  } else if (method === "Rocket") {
-                    badgeText = "DBBL Rocket";
-                    badgeClass = "badge-rocket";
-                    methodDesc = "Pay via Rocket personal send money";
-                  } else if (method === "Cash on Delivery") {
-                    badgeText = "Cash on Delivery";
-                    badgeClass = "badge-cod";
-                    methodDesc = "Pay cash when receiving parcel at doorstep";
-                  }
-
-                  return (
-                    <label
-                      className={`payment-luxury-card ${isSelected ? "selected" : ""} ${method.toLowerCase().replace(/\s+/g, "-")}`}
-                      key={method}
-                    >
-                      <input
-                        type="radio"
-                        name="paymentMethod"
-                        checked={isSelected}
-                        onChange={() => handlePaymentMethodChange(method)}
-                        className="sr-only"
-                      />
-                      <div className="payment-luxury-card-inner">
-                        <div className="payment-luxury-header">
-                          <div className="payment-title-group">
-                            <strong className="payment-method-heading">{method}</strong>
-                            <span className={`payment-method-subbadge ${badgeClass}`}>{badgeText}</span>
-                          </div>
-                          <div className={`radio-dot ${isSelected ? "checked" : ""}`} />
-                        </div>
-                        <p className="payment-method-desc">{methodDesc}</p>
-                      </div>
+                  {/* Cascading Bangladesh Location Selection */}
+                  <div className="location-selector-grid">
+                    <label>
+                      District / Zilla
+                      <select
+                        required
+                        value={selectedDistrict}
+                        onChange={(e) => {
+                          setSelectedDistrict(e.target.value);
+                        }}
+                        className="location-select"
+                      >
+                        {allDistricts.map((d) => (
+                          <option key={d} value={d}>
+                            {d} {d === "Dhaka" ? "(Dhaka City)" : ""}
+                          </option>
+                        ))}
+                      </select>
                     </label>
-                  );
-                })}
-              </div>
 
-              {manualWallet && (
-                <div className="manual-wallet-card">
-                  <div className="manual-wallet-header">
-                    <Info size={18} />
-                    <strong>How to pay via {paymentMethod}:</strong>
+                    <label>
+                      Upazila / Zone
+                      <select
+                        required
+                        value={selectedUpazila}
+                        onChange={(e) => {
+                          setSelectedUpazila(e.target.value);
+                        }}
+                        className="location-select"
+                      >
+                        {availableUpazilas.map((u) => (
+                          <option key={u} value={u}>
+                            {u}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label>
+                      Thana / Area
+                      <select
+                        required
+                        value={selectedThana}
+                        onChange={(e) => setSelectedThana(e.target.value)}
+                        className="location-select"
+                      >
+                        {availableThanas.map((tItem) => (
+                          <option key={tItem} value={tItem}>
+                            {tItem}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   </div>
 
-                  <div className="manual-wallet-number-row">
-                    <span className="wallet-label">Send Money to:</span>
-                    <strong className="wallet-number">{paymentNumbers[paymentMethod] || "+8801349529274"}</strong>
+                  <label>
+                    Street Address & House Details
+                    <textarea
+                      required
+                      minLength={8}
+                      placeholder="House number, road number, flat/apartment, landmark or specific area notes"
+                      value={streetAddress}
+                      onChange={(event) => setStreetAddress(event.target.value)}
+                    />
+                  </label>
+                </div>
+              </section>
+
+              {/* 2. Payment Method Section */}
+              <section className="checkout-section-block">
+                <div className="checkout-section-title-row">
+                  <CreditCard size={20} className="text-accent" />
+                  <h2>{t("paymentMethod")}</h2>
+                </div>
+                <div className="payment-method-luxury-grid">
+                  {methods.map((method) => {
+                    const isSelected = paymentMethod === method;
+                    let badgeText = "Manual Pay";
+                    let badgeClass = "badge-online";
+                    let methodDesc = "Send Money & enter TrxID";
+
+                    if (method === "bKash") {
+                      badgeText = "Fastest Verification";
+                      badgeClass = "badge-bkash";
+                      methodDesc = "Pay via bKash personal send money";
+                    } else if (method === "Nagad") {
+                      badgeText = "Nagad Wallet";
+                      badgeClass = "badge-nagad";
+                      methodDesc = "Pay via Nagad personal send money";
+                    } else if (method === "Rocket") {
+                      badgeText = "DBBL Rocket";
+                      badgeClass = "badge-rocket";
+                      methodDesc = "Pay via Rocket personal send money";
+                    } else if (method === "Cash on Delivery") {
+                      badgeText = "Cash on Delivery";
+                      badgeClass = "badge-cod";
+                      methodDesc = "Pay cash when receiving parcel at doorstep";
+                    }
+
+                    return (
+                      <label
+                        className={`payment-luxury-card ${isSelected ? "selected" : ""} ${method.toLowerCase().replace(/\s+/g, "-")}`}
+                        key={method}
+                      >
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          checked={isSelected}
+                          onChange={() => handlePaymentMethodChange(method)}
+                          className="sr-only"
+                        />
+                        <div className="payment-luxury-card-inner">
+                          <div className="payment-luxury-header">
+                            <div className="payment-title-group">
+                              <strong className="payment-method-heading">{method}</strong>
+                              <span className={`payment-method-subbadge ${badgeClass}`}>{badgeText}</span>
+                            </div>
+                            <div className={`radio-dot ${isSelected ? "checked" : ""}`} />
+                          </div>
+                          <p className="payment-method-desc">{methodDesc}</p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                {manualWallet && (
+                  <div className="manual-wallet-card">
+                    <div className="manual-wallet-header">
+                      <Info size={18} />
+                      <strong>How to pay via {paymentMethod}:</strong>
+                    </div>
+
+                    <div className="manual-wallet-number-row">
+                      <span className="wallet-label">Send Money to:</span>
+                      <strong className="wallet-number">{paymentNumbers[paymentMethod] || "+8801349529274"}</strong>
+                      <button
+                        type="button"
+                        className="copy-number-btn"
+                        onClick={() => handleCopyNumber(paymentNumbers[paymentMethod] || "+8801349529274")}
+                        title="Copy phone number"
+                      >
+                        {copiedNumber === (paymentNumbers[paymentMethod] || "+8801349529274") ? (
+                          <>
+                            <Check size={14} /> Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={14} /> Copy
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <p className="wallet-guide">
+                      1. Send the final payable amount (<strong>{taka(grandTotal)}</strong>) to the {paymentMethod} number above using <strong>Send Money</strong>. <br />
+                      2. Enter your Transaction ID (TrxID) and Submitted Amount below for instant verification.
+                    </p>
+
+                    <div className="manual-wallet-inputs">
+                      <label>
+                        {t("transactionId")} (TrxID)
+                        <input
+                          required
+                          placeholder="e.g., 9XF839KA72"
+                          value={transactionId}
+                          onChange={(event) => setTransactionId(event.target.value)}
+                        />
+                      </label>
+
+                      <label>
+                        {t("submittedAmount")} (৳ BDT)
+                        <input
+                          required
+                          type="number"
+                          min="1"
+                          step="1"
+                          placeholder={String(grandTotal)}
+                          value={submittedAmountTaka}
+                          onChange={(event) => setSubmittedAmountTaka(event.target.value)}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </section>
+            </div>
+
+            {/* 3. Checkout Order Summary & Final Actions Aside */}
+            <aside className="checkout-summary">
+              <h2>{t("orderSummary")}</h2>
+
+              <div className="checkout-summary-items">
+                {isBuyNow && buyNowProduct ? (
+                  <div className="checkout-item-row">
+                    <div className="item-meta">
+                      <strong>{buyNowProduct.name}</strong>
+                      <span>Quantity: {Math.max(1, buyNowQty)}</span>
+                    </div>
+                    <strong>{taka(buyNowProduct.priceTaka * Math.max(1, buyNowQty))}</strong>
+                  </div>
+                ) : (
+                  cart.items.map((item) => (
+                    <div className="checkout-item-row" key={item.productId}>
+                      <div className="item-meta">
+                        <strong>{item.name}</strong>
+                        <span>{item.quantity} × {taka(item.priceTaka)}</span>
+                      </div>
+                      <strong>{taka(item.lineTotalTaka)}</strong>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* 4. Coupon / Discount Code Section */}
+              <div className="checkout-coupon-card">
+                <div className="coupon-header">
+                  <Tag size={15} className="coupon-icon" />
+                  <strong>Discount Coupon</strong>
+                </div>
+
+                {paymentMethod === "Cash on Delivery" ? (
+                  <div className="coupon-notice-cod">
+                    <small>💡 Coupons are valid exclusively for online payment methods (bKash, Nagad, Rocket).</small>
+                  </div>
+                ) : appliedCoupon ? (
+                  <div className="coupon-applied-box">
+                    <div className="coupon-applied-info">
+                      <span className="coupon-badge">🏷️ {appliedCoupon.code}</span>
+                      <span className="coupon-save-text">-{appliedCoupon.discountPercent}% OFF ({taka(discountAmount)})</span>
+                    </div>
                     <button
                       type="button"
-                      className="copy-number-btn"
-                      onClick={() => handleCopyNumber(paymentNumbers[paymentMethod] || "+8801349529274")}
-                      title="Copy phone number"
+                      className="coupon-remove-btn"
+                      onClick={handleRemoveCoupon}
+                      title="Remove coupon"
                     >
-                      {copiedNumber === (paymentNumbers[paymentMethod] || "+8801349529274") ? (
-                        <>
-                          <Check size={14} /> Copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy size={14} /> Copy
-                        </>
-                      )}
+                      Remove
                     </button>
                   </div>
-
-                  <p className="wallet-guide">
-                    1. Send the final payable amount (<strong>{taka(grandTotal)}</strong>) to the {paymentMethod} number above using <strong>Send Money</strong>. <br />
-                    2. Enter your Transaction ID (TrxID) and Submitted Amount below for instant verification.
-                  </p>
-
-                  <div className="manual-wallet-inputs">
-                    <label>
-                      {t("transactionId")} (TrxID)
-                      <input
-                        required
-                        placeholder="e.g., 9XF839KA72"
-                        value={transactionId}
-                        onChange={(event) => setTransactionId(event.target.value)}
-                      />
-                    </label>
-
-                    <label>
-                      {t("submittedAmount")} (৳ BDT)
-                      <input
-                        required
-                        type="number"
-                        min="1"
-                        step="1"
-                        placeholder={String(grandTotal)}
-                        value={submittedAmountTaka}
-                        onChange={(event) => setSubmittedAmountTaka(event.target.value)}
-                      />
-                    </label>
+                ) : (
+                  <div className="coupon-input-group">
+                    <input
+                      type="text"
+                      placeholder="e.g. RABIORA10"
+                      value={couponInput}
+                      onChange={(e) => {
+                        setCouponInput(e.target.value.toUpperCase());
+                        setCouponError("");
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleApplyCoupon();
+                        }
+                      }}
+                      className="coupon-input"
+                    />
+                    <button
+                      type="button"
+                      className="btn coupon-apply-btn"
+                      onClick={() => handleApplyCoupon()}
+                      disabled={validateCouponMutation.isPending || !couponInput.trim()}
+                    >
+                      {validateCouponMutation.isPending ? "Applying..." : "Apply"}
+                    </button>
                   </div>
-                </div>
-              )}
-            </section>
+                )}
 
-            {error && (
-              <p className="form-error" role="alert">{error}</p>
-            )}
-
-            <button className="btn checkout-submit-btn" disabled={checkout.isPending}>
-              {checkout.isPending ? t("placingOrder") : `${t("confirmOrder")} • ${taka(grandTotal)}`}
-            </button>
-          </form>
-
-          {/* Checkout Order Summary Aside */}
-          <aside className="checkout-summary">
-            <h2>{t("orderSummary")}</h2>
-
-            <div className="checkout-summary-items">
-              {isBuyNow && buyNowProduct ? (
-                <div className="checkout-item-row">
-                  <div className="item-meta">
-                    <strong>{buyNowProduct.name}</strong>
-                    <span>Quantity: {Math.max(1, buyNowQty)}</span>
-                  </div>
-                  <strong>{taka(buyNowProduct.priceTaka * Math.max(1, buyNowQty))}</strong>
-                </div>
-              ) : (
-                cart.items.map((item) => (
-                  <div className="checkout-item-row" key={item.productId}>
-                    <div className="item-meta">
-                      <strong>{item.name}</strong>
-                      <span>{item.quantity} × {taka(item.priceTaka)}</span>
-                    </div>
-                    <strong>{taka(item.lineTotalTaka)}</strong>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Coupon / Discount Code Section */}
-            <div className="checkout-coupon-card">
-              <div className="coupon-header">
-                <Tag size={15} className="coupon-icon" />
-                <strong>Discount Coupon</strong>
+                {couponError && <p className="coupon-msg error">{couponError}</p>}
+                {couponSuccess && <p className="coupon-msg success">{couponSuccess}</p>}
               </div>
 
-              {paymentMethod === "Cash on Delivery" ? (
-                <div className="coupon-notice-cod">
-                  <small>💡 Coupons are valid exclusively for online payment methods (bKash, Nagad, Rocket).</small>
+              {/* 5. Final Pricing Calculation */}
+              <div className="checkout-calc-block">
+                <div className="checkout-line">
+                  <span>{t("subtotal")}</span>
+                  <strong>{taka(subtotal)}</strong>
                 </div>
-              ) : appliedCoupon ? (
-                <div className="coupon-applied-box">
-                  <div className="coupon-applied-info">
-                    <span className="coupon-badge">🏷️ {appliedCoupon.code}</span>
-                    <span className="coupon-save-text">-{appliedCoupon.discountPercent}% OFF ({taka(discountAmount)})</span>
+
+                {discountAmount > 0 && appliedCoupon && paymentMethod !== "Cash on Delivery" && (
+                  <div className="checkout-line coupon-discount-line">
+                    <span style={{ color: "var(--primary-bright, #20C4BA)", fontWeight: 600 }}>
+                      Discount ({appliedCoupon.code})
+                    </span>
+                    <strong style={{ color: "#22c55e" }}>-{taka(discountAmount)}</strong>
                   </div>
-                  <button
-                    type="button"
-                    className="coupon-remove-btn"
-                    onClick={handleRemoveCoupon}
-                    title="Remove coupon"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ) : (
-                <div className="coupon-input-group">
-                  <input
-                    type="text"
-                    placeholder="e.g. RABIORA10"
-                    value={couponInput}
-                    onChange={(e) => {
-                      setCouponInput(e.target.value.toUpperCase());
-                      setCouponError("");
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleApplyCoupon();
-                      }
-                    }}
-                    className="coupon-input"
-                  />
-                  <button
-                    type="button"
-                    className="btn coupon-apply-btn"
-                    onClick={() => handleApplyCoupon()}
-                    disabled={validateCouponMutation.isPending || !couponInput.trim()}
-                  >
-                    {validateCouponMutation.isPending ? "Applying..." : "Apply"}
-                  </button>
-                </div>
-              )}
+                )}
 
-              {couponError && <p className="coupon-msg error">{couponError}</p>}
-              {couponSuccess && <p className="coupon-msg success">{couponSuccess}</p>}
-            </div>
-
-            <div className="checkout-calc-block">
-              <div className="checkout-line">
-                <span>{t("subtotal")}</span>
-                <strong>{taka(subtotal)}</strong>
-              </div>
-
-              {discountAmount > 0 && appliedCoupon && paymentMethod !== "Cash on Delivery" && (
-                <div className="checkout-line coupon-discount-line">
-                  <span style={{ color: "var(--primary-dark, #0d5f57)", fontWeight: 600 }}>
-                    Discount ({appliedCoupon.code})
+                <div className="checkout-line">
+                  <span>
+                    <Truck size={14} className="inline-icon" /> {t("delivery")}
                   </span>
-                  <strong style={{ color: "#16a34a" }}>-{taka(discountAmount)}</strong>
+                  <strong>
+                    {expectedDelivery === 0 ? "Free (Dhaka City)" : taka(expectedDelivery)}
+                  </strong>
                 </div>
+
+                <div className="checkout-grand">
+                  <span>Payable Amount</span>
+                  <strong>{taka(grandTotal)}</strong>
+                </div>
+              </div>
+
+              {error && (
+                <p className="form-error" role="alert">{error}</p>
               )}
 
-              <div className="checkout-line">
-                <span>
-                  <Truck size={14} className="inline-icon" /> {t("delivery")}
-                </span>
-                <strong>
-                  {expectedDelivery === 0 ? "Free (Dhaka City)" : taka(expectedDelivery)}
-                </strong>
-              </div>
+              {/* 6. Confirm Order Submit Button */}
+              <button type="submit" className="btn checkout-submit-btn" disabled={checkout.isPending}>
+                {checkout.isPending ? t("placingOrder") : `${t("confirmOrder")} • ${taka(grandTotal)}`}
+              </button>
 
-              <div className="checkout-grand">
-                <span>Payable Amount</span>
-                <strong>{taka(grandTotal)}</strong>
-              </div>
-            </div>
-
-            <p className="order-guarantee-note">
-              🔒 100% Authentic Pakistani Three-Piece Guaranteed • 48-Hour Hassle-Free Exchange
-            </p>
-          </aside>
+              <p className="order-guarantee-note">
+                <ShieldCheck size={14} className="inline-icon" style={{ verticalAlign: "middle", display: "inline" }} /> 100% Authentic Pakistani Three-Piece Guaranteed • 48-Hour Hassle-Free Exchange
+              </p>
+            </aside>
+          </form>
         </div>
       </main>
 

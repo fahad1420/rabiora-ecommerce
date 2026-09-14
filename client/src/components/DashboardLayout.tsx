@@ -26,6 +26,7 @@ import {
   LayoutDashboard,
   LogOut,
   MailCheck,
+  Megaphone,
   MessageSquare,
   Package,
   PanelLeft,
@@ -55,6 +56,11 @@ const menuItems = [
     icon: Sparkles,
     label: "Featured Collection",
     path: "/admin/featured",
+  },
+  {
+    icon: Megaphone,
+    label: "Announcements",
+    path: "/admin/announcements",
   },
   {
     icon: Tags,

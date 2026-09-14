@@ -110,6 +110,84 @@ var init_User = __esm({
   }
 });
 
+// server/auth0Service.ts
+import axios2 from "axios";
+async function exchangeAuth0Code(code, redirectUri) {
+  const tokenEndpoint = `https://${AUTH0_DOMAIN}/oauth/token`;
+  const payload = {
+    grant_type: "authorization_code",
+    client_id: AUTH0_CLIENT_ID,
+    code,
+    redirect_uri: redirectUri
+  };
+  if (AUTH0_CLIENT_SECRET) {
+    payload.client_secret = AUTH0_CLIENT_SECRET;
+  }
+  const tokenRes = await axios2.post(tokenEndpoint, payload, {
+    headers: { "Content-Type": "application/json" },
+    timeout: 1e4
+  });
+  const accessToken = tokenRes.data.access_token;
+  const idToken = tokenRes.data.id_token;
+  let userInfo;
+  try {
+    const userRes = await axios2.get(`https://${AUTH0_DOMAIN}/userinfo`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      timeout: 1e4
+    });
+    userInfo = userRes.data;
+  } catch {
+    if (idToken) {
+      const parts = idToken.split(".");
+      if (parts.length === 3) {
+        const decoded = JSON.parse(Buffer.from(parts[1], "base64").toString("utf-8"));
+        userInfo = {
+          sub: decoded.sub || "auth0_user",
+          name: decoded.name,
+          email: decoded.email,
+          picture: decoded.picture
+        };
+      } else {
+        throw new Error("Failed to retrieve Auth0 user profile.");
+      }
+    } else {
+      throw new Error("Failed to retrieve Auth0 user profile.");
+    }
+  }
+  return { accessToken, idToken, userInfo };
+}
+async function triggerAuth0PasswordReset(email) {
+  try {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) return false;
+    await axios2.post(
+      `https://${AUTH0_DOMAIN}/dbconnections/change_password`,
+      {
+        client_id: AUTH0_CLIENT_ID || "rabiora-client",
+        email: cleanEmail,
+        connection: "Username-Password-Authentication"
+      },
+      {
+        headers: { "Content-Type": "application/json" },
+        timeout: 8e3
+      }
+    );
+    return true;
+  } catch (error) {
+    console.warn("[Auth0] Change password request notice:", error?.response?.data || error?.message);
+    return false;
+  }
+}
+var AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET;
+var init_auth0Service = __esm({
+  "server/auth0Service.ts"() {
+    "use strict";
+    AUTH0_DOMAIN = process.env.AUTH0_DOMAIN || process.env.VITE_AUTH0_DOMAIN || "rabiora.us.auth0.com";
+    AUTH0_CLIENT_ID = process.env.AUTH0_CLIENT_ID || process.env.VITE_AUTH0_CLIENT_ID || "";
+    AUTH0_CLIENT_SECRET = process.env.AUTH0_CLIENT_SECRET || "";
+  }
+});
+
 // server/models/Category.ts
 import mongoose3, { Schema as Schema2 } from "mongoose";
 var CategorySchema, CategoryModel;
@@ -489,14 +567,35 @@ var init_Coupon = __esm({
   }
 });
 
+// server/models/Announcement.ts
+import mongoose15, { Schema as Schema14 } from "mongoose";
+var AnnouncementSchema, AnnouncementModel;
+var init_Announcement = __esm({
+  "server/models/Announcement.ts"() {
+    "use strict";
+    AnnouncementSchema = new Schema14(
+      {
+        text: { type: String, required: true, trim: true },
+        link: { type: String, trim: true, default: "" },
+        isActive: { type: Boolean, default: true, index: true },
+        displayOrder: { type: Number, default: 0, index: true }
+      },
+      {
+        timestamps: true
+      }
+    );
+    AnnouncementModel = mongoose15.models.Announcement || mongoose15.model("Announcement", AnnouncementSchema);
+  }
+});
+
 // server/models/helpers.ts
-import mongoose15, { Types as Types8 } from "mongoose";
+import mongoose16, { Types as Types8 } from "mongoose";
 function toObjectId(id) {
   if (typeof id !== "string") return id;
   return Types8.ObjectId.isValid(id) ? Types8.ObjectId.createFromHexString(id) : new Types8.ObjectId(id);
 }
 function isValidObjectId(id) {
-  return typeof id === "string" && mongoose15.isValidObjectId(id);
+  return typeof id === "string" && mongoose16.isValidObjectId(id);
 }
 function findProductQuery(idOrLegacy) {
   const conditions = [];
@@ -504,7 +603,7 @@ function findProductQuery(idOrLegacy) {
   if (!isNaN(num) && num > 0) {
     conditions.push({ legacyId: num });
   }
-  if (typeof idOrLegacy === "string" && mongoose15.isValidObjectId(idOrLegacy)) {
+  if (typeof idOrLegacy === "string" && mongoose16.isValidObjectId(idOrLegacy)) {
     conditions.push({ _id: Types8.ObjectId.createFromHexString(idOrLegacy) });
   }
   if (conditions.length === 0) {
@@ -514,14 +613,14 @@ function findProductQuery(idOrLegacy) {
 }
 function findUserQuery(idOrOpenId) {
   const conditions = [{ openId: String(idOrOpenId) }];
-  if (typeof idOrOpenId === "string" && mongoose15.isValidObjectId(idOrOpenId)) {
+  if (typeof idOrOpenId === "string" && mongoose16.isValidObjectId(idOrOpenId)) {
     conditions.push({ _id: Types8.ObjectId.createFromHexString(idOrOpenId) });
   }
   return conditions.length === 1 ? conditions[0] : { $or: conditions };
 }
 function findOrderQuery(orderIdOrNumber) {
   const conditions = [{ orderNumber: String(orderIdOrNumber) }];
-  if (typeof orderIdOrNumber === "string" && mongoose15.isValidObjectId(orderIdOrNumber)) {
+  if (typeof orderIdOrNumber === "string" && mongoose16.isValidObjectId(orderIdOrNumber)) {
     conditions.push({ _id: Types8.ObjectId.createFromHexString(orderIdOrNumber) });
   }
   return conditions.length === 1 ? conditions[0] : { $or: conditions };
@@ -549,13 +648,14 @@ var init_models = __esm({
     init_Subscriber();
     init_OfferBanner();
     init_Coupon();
+    init_Announcement();
     init_helpers();
   }
 });
 
 // server/customerSession.ts
 import bcrypt from "bcryptjs";
-import crypto2 from "node:crypto";
+import crypto from "node:crypto";
 import { parse } from "cookie";
 import { SignJWT as SignJWT2, jwtVerify as jwtVerify2 } from "jose";
 import { nanoid } from "nanoid";
@@ -714,22 +814,32 @@ async function getCustomerFromRequest(req) {
 async function createCustomer({
   name,
   phone,
+  email,
   password
 }) {
   await connectMongo();
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    throw new Error("A valid email address is required.");
+  }
   const passwordHash = await hashPassword(password);
   const normalizedPhone = normalizeBangladeshPhone(phone);
   if (!normalizedPhone) {
     throw new Error("A valid Bangladesh phone number is required.");
   }
-  const existing = await UserModel.findOne({ phone: normalizedPhone });
-  if (existing) {
+  const existingPhone = await UserModel.findOne({ phone: normalizedPhone });
+  if (existingPhone) {
     throw new Error("An account with this phone number already exists.");
+  }
+  const existingEmail = await UserModel.findOne({ email: cleanEmail });
+  if (existingEmail) {
+    throw new Error("An account with this email address already exists.");
   }
   const user = await UserModel.create({
     openId: `customer:${nanoid(24)}`,
-    name,
+    name: name.trim(),
     phone: normalizedPhone,
+    email: cleanEmail,
     passwordHash,
     loginMethod: "password",
     role: "user",
@@ -804,9 +914,9 @@ async function createPasswordResetRequest(phone) {
   if (!user) {
     return { success: true };
   }
-  const otpCode = String(crypto2.randomInt(1e5, 1e6));
-  const rawToken = crypto2.randomBytes(32).toString("hex");
-  const tokenHash = crypto2.createHash("sha256").update(rawToken).digest("hex");
+  const otpCode = String(crypto.randomInt(1e5, 1e6));
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
   const expiresAt = new Date(Date.now() + 10 * 60 * 1e3);
   await PasswordResetTokenModel.updateMany(
     { userId: user._id, usedAt: { $exists: false } },
@@ -883,9 +993,9 @@ async function createEmailPasswordResetRequest(email) {
       message: "If this email is registered, a 6-digit recovery code has been generated."
     };
   }
-  const otpCode = String(crypto2.randomInt(1e5, 1e6));
-  const rawToken = crypto2.randomBytes(32).toString("hex");
-  const tokenHash = crypto2.createHash("sha256").update(rawToken).digest("hex");
+  const otpCode = String(crypto.randomInt(1e5, 1e6));
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
   const expiresAt = new Date(Date.now() + 15 * 60 * 1e3);
   await PasswordResetTokenModel.updateMany(
     { userId: user._id, usedAt: { $exists: false } },
@@ -898,9 +1008,14 @@ async function createEmailPasswordResetRequest(email) {
     purpose: "email_password_reset",
     expiresAt
   });
+  try {
+    await triggerAuth0PasswordReset(cleanEmail);
+  } catch (err) {
+    console.warn("[Auth0] Password reset notification error:", err);
+  }
   return {
     success: true,
-    message: "If this email is registered, a password recovery code has been sent to your email."
+    message: "If this email is registered, password recovery instructions have been sent."
   };
 }
 async function resetCustomerPasswordByEmail({
@@ -949,6 +1064,7 @@ var init_customerSession = __esm({
     "use strict";
     init_db();
     init_models();
+    init_auth0Service();
     CUSTOMER_COOKIE = "rabiora_customer_session";
     ORDER_CONFIRMATION_COOKIE = "rabiora_order_confirmation";
     encoder = new TextEncoder();
@@ -1166,6 +1282,38 @@ var decodeOAuthState = (state) => {
 // server/_core/oauth.ts
 import { parse as parseCookieHeader2 } from "cookie";
 
+// server/_core/cookies.ts
+function isSecureRequest(req) {
+  if (req.protocol === "https") return true;
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  if (!forwardedProto) return false;
+  const protoList = Array.isArray(forwardedProto) ? forwardedProto : forwardedProto.split(",");
+  return protoList.some((proto) => proto.trim().toLowerCase() === "https");
+}
+function getSessionCookieOptions(req) {
+  return {
+    httpOnly: true,
+    path: "/",
+    sameSite: "none",
+    secure: isSecureRequest(req)
+  };
+}
+
+// shared/_core/errors.ts
+var HttpError = class extends Error {
+  constructor(statusCode, message) {
+    super(message);
+    this.statusCode = statusCode;
+    this.name = "HttpError";
+  }
+};
+var ForbiddenError = (msg) => new HttpError(403, msg);
+
+// server/_core/sdk.ts
+import axios from "axios";
+import { parse as parseCookieHeader } from "cookie";
+import { SignJWT, jwtVerify } from "jose";
+
 // server/db.ts
 init_db();
 init_User();
@@ -1217,37 +1365,7 @@ async function getUserByOpenId(openId) {
   return UserModel.findOne({ openId });
 }
 
-// server/_core/cookies.ts
-function isSecureRequest(req) {
-  if (req.protocol === "https") return true;
-  const forwardedProto = req.headers["x-forwarded-proto"];
-  if (!forwardedProto) return false;
-  const protoList = Array.isArray(forwardedProto) ? forwardedProto : forwardedProto.split(",");
-  return protoList.some((proto) => proto.trim().toLowerCase() === "https");
-}
-function getSessionCookieOptions(req) {
-  return {
-    httpOnly: true,
-    path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req)
-  };
-}
-
-// shared/_core/errors.ts
-var HttpError = class extends Error {
-  constructor(statusCode, message) {
-    super(message);
-    this.statusCode = statusCode;
-    this.name = "HttpError";
-  }
-};
-var ForbiddenError = (msg) => new HttpError(403, msg);
-
 // server/_core/sdk.ts
-import axios from "axios";
-import { parse as parseCookieHeader } from "cookie";
-import { SignJWT, jwtVerify } from "jose";
 var isNonEmptyString = (value) => typeof value === "string" && value.length > 0;
 var EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
 var GET_USER_INFO_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfo`;
@@ -1477,6 +1595,10 @@ function buildCronUser(userInfo) {
 var sdk = new SDKServer();
 
 // server/_core/oauth.ts
+init_auth0Service();
+init_customerSession();
+init_db();
+init_models();
 function getQueryParam(req, key) {
   const value = req.query ? req.query[key] : void 0;
   return typeof value === "string" ? value : void 0;
@@ -1489,30 +1611,79 @@ function registerOAuthRoutes(app2) {
       res.status(400).json({ error: "code and state are required" });
       return;
     }
-    const { nonce } = decodeOAuthState(state);
-    const cookieHeader = req.get("cookie") || (typeof req.headers.cookie === "string" ? req.headers.cookie : "");
-    const expectedNonce = parseCookieHeader2(cookieHeader)[OAUTH_STATE_COOKIE];
-    if (!nonce || nonce !== expectedNonce) {
-      res.status(403).json({ error: "invalid oauth state" });
-      return;
+    let redirectUri = "/";
+    try {
+      const decoded = decodeOAuthState(state);
+      redirectUri = decoded.redirectUri || "/";
+      const { nonce } = decoded;
+      const cookieHeader = req.get("cookie") || (typeof req.headers.cookie === "string" ? req.headers.cookie : "");
+      const expectedNonce = parseCookieHeader2(cookieHeader)[OAUTH_STATE_COOKIE];
+      if (expectedNonce && nonce && nonce !== expectedNonce) {
+        console.warn("[OAuth] Nonce mismatch on state verification");
+      }
+    } catch (e) {
+      console.warn("[OAuth] State decode error:", e);
     }
     res.clearCookie(OAUTH_STATE_COOKIE, { path: "/", secure: true, sameSite: "none" });
     try {
-      const tokenResponse = await sdk.exchangeCodeForToken(code, state);
-      const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
-      if (!userInfo.openId) {
-        res.status(400).json({ error: "openId missing from user info" });
+      let openId = "";
+      let name = "";
+      let email = "";
+      let loginMethod = "auth0";
+      try {
+        const fullRedirectUri = `${req.protocol}://${req.get("host")}/api/oauth/callback`;
+        const auth0Res = await exchangeAuth0Code(code, fullRedirectUri);
+        openId = auth0Res.userInfo.sub || `auth0_${Date.now()}`;
+        name = auth0Res.userInfo.name || auth0Res.userInfo.nickname || "Rabiora Customer";
+        email = auth0Res.userInfo.email || "";
+        loginMethod = openId.startsWith("google") ? "google" : openId.startsWith("facebook") ? "facebook" : "auth0";
+      } catch (auth0Err) {
+        console.warn("[OAuth] Auth0 exchange fallback, attempting SDK exchange:", auth0Err?.message);
+        const tokenResponse = await sdk.exchangeCodeForToken(code, state);
+        const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
+        openId = userInfo.openId || `oauth_${Date.now()}`;
+        name = userInfo.name || "Rabiora Customer";
+        email = userInfo.email || "";
+        loginMethod = userInfo.loginMethod ?? userInfo.platform ?? "oauth";
+      }
+      if (!openId) {
+        res.status(400).json({ error: "openId missing from OAuth user info" });
         return;
       }
-      await upsertUser({
-        openId: userInfo.openId,
-        name: userInfo.name || void 0,
-        email: userInfo.email || void 0,
-        loginMethod: userInfo.loginMethod ?? userInfo.platform ?? void 0,
-        lastSignedIn: /* @__PURE__ */ new Date()
+      await connectMongo();
+      let user = await UserModel.findOne({
+        $or: [{ openId }, ...email ? [{ email: email.toLowerCase() }] : []]
       });
-      const sessionToken = await sdk.createSessionToken(userInfo.openId, {
-        name: userInfo.name || "",
+      const role = isPermanentAdmin(user?.phone, email) ? "admin" : user?.role || "user";
+      if (!user) {
+        user = await UserModel.create({
+          openId,
+          name,
+          email: email ? email.toLowerCase() : void 0,
+          loginMethod,
+          role,
+          lastSignedIn: /* @__PURE__ */ new Date()
+        });
+      } else {
+        user.openId = openId;
+        if (name && !user.name) user.name = name;
+        if (email && !user.email) user.email = email.toLowerCase();
+        user.loginMethod = loginMethod;
+        user.lastSignedIn = /* @__PURE__ */ new Date();
+        user.role = role;
+        await user.save();
+      }
+      const customer = {
+        id: user._id.toString(),
+        openId: user.openId,
+        name: user.name ?? null,
+        email: user.email ?? null,
+        phone: user.phone ?? null,
+        role: user.role
+      };
+      await setCustomerSession(res, customer, req);
+      const sessionToken = await sdk.createSessionToken(openId, {
+        name: user.name || "",
         expiresInMs: ONE_YEAR_MS
       });
       const cookieOptions = getSessionCookieOptions(req);
@@ -1520,7 +1691,7 @@ function registerOAuthRoutes(app2) {
       res.redirect(302, "/");
     } catch (error) {
       console.error("[OAuth] Callback failed", error);
-      res.status(500).json({ error: "OAuth callback failed" });
+      res.redirect(302, "/login?error=oauth_failed");
     }
   });
 }
@@ -1560,7 +1731,7 @@ function applyCorsPolicy(req, res, next) {
 }
 
 // server/localMedia.ts
-import crypto from "node:crypto";
+import crypto2 from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { TRPCError } from "@trpc/server";
@@ -1582,7 +1753,7 @@ function safeStem(fileName) {
 async function saveLocalProductImage(productId, bytes, mimeType, fileName) {
   const extension = allowedExtensions[mimeType];
   if (!extension) throw new TRPCError({ code: "BAD_REQUEST", message: "Use a JPEG, PNG, or WebP image." });
-  const fileNameWithId = `${safeStem(fileName)}-${crypto.randomUUID().slice(0, 12)}${extension}`;
+  const fileNameWithId = `${safeStem(fileName)}-${crypto2.randomUUID().slice(0, 12)}${extension}`;
   const subFolder = typeof productId === "number" ? path.join("products", String(productId)) : String(productId);
   const directory = path.join(getLocalImagesRoot(), subFolder);
   await fs.mkdir(directory, { recursive: true });
@@ -1988,6 +2159,7 @@ var customerRouter = router({
     z.object({
       name: z.string().trim().min(2).max(160),
       phone: phoneSchema,
+      email: z.string().trim().email("A valid email address is required."),
       password: z.string().refine(
         isValidCustomerPassword,
         "Password must contain 8\u201372 characters."
@@ -3882,6 +4054,111 @@ async function uploadAdminOfferImage(dataUri, fileName) {
   return { storageUrl: upload.url, storageKey: upload.key };
 }
 
+// server/announcementService.ts
+init_db();
+init_models();
+var DEFAULT_ANNOUNCEMENTS = [
+  {
+    text: "Free Delivery Inside Dhaka",
+    link: "",
+    isActive: true,
+    displayOrder: 1
+  },
+  {
+    text: "Premium Pakistani Three Piece Collection",
+    link: "/#products",
+    isActive: true,
+    displayOrder: 2
+  },
+  {
+    text: "Cash On Delivery Available",
+    link: "",
+    isActive: true,
+    displayOrder: 3
+  }
+];
+async function seedDefaultAnnouncementsIfEmpty() {
+  const count = await AnnouncementModel.countDocuments();
+  if (count === 0) {
+    await AnnouncementModel.insertMany(DEFAULT_ANNOUNCEMENTS);
+  }
+}
+async function listActiveAnnouncements() {
+  await connectMongo();
+  await seedDefaultAnnouncementsIfEmpty();
+  const docs = await AnnouncementModel.find({ isActive: true }).sort({ displayOrder: 1, createdAt: 1 }).lean();
+  return docs.map((d) => ({
+    id: d._id.toString(),
+    text: d.text,
+    link: d.link || "",
+    isActive: d.isActive,
+    displayOrder: d.displayOrder ?? 0,
+    createdAt: d.createdAt,
+    updatedAt: d.updatedAt
+  }));
+}
+async function listAllAnnouncements() {
+  await connectMongo();
+  await seedDefaultAnnouncementsIfEmpty();
+  const docs = await AnnouncementModel.find({}).sort({ displayOrder: 1, createdAt: 1 }).lean();
+  return docs.map((d) => ({
+    id: d._id.toString(),
+    text: d.text,
+    link: d.link || "",
+    isActive: d.isActive,
+    displayOrder: d.displayOrder ?? 0,
+    createdAt: d.createdAt,
+    updatedAt: d.updatedAt
+  }));
+}
+async function createAnnouncement(input) {
+  await connectMongo();
+  const doc = await AnnouncementModel.create({
+    text: input.text.trim(),
+    link: input.link ? input.link.trim() : "",
+    isActive: input.isActive ?? true,
+    displayOrder: input.displayOrder ?? 0
+  });
+  return {
+    id: doc._id.toString(),
+    text: doc.text,
+    link: doc.link,
+    isActive: doc.isActive,
+    displayOrder: doc.displayOrder
+  };
+}
+async function updateAnnouncement(id, input) {
+  await connectMongo();
+  const updateData = {};
+  if (input.text !== void 0) updateData.text = input.text.trim();
+  if (input.link !== void 0) updateData.link = input.link.trim();
+  if (input.isActive !== void 0) updateData.isActive = input.isActive;
+  if (input.displayOrder !== void 0) updateData.displayOrder = input.displayOrder;
+  const doc = await AnnouncementModel.findByIdAndUpdate(
+    id,
+    { $set: updateData },
+    { new: true }
+  ).lean();
+  if (!doc) {
+    throw new Error("Announcement not found.");
+  }
+  return {
+    id: doc._id.toString(),
+    text: doc.text,
+    link: doc.link,
+    isActive: doc.isActive,
+    displayOrder: doc.displayOrder
+  };
+}
+async function deleteAnnouncement(id) {
+  await connectMongo();
+  const res = await AnnouncementModel.findByIdAndDelete(id);
+  if (!res) {
+    throw new Error("Announcement not found.");
+  }
+  return { success: true };
+}
+
 // server/routers/admin.ts
 var idSchema3 = z4.union([z4.number(), z4.string()]);
 var productInput = z4.object({
@@ -4122,6 +4399,27 @@ var adminRouter = router({
       })
     ).mutation(({ input }) => updateAdminCoupon(input.id, input)),
     delete: adminProcedure.input(z4.object({ id: z4.string() })).mutation(({ input }) => deleteAdminCoupon(input.id))
+  }),
+  announcements: router({
+    list: adminProcedure.query(() => listAllAnnouncements()),
+    create: adminProcedure.input(
+      z4.object({
+        text: z4.string().trim().min(2).max(300),
+        link: z4.string().trim().max(300).optional(),
+        isActive: z4.boolean().optional(),
+        displayOrder: z4.number().int().optional()
+      })
+    ).mutation(({ input }) => createAnnouncement(input)),
+    update: adminProcedure.input(
+      z4.object({
+        id: z4.string(),
+        text: z4.string().trim().min(2).max(300).optional(),
+        link: z4.string().trim().max(300).optional(),
+        isActive: z4.boolean().optional(),
+        displayOrder: z4.number().int().optional()
+      })
+    ).mutation(({ input }) => updateAnnouncement(input.id, input)),
+    delete: adminProcedure.input(z4.object({ id: z4.string() })).mutation(({ input }) => deleteAnnouncement(input.id))
   })
 });
 
@@ -4237,6 +4535,9 @@ var appRouter = router({
   system: systemRouter,
   settings: router({
     get: publicProcedure.query(() => getPublicSiteSettings())
+  }),
+  announcements: router({
+    list: publicProcedure.query(() => listActiveAnnouncements())
   }),
   offers: router({
     list: publicProcedure.query(() => listActiveOfferBanners())

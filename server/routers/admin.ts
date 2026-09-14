@@ -43,6 +43,13 @@ import {
   deleteAdminCoupon,
 } from "../couponService";
 
+import {
+  listAllAnnouncements,
+  createAnnouncement,
+  updateAnnouncement,
+  deleteAnnouncement,
+} from "../announcementService";
+
 const idSchema = z.union([z.number(), z.string()]);
 
 const productInput = z.object({
@@ -356,5 +363,33 @@ export const adminRouter = router({
     delete: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(({ input }) => deleteAdminCoupon(input.id)),
+  }),
+
+  announcements: router({
+    list: adminProcedure.query(() => listAllAnnouncements()),
+    create: adminProcedure
+      .input(
+        z.object({
+          text: z.string().trim().min(2).max(300),
+          link: z.string().trim().max(300).optional(),
+          isActive: z.boolean().optional(),
+          displayOrder: z.number().int().optional(),
+        })
+      )
+      .mutation(({ input }) => createAnnouncement(input)),
+    update: adminProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          text: z.string().trim().min(2).max(300).optional(),
+          link: z.string().trim().max(300).optional(),
+          isActive: z.boolean().optional(),
+          displayOrder: z.number().int().optional(),
+        })
+      )
+      .mutation(({ input }) => updateAnnouncement(input.id, input)),
+    delete: adminProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(({ input }) => deleteAnnouncement(input.id)),
   }),
 });

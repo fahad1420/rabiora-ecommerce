@@ -59,10 +59,11 @@ export function AuthPage({
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [resetIdentifier, setResetIdentifier] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
   const [resetStep, setResetStep] = useState<ResetStep>("request");
   const [otpCode, setOtpCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -74,15 +75,11 @@ export function AuthPage({
   const register = trpc.customer.register.useMutation();
   const login = trpc.customer.login.useMutation();
 
-  const requestPasswordReset = trpc.customer.requestPasswordReset.useMutation();
   const requestEmailPasswordReset = trpc.customer.requestEmailPasswordReset.useMutation();
-  const resetPassword = trpc.customer.resetPassword.useMutation();
   const resetPasswordByEmail = trpc.customer.resetPasswordByEmail.useMutation();
 
   const mergeGuestWishlist = trpc.wishlist.mergeGuest.useMutation();
   const utils = trpc.useUtils();
-
-  const isEmailIdentifier = (val: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -91,9 +88,15 @@ export function AuthPage({
     try {
       let result;
       if (mode === "register") {
+        if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+          setError("A valid email address is required to register.");
+          return;
+        }
+
         result = await register.mutateAsync({
           name,
           phone,
+          email: email.trim().toLowerCase(),
           password,
           anonymousToken: getGuestCartToken(),
         });
@@ -145,31 +148,23 @@ export function AuthPage({
     setResetError("");
     setResetMessage("");
 
-    const target = (resetIdentifier || phone).trim();
-    if (!target) {
-      setResetError("Please enter your registered email address.");
+    const targetEmail = resetEmail.trim().toLowerCase();
+    if (!targetEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(targetEmail)) {
+      setResetError("Please enter a valid registered email address.");
       return;
     }
 
     try {
-      if (isEmailIdentifier(target)) {
-        const result = await requestEmailPasswordReset.mutateAsync({
-          email: target,
-        });
-        setResetStep("verify");
-        setResetMessage(result.message || "A 6-digit recovery code has been sent to your email.");
-      } else {
-        const result = await requestPasswordReset.mutateAsync({
-          phone: target,
-        });
-        setResetStep("verify");
-        setResetMessage(result.message || "If an account exists for this number, a verification code has been sent.");
-      }
+      const result = await requestEmailPasswordReset.mutateAsync({
+        email: targetEmail,
+      });
+      setResetStep("verify");
+      setResetMessage(result.message || "Password recovery instructions and code have been sent to your email.");
     } catch (cause) {
       setResetError(
         cause instanceof Error
           ? cause.message
-          : "Unable to request password reset.",
+          : "Unable to request password recovery.",
       );
     }
   };
@@ -185,24 +180,15 @@ export function AuthPage({
       return;
     }
 
-    const target = (resetIdentifier || phone).trim();
+    const targetEmail = resetEmail.trim().toLowerCase();
 
     try {
-      if (isEmailIdentifier(target)) {
-        const res = await resetPasswordByEmail.mutateAsync({
-          email: target,
-          otpCode: otpCode.trim(),
-          newPassword,
-        });
-        setResetMessage(res.message || "Password reset successfully. You can now log in.");
-      } else {
-        await resetPassword.mutateAsync({
-          phone: target,
-          otpCode: otpCode.trim(),
-          newPassword,
-        });
-        setResetMessage("Password reset successfully. You can now log in with your new password.");
-      }
+      const res = await resetPasswordByEmail.mutateAsync({
+        email: targetEmail,
+        otpCode: otpCode.trim(),
+        newPassword,
+      });
+      setResetMessage(res.message || "Password reset successfully. You can now log in.");
 
       setPassword("");
       setOtpCode("");
@@ -217,16 +203,13 @@ export function AuthPage({
       setResetError(
         cause instanceof Error
           ? cause.message
-          : "Unable to reset password. Please check your verification code.",
+          : "Unable to reset password. Please verify your 6-digit recovery code.",
       );
     }
   };
-
   const pending = register.isPending || login.isPending;
   const resetPending =
-    requestPasswordReset.isPending ||
     requestEmailPasswordReset.isPending ||
-    resetPassword.isPending ||
     resetPasswordByEmail.isPending;
 
   return (
@@ -269,25 +252,22 @@ export function AuthPage({
 
             <p className="auth-subtitle">
               {resetStep === "request"
-                ? "Enter your registered email address or phone number to receive your secure 6-digit recovery code."
+                ? "Enter your registered email address to receive password recovery instructions and a secure 6-digit recovery code."
                 : "Enter the 6-digit verification code sent to your email and create a new secure password."}
             </p>
 
             <div className="auth-fields-group">
               <label className="auth-field-label">
-                <span>Email Address or Phone Number</span>
+                <span>Registered Email Address</span>
                 <div className="auth-input-wrapper">
                   <Mail size={16} className="auth-input-icon" />
                   <input
                     required
-                    type="text"
-                    placeholder="name@example.com or 01XXXXXXXXX"
-                    value={resetIdentifier || phone}
+                    type="email"
+                    placeholder="name@example.com"
+                    value={resetEmail}
                     disabled={resetStep === "verify"}
-                    onChange={(event) => {
-                      setResetIdentifier(event.target.value);
-                      setPhone(event.target.value);
-                    }}
+                    onChange={(event) => setResetEmail(event.target.value)}
                   />
                 </div>
               </label>
@@ -385,7 +365,7 @@ export function AuthPage({
                     setNewPassword("");
                   }}
                 >
-                  Change Email / Phone
+                  Change Email
                 </button>
               </div>
             )}
@@ -468,6 +448,24 @@ export function AuthPage({
                       value={name}
                       onChange={(event) =>
                         setName(event.target.value)
+                      }
+                    />
+                  </div>
+                </label>
+              )}
+
+              {mode === "register" && (
+                <label className="auth-field-label">
+                  <span>Email Address <small style={{ color: "var(--accent)" }}>(Required)</small></span>
+                  <div className="auth-input-wrapper">
+                    <Mail size={16} className="auth-input-icon" />
+                    <input
+                      required
+                      type="email"
+                      placeholder="name@example.com"
+                      value={email}
+                      onChange={(event) =>
+                        setEmail(event.target.value)
                       }
                     />
                   </div>

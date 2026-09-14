@@ -6,6 +6,7 @@ import { nanoid } from "nanoid";
 import type { Request, Response } from "express";
 import { connectMongo } from "./config/db";
 import { UserModel, PasswordResetTokenModel, findUserQuery } from "./models";
+import { triggerAuth0PasswordReset } from "./auth0Service";
 
 const CUSTOMER_COOKIE = "rabiora_customer_session";
 const ORDER_CONFIRMATION_COOKIE = "rabiora_order_confirmation";
@@ -259,13 +260,20 @@ export async function getCustomerFromRequest(
 export async function createCustomer({
   name,
   phone,
+  email,
   password,
 }: {
   name: string;
   phone: string;
+  email: string;
   password: string;
 }) {
   await connectMongo();
+
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    throw new Error("A valid email address is required.");
+  }
 
   const passwordHash = await hashPassword(password);
   const normalizedPhone = normalizeBangladeshPhone(phone);
@@ -274,15 +282,21 @@ export async function createCustomer({
     throw new Error("A valid Bangladesh phone number is required.");
   }
 
-  const existing = await UserModel.findOne({ phone: normalizedPhone });
-  if (existing) {
+  const existingPhone = await UserModel.findOne({ phone: normalizedPhone });
+  if (existingPhone) {
     throw new Error("An account with this phone number already exists.");
+  }
+
+  const existingEmail = await UserModel.findOne({ email: cleanEmail });
+  if (existingEmail) {
+    throw new Error("An account with this email address already exists.");
   }
 
   const user = await UserModel.create({
     openId: `customer:${nanoid(24)}`,
-    name,
+    name: name.trim(),
     phone: normalizedPhone,
+    email: cleanEmail,
     passwordHash,
     loginMethod: "password",
     role: "user",
@@ -507,9 +521,16 @@ export async function createEmailPasswordResetRequest(email: string) {
     expiresAt,
   });
 
+  // Also trigger Auth0 password reset email via Auth0 API
+  try {
+    await triggerAuth0PasswordReset(cleanEmail);
+  } catch (err) {
+    console.warn("[Auth0] Password reset notification error:", err);
+  }
+
   return {
     success: true as const,
-    message: "If this email is registered, a password recovery code has been sent to your email.",
+    message: "If this email is registered, password recovery instructions have been sent.",
   };
 }
 

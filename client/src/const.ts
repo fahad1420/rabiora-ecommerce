@@ -13,6 +13,8 @@ export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 // with "invalid oauth state". It returns void by design, so there is no URL to
 // stash across renders.
 export const startLogin = (options?: { connection?: "google" | "facebook" }) => {
+  const auth0Domain = import.meta.env.VITE_AUTH0_DOMAIN || "rabiora.us.auth0.com";
+  const auth0ClientId = import.meta.env.VITE_AUTH0_CLIENT_ID || "rabiora-app-client";
   const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL || "";
   const appId = import.meta.env.VITE_APP_ID || "";
   const redirectUri = `${window.location.origin}/api/oauth/callback`;
@@ -21,22 +23,8 @@ export const startLogin = (options?: { connection?: "google" | "facebook" }) => 
   document.cookie = `${OAUTH_STATE_COOKIE}=${nonce}; Path=/; Max-Age=600; SameSite=None; Secure`;
   const state = encodeOAuthState({ redirectUri, nonce });
 
-  if (oauthPortalUrl && appId) {
-    const url = new URL(`${oauthPortalUrl}/app-auth`);
-    url.searchParams.set("appId", appId);
-    url.searchParams.set("redirectUri", redirectUri);
-    url.searchParams.set("state", state);
-    url.searchParams.set("type", "signIn");
-    if (options?.connection) {
-      url.searchParams.set("connection", options.connection === "google" ? "google-oauth2" : "facebook");
-    }
-    window.location.href = url.toString();
-    return;
-  }
-
-  const auth0Domain = import.meta.env.VITE_AUTH0_DOMAIN;
-  const auth0ClientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
-  if (auth0Domain && auth0ClientId) {
+  // Priority 1: Auth0 Direct Connection
+  if (auth0Domain) {
     const auth0Url = new URL(`https://${auth0Domain}/authorize`);
     auth0Url.searchParams.set("client_id", auth0ClientId);
     auth0Url.searchParams.set("response_type", "code");
@@ -50,11 +38,18 @@ export const startLogin = (options?: { connection?: "google" | "facebook" }) => 
     return;
   }
 
-  if (oauthPortalUrl) {
+  // Priority 2: Manus OAuth Portal (fallback if configured)
+  if (oauthPortalUrl && appId) {
     const url = new URL(`${oauthPortalUrl}/app-auth`);
+    url.searchParams.set("appId", appId);
     url.searchParams.set("redirectUri", redirectUri);
     url.searchParams.set("state", state);
+    url.searchParams.set("type", "signIn");
+    if (options?.connection) {
+      url.searchParams.set("connection", options.connection === "google" ? "google-oauth2" : "facebook");
+    }
     window.location.href = url.toString();
+    return;
   }
 };
 
