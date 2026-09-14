@@ -4847,4 +4847,496 @@ img { display: block; max-width: 100%; }
   }
 }
 
+/* ============================================================
+   ADMIN COMPONENT OVERHAUL & MOBILE RESPONSIVE CARDS
+   ============================================================ */
+
+/* 1. Global Admin Typography & Contrast */
+.admin-stack,
+.admin-card,
+.admin-list-card,
+.admin-form {
+  color: #F5F7F7 !important;
+}
+
+.admin-field label,
+.admin-form label {
+  color: #C5D1D0 !important;
+  font-weight: 500 !important;
+  font-size: 13.5px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  margin-bottom: 12px !important;
+}
+
+.admin-input,
+.admin-form input,
+.admin-form textarea,
+.admin-form select {
+  background: #0A1617 !important;
+  color: #F5F7F7 !important;
+  border: 1px solid #244746 !important;
+  border-radius: 10px !important;
+  padding: 10px 14px !important;
+  font-size: 14px !important;
+}
+
+.admin-input:focus,
+.admin-form input:focus,
+.admin-form textarea:focus,
+.admin-form select:focus {
+  border-color: #18A89E !important;
+  box-shadow: 0 0 0 2px rgba(24, 168, 158, 0.25) !important;
+  outline: none !important;
+}
+
+.admin-loading-text {
+  color: #C5D1D0 !important;
+  padding: 16px 0 !important;
+}
+
+.admin-empty-text {
+  color: #8E9C9B !important;
+  padding: 24px 0 !important;
+  text-align: center !important;
+}
+
+.admin-detail-label {
+  color: #8E9C9B !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+}
+
+.admin-detail-value {
+  color: #F5F7F7 !important;
+  font-size: 13.5px !important;
+}
+
+.admin-break-all {
+  word-break: break-all !important;
+  overflow-wrap: anywhere !important;
+}
+
+/* Button variants */
+.btn-gold-action {
+  background: #C9A96E !important;
+  color: #0D1B1C !important;
+  font-weight: 600 !important;
+  border: none !important;
+}
+
+.btn-gold-action:hover {
+  background: #D8B97E !important;
+}
+
+.btn-danger-action {
+  background: #DC2626 !important;
+  color: #FFFFFF !important;
+  font-weight: 600 !important;
+  border: none !important;
+}
+
+.btn-danger-action:hover {
+  background: #EF4444 !important;
+}
+
+/* 2. Featured Collection Layout */
+.admin-featured-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-featured-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: #0A1617;
+  border: 1px solid #1B3837;
+  border-radius: 12px;
+  transition: border-color 0.2s ease;
+}
+
+.admin-featured-card.is-featured {
+  border-left: 4px solid #C9A96E;
+  background: #0E2223;
+}
+
+.admin-featured-card-body {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.admin-featured-thumb {
+  width: 64px;
+  height: 76px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #132B2C;
+  flex-shrink: 0;
+}
+
+.admin-featured-thumb-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8E9C9B;
+  font-size: 11px;
+}
+
+.admin-featured-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-featured-header-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-featured-product-name {
+  color: #FFFFFF !important;
+  font-size: 14.5px !important;
+  font-weight: 600 !important;
+  margin: 0 !important;
+  word-break: break-word !important;
+}
+
+.badge-featured {
+  background: #C9A96E !important;
+  color: #0D1B1C !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  padding: 2px 8px !important;
+  border-radius: 999px !important;
+}
+
+.badge-standard {
+  background: #1B3837 !important;
+  color: #8E9C9B !important;
+  font-size: 11px !important;
+  padding: 2px 8px !important;
+  border-radius: 999px !important;
+}
+
+.admin-featured-details-line {
+  color: #C5D1D0 !important;
+  font-size: 13px !important;
+  margin: 2px 0 0 0 !important;
+  word-break: break-word !important;
+}
+
+.admin-featured-cat {
+  color: #4FD1C5 !important;
+  font-weight: 500 !important;
+}
+
+.admin-featured-price {
+  color: #C9A96E !important;
+  font-weight: 600 !important;
+}
+
+.admin-featured-actions {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #1B3837;
+  padding-top: 10px;
+}
+
+@media (max-width: 640px) {
+  .admin-featured-card-body {
+    flex-direction: column;
+  }
+  .admin-featured-thumb {
+    width: 100%;
+    height: 140px;
+  }
+  .admin-featured-actions button {
+    width: 100%;
+  }
+}
+
+/* 3. Categories Layout */
+.admin-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-category-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #0A1617;
+  border: 1px solid #1B3837;
+  border-radius: 10px;
+}
+
+.admin-category-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-category-title {
+  color: #FFFFFF !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  margin: 0 !important;
+}
+
+.admin-category-slug {
+  color: #4FD1C5 !important;
+  font-size: 12.5px !important;
+  margin: 2px 0 0 0 !important;
+}
+
+.admin-category-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .admin-category-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .admin-category-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* 4. Customer Cards (Mobile) vs Table (Desktop) */
+.admin-customer-cards-mobile {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-customer-mobile-card {
+  background: #0A1617;
+  border: 1px solid #1B3837;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-customer-mobile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  border-bottom: 1px solid #1B3837;
+  padding-bottom: 8px;
+}
+
+.admin-customer-mobile-id {
+  font-size: 11px;
+  color: #8E9C9B;
+  display: block;
+}
+
+.admin-customer-mobile-name {
+  color: #FFFFFF !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  margin: 0 !important;
+}
+
+.admin-customer-mobile-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-customer-mobile-actions {
+  margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+  .admin-customer-table-desktop {
+    display: none !important;
+  }
+  .admin-customer-cards-mobile {
+    display: flex !important;
+  }
+}
+
+/* 5. Offer Banners Layout */
+.admin-offer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-offer-card {
+  background: #0A1617;
+  border: 1px solid #1B3837;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-offer-card-top {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.admin-offer-img {
+  width: 70px;
+  height: 64px;
+  object-fit: contain;
+  background: #132B2C;
+  border-radius: 8px;
+  flex-shrink: 0;
+  padding: 2px;
+}
+
+.admin-offer-placeholder {
+  width: 70px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #132B2C;
+  border-radius: 8px;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.admin-offer-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-offer-title {
+  color: #FFFFFF !important;
+  font-size: 14.5px !important;
+  font-weight: 600 !important;
+  margin: 0 !important;
+  word-break: break-word !important;
+}
+
+.admin-offer-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.admin-offer-subtitle {
+  color: #C5D1D0 !important;
+  font-size: 12.5px !important;
+  margin: 2px 0 0 0 !important;
+}
+
+.admin-offer-meta {
+  color: #8E9C9B !important;
+  font-size: 11.5px !important;
+  margin: 2px 0 0 0 !important;
+}
+
+.admin-offer-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  border-top: 1px solid #1B3837;
+  padding-top: 10px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 480px) {
+  .admin-offer-card-top {
+    flex-direction: column;
+  }
+  .admin-offer-img,
+  .admin-offer-placeholder {
+    width: 100%;
+    height: 90px;
+  }
+  .admin-offer-actions button {
+    flex: 1;
+  }
+}
+
+/* 6. Subscriber Cards Layout */
+.admin-subscriber-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-subscriber-card {
+  background: #0A1617;
+  border: 1px solid #1B3837;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-subscriber-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-subscriber-email-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-subscriber-email {
+  color: #FFFFFF !important;
+  font-size: 14px !important;
+}
+
+.admin-subscriber-date {
+  color: #8E9C9B !important;
+  font-size: 11.5px !important;
+}
+
+.admin-subscriber-phone {
+  color: #C5D1D0 !important;
+  font-size: 13px !important;
+  margin: 0 !important;
+}
+
+.admin-subscriber-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 

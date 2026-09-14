@@ -28,6 +28,14 @@ export function MobileNavbar() {
           {/* Home */}
           <Link
             href="/"
+            onClick={(e) => {
+              if (location === "/") {
+                e.preventDefault();
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              } else {
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }
+            }}
             className={`mobile-nav-item ${location === "/" ? "active" : ""}`}
             aria-label="Home"
           >

@@ -726,25 +726,24 @@ function CategoryManager() {
         <section className="admin-card">
           <h3>Existing Categories ({categories.data?.length || 0})</h3>
           {categories.isLoading ? (
-            <p>Loading categories...</p>
+            <p className="admin-loading-text">Loading categories...</p>
           ) : categories.data?.length === 0 ? (
-            <p>No categories found.</p>
+            <p className="admin-empty-text">No categories found.</p>
           ) : (
-            <div className="admin-product-list">
+            <div className="admin-category-list">
               {categories.data?.map((cat) => (
-                <article key={cat.id} className="admin-product-item">
-                  <div className="admin-product-item-details">
-                    <h4>{cat.name}</h4>
-                    <p className="slug">/{cat.slug}</p>
+                <article key={cat.id} className="admin-category-card">
+                  <div className="admin-category-info">
+                    <h4 className="admin-category-title">{cat.name}</h4>
+                    <p className="admin-category-slug">/{cat.slug}</p>
                   </div>
-                  <div className="admin-product-item-actions">
-                    <button type="button" className="btn btn-secondary" onClick={() => startEdit(cat)}>
+                  <div className="admin-category-actions">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => startEdit(cat)}>
                       Edit
                     </button>
                     <button
                       type="button"
-                      className="btn"
-                      style={{ background: "#dc2626", color: "#fff" }}
+                      className="btn btn-danger-action btn-sm"
                       disabled={remove.isPending}
                       onClick={() => {
                         if (window.confirm(`Delete category "${cat.name}"? Products will be reassigned.`)) {
@@ -1174,72 +1173,47 @@ function CustomerManager() {
 
       <section className="admin-list-card">
         {customers.isLoading ? (
-          <p>Loading customers...</p>
+          <p className="admin-loading-text">Loading customers...</p>
         ) : customers.data?.length === 0 ? (
-          <p>No customers found.</p>
+          <p className="admin-empty-text">No customers found.</p>
         ) : (
-          <div className="admin-customer-table-wrap">
-            <table className="admin-customer-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Phone</th>
-                  <th>Role</th>
-                  <th>Created</th>
-                  <th>Total Orders</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
+          <>
+            {/* Desktop Table View */}
+            <div className="admin-customer-table-desktop admin-customer-table-wrap">
+              <table className="admin-customer-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Role</th>
+                    <th>Created</th>
+                    <th>Total Orders</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
 
-              <tbody>
-                {customers.data?.map(
-                  (customer) => (
+                <tbody>
+                  {customers.data?.map((customer) => (
                     <tr key={customer.id}>
-                      <td>
-                        #{customer.id}
-                      </td>
-
-                      <td>
-                        {customer.name ||
-                          "Unnamed"}
-                      </td>
-
-                      <td>
-                        {customer.email || "—"}
-                      </td>
-
-                      <td>
-                        {customer.phone || "—"}
-                      </td>
-
+                      <td className="admin-cell-id">#{customer.id}</td>
+                      <td className="admin-cell-name"><strong>{customer.name || "Unnamed"}</strong></td>
+                      <td className="admin-cell-email">{customer.email || "—"}</td>
+                      <td className="admin-cell-phone">{customer.phone || "—"}</td>
                       <td>
                         <span
                           className={`status-pill ${
-                            customer.role ===
-                            "admin"
+                            customer.role === "admin"
                               ? "status-confirmed"
                               : "status-pending"
                           }`}
                         >
-                          {customer.role ===
-                          "admin"
-                            ? "Admin"
-                            : "Customer"}
+                          {customer.role === "admin" ? "Admin" : "Customer"}
                         </span>
                       </td>
-
-                      <td>
-                        {formatDate(
-                          customer.createdAt,
-                        )}
-                      </td>
-
-                      <td>
-                        {customer.totalOrders}
-                      </td>
-
+                      <td>{formatDate(customer.createdAt)}</td>
+                      <td><strong>{customer.totalOrders}</strong></td>
                       <td>
                         <Link
                           className="btn btn-small"
@@ -1249,11 +1223,62 @@ function CustomerManager() {
                         </Link>
                       </td>
                     </tr>
-                  ),
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards View */}
+            <div className="admin-customer-cards-mobile">
+              {customers.data?.map((customer) => (
+                <article key={customer.id} className="admin-customer-mobile-card">
+                  <div className="admin-customer-mobile-header">
+                    <div>
+                      <span className="admin-customer-mobile-id">#{customer.id}</span>
+                      <h4 className="admin-customer-mobile-name">{customer.name || "Unnamed"}</h4>
+                    </div>
+                    <span
+                      className={`status-pill ${
+                        customer.role === "admin"
+                          ? "status-confirmed"
+                          : "status-pending"
+                      }`}
+                    >
+                      {customer.role === "admin" ? "Admin" : "Customer"}
+                    </span>
+                  </div>
+
+                  <div className="admin-customer-mobile-details">
+                    <div className="admin-detail-row">
+                      <span className="admin-detail-label">Email:</span>
+                      <span className="admin-detail-value admin-break-all">{customer.email || "—"}</span>
+                    </div>
+                    <div className="admin-detail-row">
+                      <span className="admin-detail-label">Phone:</span>
+                      <span className="admin-detail-value">{customer.phone || "—"}</span>
+                    </div>
+                    <div className="admin-detail-row">
+                      <span className="admin-detail-label">Joined:</span>
+                      <span className="admin-detail-value">{formatDate(customer.createdAt)}</span>
+                    </div>
+                    <div className="admin-detail-row">
+                      <span className="admin-detail-label">Orders:</span>
+                      <span className="admin-detail-value font-semibold">{customer.totalOrders}</span>
+                    </div>
+                  </div>
+
+                  <div className="admin-customer-mobile-actions">
+                    <Link
+                      className="btn btn-block btn-small"
+                      href={`/admin/customers/${customer.id}`}
+                    >
+                      View Customer Details →
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </>
         )}
       </section>
     </div>
@@ -1938,40 +1963,43 @@ function OfferBannersManager() {
           {offers.isLoading ? (
             <p>Loading offers...</p>
           ) : offers.data?.length === 0 ? (
-            <p>No offer banners created yet.</p>
+            <p className="admin-empty-text">No offer banners created yet.</p>
           ) : (
-            <div className="admin-product-list">
+            <div className="admin-offer-list">
               {offers.data?.map((banner) => (
-                <article key={banner.id} className="admin-product-row">
-                  {banner.imageUrl ? (
-                    <img
-                      src={banner.imageUrl}
-                      alt={banner.title}
-                      style={{ width: "70px", height: "64px", objectFit: "contain", background: "#f8fafc", borderRadius: "8px", padding: "2px" }}
-                    />
-                  ) : (
-                    <div style={{ width: "70px", height: "64px", display: "grid", placeItems: "center", background: "#f1f5f9", borderRadius: "8px", fontSize: "20px" }}>
-                      📝
+                <article key={banner.id} className="admin-offer-card">
+                  <div className="admin-offer-card-top">
+                    {banner.imageUrl ? (
+                      <img
+                        src={banner.imageUrl}
+                        alt={banner.title}
+                        className="admin-offer-img"
+                      />
+                    ) : (
+                      <div className="admin-offer-placeholder">
+                        📝
+                      </div>
+                    )}
+                    <div className="admin-offer-details">
+                      <h4 className="admin-offer-title">{banner.title}</h4>
+                      <div className="admin-offer-pills">
+                        <span className="status-pill status-confirmed">
+                          {banner.offerType === "image_banner" ? "🖼️ Image Banner" : "📝 Text Offer"}
+                        </span>
+                        <span className={`status-pill ${banner.isActive ? "status-confirmed" : "status-pending"}`}>
+                          {banner.isActive ? "Active" : "Hidden"}
+                        </span>
+                      </div>
+                      {banner.subtitle && <p className="admin-offer-subtitle">{banner.subtitle}</p>}
+                      <p className="admin-offer-meta">
+                        {banner.badge ? `Badge: ${banner.badge} • ` : ""}{banner.discountCode ? `Code: ${banner.discountCode} • ` : ""}Order: {banner.displayOrder}
+                      </p>
                     </div>
-                  )}
-                  <div>
-                    <strong>{banner.title}</strong>
-                    <div style={{ margin: "3px 0", display: "flex", gap: "6px", alignItems: "center" }}>
-                      <span className="status-pill status-confirmed" style={{ fontSize: "10px", padding: "2px 8px" }}>
-                        {banner.offerType === "image_banner" ? "🖼️ Image Banner" : "📝 Text Offer"}
-                      </span>
-                      <span className={`status-pill ${banner.isActive ? "status-confirmed" : "status-pending"}`} style={{ fontSize: "10px", padding: "2px 8px" }}>
-                        {banner.isActive ? "Active" : "Hidden"}
-                      </span>
-                    </div>
-                    {banner.subtitle && <p style={{ margin: "2px 0", fontSize: "12px" }}>{banner.subtitle}</p>}
-                    <small>
-                      {banner.badge ? `Badge: ${banner.badge} • ` : ""}{banner.discountCode ? `Code: ${banner.discountCode} • ` : ""}Order: {banner.displayOrder}
-                    </small>
                   </div>
-                  <div className="row-actions">
+                  <div className="admin-offer-actions">
                     <button
                       type="button"
+                      className="btn btn-secondary btn-sm"
                       onClick={() => {
                         update.mutate({
                           id: banner.id,
@@ -1982,10 +2010,12 @@ function OfferBannersManager() {
                     >
                       {banner.isActive ? "Hide" : "Activate"}
                     </button>
-                    <button type="button" onClick={() => handleEdit(banner)}>Edit</button>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleEdit(banner)}>
+                      Edit
+                    </button>
                     <button
                       type="button"
-                      className="danger"
+                      className="btn btn-danger-action btn-sm"
                       onClick={() => {
                         if (window.confirm(`Delete offer "${banner.title}"?`)) {
                           remove.mutate({ id: banner.id });
@@ -2332,27 +2362,29 @@ function SubscribersManager() {
 
       <section className="admin-list-card">
         {subscribers.isLoading ? (
-          <p>Loading subscribers...</p>
+          <p className="admin-loading-text">Loading subscribers...</p>
         ) : subscribers.data?.length === 0 ? (
-          <p>No subscribers have signed up yet.</p>
+          <p className="admin-empty-text">No subscribers have signed up yet.</p>
         ) : (
-          <div className="admin-order-list">
+          <div className="admin-subscriber-list">
             {subscribers.data?.map((sub) => (
-              <article key={sub.id} className="admin-order">
-                <div className="order-topline">
-                  <div>
-                    <strong>{sub.email}</strong>
-                    <small>Subscribed: {new Date(sub.createdAt).toLocaleDateString("en-BD")}</small>
+              <article key={sub.id} className="admin-subscriber-card">
+                <div className="admin-subscriber-header">
+                  <div className="admin-subscriber-email-wrap">
+                    <strong className="admin-subscriber-email admin-break-all">{sub.email}</strong>
+                    <small className="admin-subscriber-date">Subscribed: {new Date(sub.createdAt).toLocaleDateString("en-BD")}</small>
                   </div>
                   <span className="status-pill status-confirmed">
                     {sub.residency === "inside_bangladesh" ? "🇧🇩 Bangladesh" : "🌍 International"}
                   </span>
                 </div>
-                <p><strong>Mobile:</strong> {sub.phone}</p>
-                <div className="row-actions" style={{ justifyContent: "flex-end" }}>
+                <p className="admin-subscriber-phone">
+                  <span className="admin-detail-label">Mobile:</span> {sub.phone || "—"}
+                </p>
+                <div className="admin-subscriber-actions">
                   <button
                     type="button"
-                    className="danger"
+                    className="btn btn-danger-action btn-sm"
                     onClick={() => {
                       if (window.confirm(`Remove subscriber ${sub.email}?`)) {
                         remove.mutate({ id: sub.id });
@@ -2571,37 +2603,38 @@ function FeaturedCollectionManager() {
         ) : filteredProducts.length === 0 ? (
           <p>No matching products found.</p>
         ) : (
-          <div className="admin-product-list">
+          <div className="admin-featured-list">
             {filteredProducts.map((p) => {
               const coverImg = p.images.find((img: any) => img.isCover) || p.images[0];
               return (
-                <article key={p.id} className="admin-product-row" style={{ borderLeft: p.featured ? "4px solid #C9A96E" : "1px solid var(--border)" }}>
-                  {coverImg ? (
-                    <img src={coverImg.storageUrl} alt={p.name} className="product-thumbnail" />
-                  ) : (
-                    <div className="product-thumbnail image-fallback">No Img</div>
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                      <strong>{p.name}</strong>
-                      {p.featured ? (
-                        <span className="badge" style={{ background: "#C9A96E", color: "#fff", fontSize: "11px", padding: "2px 8px" }}>
-                          ★ Featured on Storefront
-                        </span>
-                      ) : (
-                        <span style={{ fontSize: "11px", color: "var(--gray)" }}>Standard Catalogue</span>
-                      )}
+                <article key={p.id} className={`admin-featured-card ${p.featured ? "is-featured" : ""}`}>
+                  <div className="admin-featured-card-body">
+                    {coverImg ? (
+                      <img src={coverImg.storageUrl} alt={p.name} className="admin-featured-thumb" />
+                    ) : (
+                      <div className="admin-featured-thumb admin-featured-thumb-fallback">No Img</div>
+                    )}
+                    <div className="admin-featured-info">
+                      <div className="admin-featured-header-line">
+                        <h4 className="admin-featured-product-name">{p.name}</h4>
+                        {p.featured ? (
+                          <span className="badge badge-featured">
+                            ★ Featured
+                          </span>
+                        ) : (
+                          <span className="badge badge-standard">Standard</span>
+                        )}
+                      </div>
+                      <p className="admin-featured-details-line">
+                        <span className="admin-featured-cat">{p.categoryName}</span> • <span className="admin-featured-price">৳{p.priceTaka.toLocaleString("en-BD")}</span> • Fabric: {p.fabric} • Stock: {p.stockQuantity}
+                      </p>
                     </div>
-                    <p style={{ margin: "4px 0", fontSize: "13px", color: "var(--gray)" }}>
-                      {p.categoryName} • ৳{p.priceTaka.toLocaleString("en-BD")} • Fabric: {p.fabric} • Stock: {p.stockQuantity}
-                    </p>
                   </div>
-                  <div className="row-actions">
+                  <div className="admin-featured-actions">
                     <button
                       type="button"
                       disabled={updateProduct.isPending}
-                      className={p.featured ? "danger" : "btn"}
-                      style={{ minWidth: "140px", fontSize: "12px", padding: "8px 12px" }}
+                      className={`btn btn-sm ${p.featured ? "btn-danger-action" : "btn-gold-action"}`}
                       onClick={() => toggleFeatured(p)}
                     >
                       {p.featured ? "Remove from Featured" : "★ Mark as Featured"}
