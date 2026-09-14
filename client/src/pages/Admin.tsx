@@ -790,47 +790,47 @@ function OrderManager() {
 
       <section className="admin-list-card">
         {orders.isLoading ? (
-          <p>Loading orders...</p>
+          <p className="admin-loading-text">Loading orders...</p>
         ) : orders.data?.length === 0 ? (
-          <p>No orders have been placed yet.</p>
+          <p className="admin-empty-text">No orders have been placed yet.</p>
         ) : (
           <div className="admin-order-list">
             {orders.data?.map((order) => (
-              <article key={order.id} className="admin-order">
-                <div className="order-topline">
-                  <div>
-                    <strong>{order.orderNumber}</strong>
-                    <small>{new Date(order.createdAt).toLocaleString("en-BD")}</small>
+              <article key={order.id} className="admin-order-card">
+                <div className="admin-order-card-header">
+                  <div className="admin-order-id-group">
+                    <strong className="admin-order-number">{order.orderNumber}</strong>
+                    <small className="admin-order-date">{new Date(order.createdAt).toLocaleString("en-BD")}</small>
                   </div>
-
                   <span className={`status-pill status-${order.status}`}>{order.status}</span>
                 </div>
 
-                <p>
-                  <strong>{order.customerName}</strong> · {order.customerPhone}
-                </p>
+                <div className="admin-order-customer-info">
+                  <p className="admin-order-customer-name">
+                    <strong>{order.customerName}</strong> · <a href={`tel:${order.customerPhone}`} className="admin-order-phone">{order.customerPhone}</a>
+                  </p>
+                  <p className="admin-order-address">
+                    📍 {order.districtArea}, {order.fullAddress}
+                  </p>
+                </div>
 
-                <p>
-                  {order.districtArea}, {order.fullAddress}
-                </p>
-
-                <div className="admin-order-items-grid">
+                <div className="admin-order-items-container">
                   {order.items.map((item) => (
-                    <div className="admin-order-item-card" key={item.id}>
+                    <div className="admin-order-item-row" key={item.id}>
                       {item.imageUrl ? (
                         <img
                           src={item.imageUrl}
                           alt={item.productName}
-                          className="admin-order-item-img"
+                          className="admin-order-item-thumb"
                           loading="lazy"
                         />
                       ) : (
-                        <div className="admin-order-item-fallback">👗</div>
+                        <div className="admin-order-item-thumb-fallback">👗</div>
                       )}
-                      <div className="admin-order-item-info">
-                        <strong>{item.productName}</strong>
-                        {item.sku && <small className="sku-tag">SKU: {item.sku}</small>}
-                        <span>
+                      <div className="admin-order-item-details">
+                        <span className="admin-order-item-name">{item.productName}</span>
+                        {item.sku && <small className="admin-order-item-sku">SKU: {item.sku}</small>}
+                        <span className="admin-order-item-calc">
                           {item.quantity} × {taka(item.unitPriceTaka)} = <strong>{taka(item.lineTotalTaka)}</strong>
                         </span>
                       </div>
@@ -838,43 +838,46 @@ function OrderManager() {
                   ))}
                 </div>
 
-                <div className="order-payment">
-                  <span>Method: <strong>{order.paymentMethod}</strong></span>
-
-                  {(order as any).couponCode && (
-                    <span style={{ color: "#16a34a", fontWeight: 600 }}>
-                      🏷️ Coupon: <strong>{(order as any).couponCode}</strong> (-{(order as any).discountPercent}%, -{taka((order as any).discountAmountTaka || 0)})
-                    </span>
-                  )}
-
-                  {order.payment && (
-                    <span>
-                      {order.payment.transactionId
-                        ? `TrxID: ${order.payment.transactionId} (Paid: ${taka(order.payment.submittedAmountTaka || 0)})`
-                        : "No TrxID (COD)"}
-                    </span>
-                  )}
-
-                  <strong>
-                    {(order as any).couponCode && (order as any).originalSubtotalTaka
-                      ? `Payable: ${taka(order.totalTaka)} (Subtotal: ${taka((order as any).originalSubtotalTaka)})`
-                      : `Total: ${taka(order.totalTaka)}`}
-                  </strong>
+                <div className="admin-order-summary-bar">
+                  <div className="admin-order-payment-meta">
+                    <span>Payment: <strong>{order.paymentMethod}</strong></span>
+                    {(order as any).couponCode && (
+                      <span className="admin-coupon-applied-tag">
+                        🏷️ Coupon: <strong>{(order as any).couponCode}</strong> (-{(order as any).discountPercent}%, -{taka((order as any).discountAmountTaka || 0)})
+                      </span>
+                    )}
+                    {order.payment && (
+                      <span className="admin-order-trxid">
+                        {order.payment.transactionId
+                          ? `TrxID: ${order.payment.transactionId} (Paid: ${taka(order.payment.submittedAmountTaka || 0)})`
+                          : "No TrxID (COD)"}
+                      </span>
+                    )}
+                  </div>
+                  <div className="admin-order-total-group">
+                    <strong className="admin-order-total-amount">
+                      {(order as any).couponCode && (order as any).originalSubtotalTaka
+                        ? `Payable: ${taka(order.totalTaka)} (Subtotal: ${taka((order as any).originalSubtotalTaka)})`
+                        : `Total: ${taka(order.totalTaka)}`}
+                    </strong>
+                  </div>
                 </div>
 
                 {next[order.status] && (
-                  <button
-                    className="btn"
-                    disabled={advance.isPending}
-                    onClick={() =>
-                      advance.mutate({
-                        orderId: order.id,
-                        nextStatus: next[order.status]!,
-                      })
-                    }
-                  >
-                    Mark as {next[order.status]}
-                  </button>
+                  <div className="admin-order-actions-bar">
+                    <button
+                      className="btn btn-gold-action"
+                      disabled={advance.isPending}
+                      onClick={() =>
+                        advance.mutate({
+                          orderId: order.id,
+                          nextStatus: next[order.status]!,
+                        })
+                      }
+                    >
+                      Mark as {next[order.status]}
+                    </button>
+                  </div>
                 )}
               </article>
             ))}
@@ -1180,7 +1183,7 @@ function CustomerManager() {
           <>
             {/* Desktop Table View */}
             <div className="admin-customer-table-desktop admin-customer-table-wrap">
-              <table className="admin-customer-table">
+              <table className="admin-customer-table admin-table">
                 <thead>
                   <tr>
                     <th>ID</th>
@@ -1216,7 +1219,7 @@ function CustomerManager() {
                       <td><strong>{customer.totalOrders}</strong></td>
                       <td>
                         <Link
-                          className="btn btn-small"
+                          className="btn btn-secondary btn-sm"
                           href={`/admin/customers/${customer.id}`}
                         >
                           View Details
@@ -1269,7 +1272,7 @@ function CustomerManager() {
 
                   <div className="admin-customer-mobile-actions">
                     <Link
-                      className="btn btn-block btn-small"
+                      className="btn btn-block btn-secondary btn-sm"
                       href={`/admin/customers/${customer.id}`}
                     >
                       View Customer Details →
@@ -1290,15 +1293,13 @@ function CustomerDetailManager() {
     "/admin/customers/:id",
   );
 
-  const customerId = Number(params?.id);
+  const customerId = params?.id ? decodeURIComponent(params.id) : "";
 
   const customer =
     trpc.admin.customers.detail.useQuery(
       { id: customerId },
       {
-        enabled:
-          Number.isInteger(customerId) &&
-          customerId > 0,
+        enabled: Boolean(customerId),
       },
     );
 
@@ -1334,145 +1335,98 @@ function CustomerDetailManager() {
 
       {customer.isLoading ? (
         <section className="admin-list-card">
-          <p>
-            Loading customer details...
-          </p>
+          <p className="admin-loading-text">Loading customer details...</p>
         </section>
       ) : !customer.data ? (
         <section className="admin-list-card">
-          <p>Customer not found.</p>
+          <p className="admin-empty-text">Customer not found.</p>
         </section>
       ) : (
         <div className="admin-grid">
-          <section className="admin-form">
-            <h2>Profile</h2>
+          <section className="admin-card">
+            <h2 style={{ marginBottom: "16px" }}>Customer Profile</h2>
 
             <div className="admin-detail-list">
-              <div>
-                <span>ID</span>
-                <strong>
+              <div className="admin-detail-row">
+                <span className="admin-detail-label">Customer ID</span>
+                <strong className="admin-detail-value admin-break-all">
                   #{customer.data.id}
                 </strong>
               </div>
 
-              <div>
-                <span>Name</span>
-                <strong>
-                  {customer.data.name ||
-                    "Unnamed"}
+              <div className="admin-detail-row">
+                <span className="admin-detail-label">Name</span>
+                <strong className="admin-detail-value">
+                  {customer.data.name || "Unnamed"}
                 </strong>
               </div>
 
-              <div>
-                <span>Email</span>
-                <strong>
+              <div className="admin-detail-row">
+                <span className="admin-detail-label">Email</span>
+                <strong className="admin-detail-value admin-break-all">
                   {customer.data.email || "—"}
                 </strong>
               </div>
 
-              <div>
-                <span>Phone</span>
-                <strong>
+              <div className="admin-detail-row">
+                <span className="admin-detail-label">Phone</span>
+                <strong className="admin-detail-value">
                   {customer.data.phone || "—"}
                 </strong>
               </div>
 
-              <div>
-                <span>Role</span>
-                <strong>
-                  {customer.data.role ===
-                  "admin"
-                    ? "Admin"
-                    : "Customer"}
-                </strong>
+              <div className="admin-detail-row">
+                <span className="admin-detail-label">Account Role</span>
+                <span className={`status-pill ${customer.data.role === "admin" ? "status-confirmed" : "status-pending"}`}>
+                  {customer.data.role === "admin" ? "Admin" : "Customer"}
+                </span>
               </div>
 
-              <div>
-                <span>Created</span>
-                <strong>
-                  {formatDate(
-                    customer.data.createdAt,
-                  )}
+              <div className="admin-detail-row">
+                <span className="admin-detail-label">Member Since</span>
+                <strong className="admin-detail-value">
+                  {formatDate(customer.data.createdAt)}
                 </strong>
               </div>
             </div>
           </section>
 
           <section className="admin-list-card">
-            <h2>Order History</h2>
+            <h2 style={{ marginBottom: "16px" }}>Order History ({customer.data.orders.length})</h2>
 
-            {customer.data.orders.length ===
-            0 ? (
-              <p>
-                No orders found for this
-                customer.
-              </p>
+            {customer.data.orders.length === 0 ? (
+              <p className="admin-empty-text">No orders found for this customer.</p>
             ) : (
               <div className="admin-order-list">
-                {customer.data.orders.map(
-                  (order) => (
-                    <article
-                      key={order.id}
-                      className="admin-order"
-                    >
-                      <div className="order-topline">
-                        <div>
-                          <strong>
-                            {
-                              order.orderNumber
-                            }
-                          </strong>
-
-                          <small>
-                            {formatDate(
-                              order.createdAt,
-                            )}
-                          </small>
-                        </div>
-
-                        <span
-                          className={`status-pill status-${order.status}`}
-                        >
-                          {order.status}
-                        </span>
+                {customer.data.orders.map((order) => (
+                  <article key={order.id} className="admin-order-card">
+                    <div className="admin-order-card-header">
+                      <div className="admin-order-id-group">
+                        <strong className="admin-order-number">{order.orderNumber}</strong>
+                        <small className="admin-order-date">{formatDate(order.createdAt)}</small>
                       </div>
+                      <span className={`status-pill status-${order.status}`}>{order.status}</span>
+                    </div>
 
-                      <p>
-                        <strong>
-                          {
-                            order.customerName
-                          }
-                        </strong>{" "}
-                        ·{" "}
-                        {
-                          order.customerPhone
-                        }
+                    <div className="admin-order-customer-info">
+                      <p className="admin-order-customer-name">
+                        <strong>{order.customerName}</strong> · {order.customerPhone}
                       </p>
-
-                      <p>
-                        {
-                          order.districtArea
-                        }
-                        ,{" "}
-                        {order.fullAddress}
+                      <p className="admin-order-address">
+                        📍 {order.districtArea}, {order.fullAddress}
                       </p>
+                    </div>
 
-                      <div className="order-payment">
-                        <span>
-                          {
-                            order.paymentMethod
-                          }
-                        </span>
-
-                        <strong>
-                          {taka(
-                            order.totalTaka,
-                          )}
-                        </strong>
+                    <div className="admin-order-summary-bar">
+                      <div className="admin-order-payment-meta">
+                        <span>Payment: <strong>{order.paymentMethod}</strong></span>
                       </div>
-                    </article>
-                  ),
-                )}
+                      <div className="admin-order-total-group">
+                        <strong className="admin-order-total-amount">{taka(order.totalTaka)}</strong>
+                      </div>
+                    </div>
+                  </article>
+                ))}
               </div>
             )}
           </section>
