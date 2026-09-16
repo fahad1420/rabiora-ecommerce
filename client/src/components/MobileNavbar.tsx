@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
 import { Home, ShoppingBag, Heart, Search, User, ShieldAlert } from "lucide-react";
 import { useRabioraCart } from "@/hooks/useRabioraCart";
@@ -14,6 +15,11 @@ export function MobileNavbar() {
     staleTime: 1000 * 60 * 5,
   });
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (location.startsWith("/admin")) {
     return null;
@@ -21,7 +27,7 @@ export function MobileNavbar() {
 
   const isAdmin = customer.data?.role === "admin";
 
-  return (
+  const content = (
     <>
       <nav className="mobile-bottom-nav" aria-label="Mobile Navigation">
         <div className="mobile-nav-bar">
@@ -116,4 +122,10 @@ export function MobileNavbar() {
       <MobileSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </>
   );
+
+  if (!mounted || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(content, document.body);
 }

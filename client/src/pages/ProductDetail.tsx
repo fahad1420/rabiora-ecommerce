@@ -20,18 +20,38 @@ export default function ProductDetail() {
 
   const cart = useRabioraCart();
   const wishlist = useRabioraWishlist();
-  const customer = trpc.customer.me.useQuery();
+  const utils = trpc.useUtils();
+  const customer = trpc.customer.me.useQuery(undefined, {
+    staleTime: 1000 * 60 * 5,
+  });
   const { t } = useLanguage();
+
+  // Instant Cache Lookup: Check if product was already fetched in catalogue.list
+  const cachedList = utils.catalogue.list.getData();
+  const cachedProduct = useMemo(() => {
+    if (!slug || !cachedList) return undefined;
+    return cachedList.find(
+      (item) =>
+        item.slug === slug ||
+        String(item.id) === slug ||
+        String(item.legacyId) === slug
+    );
+  }, [slug, cachedList]);
 
   const productQuery = trpc.catalogue.bySlug.useQuery(
     { slug },
-    { enabled: Boolean(slug) },
+    {
+      enabled: Boolean(slug),
+      placeholderData: cachedProduct,
+      staleTime: 1000 * 60 * 5,
+    },
   );
 
-  const allProductsQuery =
-    trpc.catalogue.list.useQuery();
+  const allProductsQuery = trpc.catalogue.list.useQuery(undefined, {
+    staleTime: 1000 * 60 * 5,
+  });
 
-  const product = productQuery.data;
+  const product = productQuery.data ?? cachedProduct;
 
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
@@ -39,7 +59,7 @@ export default function ProductDetail() {
 
   const reviewsQuery = trpc.customer.productReviews.useQuery(
     { productId: product?.id ?? 0 },
-    { enabled: Boolean(product?.id) },
+    { enabled: Boolean(product?.id), staleTime: 1000 * 60 * 5 },
   );
 
   useEffect(() => {
@@ -79,17 +99,19 @@ export default function ProductDetail() {
       ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
       : 0;
 
-  if (productQuery.isLoading) {
+  if (productQuery.isLoading && !product) {
     return (
       <div className="page-shell">
         <RabioraHeader cartCount={cart.count} wishlistCount={wishlist.count} />
-        <main className="catalogue-state">{t("loadingProduct")}</main>
+        <main className="container" style={{ padding: "40px 0", minHeight: "60vh" }}>
+          <div className="catalogue-state">{t("loadingProduct")}</div>
+        </main>
         <RabioraFooter />
       </div>
     );
   }
 
-  if (productQuery.isError || !product) {
+  if ((productQuery.isError && !product) || !product) {
     return (
       <div className="page-shell">
         <RabioraHeader cartCount={cart.count} wishlistCount={wishlist.count} />
@@ -131,6 +153,7 @@ export default function ProductDetail() {
                     className="main-image"
                     src={mainImage.storageUrl}
                     alt={mainImage.altText || product.name}
+                    loading="eager"
                     decoding="async"
                   />
                 ) : (

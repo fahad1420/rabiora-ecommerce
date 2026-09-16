@@ -1,6 +1,7 @@
 import { ArrowUpRight, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
+import { trpc } from "@/lib/trpc";
 
 export interface FeaturedProduct {
   id: number | string;
@@ -17,6 +18,7 @@ interface FeaturedCarousel3DProps {
 }
 
 export function FeaturedCarousel3D({ products }: FeaturedCarousel3DProps) {
+  const utils = trpc.useUtils();
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const touchStartXRef = useRef<number | null>(null);
@@ -149,6 +151,14 @@ export function FeaturedCarousel3D({ products }: FeaturedCarousel3DProps) {
                 href={productUrl}
                 className="carousel-3d-card-inner"
                 title={`View ${product.name}`}
+                onMouseEnter={() => {
+                  const targetSlug = product.slug || String(product.id);
+                  if (targetSlug) utils.catalogue.bySlug.prefetch({ slug: targetSlug });
+                }}
+                onTouchStart={() => {
+                  const targetSlug = product.slug || String(product.id);
+                  if (targetSlug) utils.catalogue.bySlug.prefetch({ slug: targetSlug });
+                }}
               >
                 <div className="carousel-3d-media-wrapper">
                   {coverImage ? (

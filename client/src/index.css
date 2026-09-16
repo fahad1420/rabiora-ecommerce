@@ -4605,14 +4605,14 @@ img { display: block; max-width: 100%; }
   right: 0 !important;
   bottom: 0 !important;
   width: 100% !important;
-  max-width: 100vw !important;
-  z-index: 9999 !important;
+  max-width: 100% !important;
+  z-index: 99999 !important;
   display: block !important;
   pointer-events: auto !important;
-  -webkit-transform: translate3d(0, 0, 0) !important;
-  transform: translate3d(0, 0, 0) !important;
-  -webkit-backface-visibility: hidden !important;
-  backface-visibility: hidden !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  backface-visibility: visible !important;
+  -webkit-backface-visibility: visible !important;
   touch-action: manipulation !important;
   background: #0E2223 !important;
   background: rgba(14, 34, 35, 0.98) !important;
@@ -4714,10 +4714,10 @@ img { display: block; max-width: 100%; }
     display: none !important;
   }
   .page-shell > main:last-child {
-    padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(56px + 16px + env(safe-area-inset-bottom, 0px)) !important;
   }
   .rabiora-footer {
-    padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(56px + 16px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 
@@ -5084,7 +5084,7 @@ img { display: block; max-width: 100%; }
 .rabiora-whatsapp-float {
   position: fixed !important;
   right: 18px !important;
-  bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
+  bottom: calc(56px + 14px + env(safe-area-inset-bottom, 0px)) !important;
   z-index: 9998 !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -5097,13 +5097,11 @@ img { display: block; max-width: 100%; }
   text-decoration: none !important;
   font-size: 13px !important;
   font-weight: 700 !important;
-  transform: translateZ(0) !important;
-  -webkit-transform: translateZ(0) !important;
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease !important;
 }
 
 .rabiora-whatsapp-float:hover {
-  transform: translateY(-3px) scale(1.04) translateZ(0) !important;
+  transform: translateY(-3px) scale(1.04) !important;
   box-shadow: 0 10px 26px rgba(37, 211, 102, 0.5), 0 6px 16px rgba(0, 0, 0, 0.4) !important;
   color: #FFFFFF !important;
 }
@@ -5144,7 +5142,7 @@ img { display: block; max-width: 100%; }
     padding: 8px !important;
     border-radius: 50% !important;
     right: 14px !important;
-    bottom: calc(74px + env(safe-area-inset-bottom, 0px)) !important;
+    bottom: calc(56px + 14px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 
@@ -7186,9 +7184,14 @@ button.danger:hover {
 /* ============================================================
    UNIVERSAL MOBILE RESPONSIVENESS & OVERFLOW SAFETY
    ============================================================ */
-html, body, #root, .page-shell {
+html, body {
   max-width: 100vw;
-  overflow-x: hidden;
+  overflow-x: clip;
+  box-sizing: border-box;
+}
+
+#root, .page-shell {
+  max-width: 100vw;
   box-sizing: border-box;
 }
 
@@ -7633,11 +7636,17 @@ img, video, canvas, svg {
 /* Universal Mobile Viewport & Touch Optimization */
 @media (max-width: 640px) {
   /* Prevent horizontal blowouts on all screen sizes (iPhone, Samsung, Oppo, Realme, Xiaomi) */
-  html, body, #root, .page-shell {
+  html, body {
     width: 100% !important;
     max-width: 100vw !important;
-    overflow-x: hidden !important;
+    overflow-x: clip !important;
     -webkit-text-size-adjust: 100% !important;
+  }
+
+  #root, .page-shell {
+    width: 100% !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
   }
 
   .container {

@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Heart, ShoppingBag, ShoppingCart, Zap } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { trpc } from "@/lib/trpc";
 
 export type CatalogueProductCard = {
   id: number | string;
@@ -33,9 +34,17 @@ export const ProductCard = memo(function ProductCard({
   wishlisted?: boolean;
 }) {
   const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
   const coverImage = product.images.find((image) => image.isCover) ?? product.images[0];
   const { t } = useLanguage();
   const productUrl = `/products/${product.slug || product.id}`;
+
+  const prefetchProduct = () => {
+    const slug = product.slug || String(product.id);
+    if (slug) {
+      utils.catalogue.bySlug.prefetch({ slug });
+    }
+  };
 
   const handleCardClick = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest(".image-wishlist")) {
@@ -45,7 +54,13 @@ export const ProductCard = memo(function ProductCard({
   };
 
   return (
-    <article className="product-card" onClick={handleCardClick} style={{ cursor: "pointer" }}>
+    <article
+      className="product-card"
+      onClick={handleCardClick}
+      onMouseEnter={prefetchProduct}
+      onTouchStart={prefetchProduct}
+      style={{ cursor: "pointer" }}
+    >
       <div className="product-image">
         {product.discountPercent > 0 && (
           <span className="discount">-{product.discountPercent}%</span>

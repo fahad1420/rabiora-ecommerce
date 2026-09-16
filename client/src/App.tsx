@@ -11,7 +11,7 @@ import { MobileNavbar } from "./components/MobileNavbar";
 import { WhatsAppFloatingButton } from "./components/WhatsAppFloatingButton";
 import { NewCustomerDiscountModal } from "./components/NewCustomerDiscountModal";
 
-const ProductDetail = lazy(() => import("./pages/ProductDetail"));
+import ProductDetail from "./pages/ProductDetail";
 const Cart = lazy(() => import("./pages/Cart"));
 const Wishlist = lazy(() => import("./pages/Wishlist"));
 const AuthPage = lazy(() =>

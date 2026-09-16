@@ -14,9 +14,10 @@ export function MobileSearchModal({ isOpen, onClose }: MobileSearchModalProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [, setLocation] = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
+  const utils = trpc.useUtils();
 
   const catalogue = trpc.catalogue.list.useQuery(undefined, {
-    staleTime: 1000 * 60 * 3,
+    staleTime: 1000 * 60 * 5,
   });
 
   useEffect(() => {
@@ -162,6 +163,14 @@ export function MobileSearchModal({ isOpen, onClose }: MobileSearchModalProps) {
                   key={product.id}
                   className="search-result-item"
                   onClick={() => handleProductSelect(product)}
+                  onMouseEnter={() => {
+                    const targetSlug = product.slug || String(product.id);
+                    if (targetSlug) utils.catalogue.bySlug.prefetch({ slug: targetSlug });
+                  }}
+                  onTouchStart={() => {
+                    const targetSlug = product.slug || String(product.id);
+                    if (targetSlug) utils.catalogue.bySlug.prefetch({ slug: targetSlug });
+                  }}
                 >
                   {coverImg ? (
                     <img
