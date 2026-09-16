@@ -1,102 +1,148 @@
 # Rabiora E-Commerce
 
-Rabiora is a Bangladesh-focused Pakistani three-piece fashion storefront and commerce application. It includes a database-backed catalogue, customer accounts, persistent carts and wishlists, manual-payment checkout, credential-free Click-to-WhatsApp order handoff, secure customer order tracking, a role-gated administration area, and portable self-hosted product/payment image assets.
+Rabiora is a modern, high-performance Pakistani luxury three-piece fashion storefront and full-stack e-commerce application tailored for Bangladesh and global shoppers. Built with **React 19**, **Vite 7**, **TypeScript**, **Tailwind CSS 4**, **Express**, **tRPC**, and **MongoDB (Mongoose)**.
 
-## Technology stack
+---
 
-The application uses **React 19**, **Vite 7**, **TypeScript**, **Tailwind CSS 4**, **Express 4**, **tRPC 11**, **Drizzle ORM**, and **MySQL/TiDB**. Customer passwords are hashed with bcrypt, customer/confirmation sessions use signed JWT cookies, and tests run with Vitest. The repository uses pnpm and includes the lockfile required for reproducible installs.
+## ✨ Features & Architecture
 
-## Repository contents
+### 🛍️ Storefront & User Experience
+- **Luxury Product Showcase**: Curated catalogue for Pakistani three-piece collections (Luxury Lawn, Swiss Cotton, Silk & Organza, Casual Wear).
+- **Interactive 3D Featured Carousel**: Smooth 3D stage rotation with 2-second auto-slide, touch swipe support, and instant product prefetching.
+- **Dynamic Flash Sale Manager**: Real-time ticking countdown timer, discount banners, and admin-curated flash sale product cards with live stock indicators.
+- **Continuous Announcement Marquee**: Seamless right-to-left marquee ticker with gradient masks, pause on hover/touch, and dynamic announcement management.
+- **Instant Search Drawer**: Full-screen mobile & desktop search modal with automatic focus, iOS auto-zoom prevention, quick category chips, and live product search results.
+- **Rock-Solid Mobile App Navbar**: Hardware-composited, React Portal-mounted bottom navigation bar specifically engineered for iOS Safari dynamic viewport stability and `env(safe-area-inset-bottom)` notch support across all iPhone and Android devices.
+- **Zero-Lag Product Detail Page**: Instant 0ms page transitions powered by React Query cache prefetching and synchronous placeholder seeding.
+- **Bangladesh-Specific Checkout**: Complete delivery area hierarchy (Dhaka City vs Outside Dhaka, District & Upazila/Thana cascading dropdowns) with automatic shipping calculation.
+- **Payment & Order Handoff**:
+  - Cash on Delivery (COD)
+  - bKash, Nagad, Rocket mobile wallet integration
+  - 1-tap Click-to-WhatsApp direct order handoff (`wa.me`)
+- **Customer Accounts & Order Tracking**: Secure login, registration, order history tracking, and wishlist synchronization.
+- **Customer Reviews & Ratings**: Verified customer product reviews with star ratings and feedback display.
+- **VIP Discount & Newsletter Modal**: First-order discount lead capture modal and subscriber management.
 
-| Path | Purpose |
-|---|---|
-| `client/` | React customer and administrator interface, route registration, styling, localization, and assets configuration. |
-| `server/` | Express/tRPC server, customer sessions, carts, orders, order tracking, administration, WhatsApp handoff provider, local image serving, and local upload adapter. |
-| `drizzle/schema.ts` | Authoritative MySQL/TiDB commerce schema. |
-| `drizzle/*.sql` and `drizzle/meta/` | Generated database migrations and migration metadata. |
-| `package.json` and `pnpm-lock.yaml` | Runtime scripts and locked dependency graph. |
-| `uploads/images/` | Physical portable Rabiora assets: product galleries, payment images, branding, and the persistent location for future administrator uploads. |
-| `PORTABILITY_NOTES.md` | Detailed image-migration inventory, local upload architecture, archive evidence, and independent-host dependency notes. |
-| `ENVIRONMENT_TEMPLATE.md` | Non-secret variable template. Copy its assignments into `.env.example` after GitHub export, then create a private `.env`; never commit `.env`. |
+---
 
-## Local installation
+### 🛡️ Administration Dashboard
+- **Theme Engine**: Complete Dark/Light mode support across all admin and storefront pages.
+- **Product Management**: Full CRUD for catalogue products, multi-image upload galleries, SKU, pricing, compare-at pricing, and stock controls.
+- **Featured Collection Manager**: 3D carousel curation and slot ordering.
+- **Flash Sale Manager**: Live timer expiration configuration and active product assignment.
+- **Announcements Manager**: Add, edit, reorder, and toggle storefront marquee banners.
+- **Orders & Customer CRM**: Real-time order status tracking (Pending, Processing, Shipped, Delivered, Cancelled) and customer profiles.
+- **Promotions & Coupons**: Dynamic discount codes with subtotal thresholds and validity rules.
 
-Prerequisites are Node.js 22 or later, pnpm 10, and an accessible MySQL 8-compatible or TiDB database.
+---
 
+## 🛠️ Technology Stack
+
+| Layer | Technology |
+| :--- | :--- |
+| **Frontend** | React 19, TypeScript, Vite 7, Wouter, TanStack Query (React Query v5), Tailwind CSS 4, Lucide Icons, Sonner |
+| **Backend API** | Node.js, Express, tRPC (End-to-End Type Safety), Zod |
+| **Database & Models** | MongoDB, Mongoose ODM |
+| **Authentication** | Secure JWT Session Cookies, bcrypt password hashing, Role-Based Access Control (`admin` / `customer`) |
+| **Styling & Design System** | Custom CSS Design System with dark mode variables, CSS Grid, 3D Perspective, and iOS Safe-Area support |
+| **Build & Bundler** | Vite (Client), ESBuild (Server bundle) |
+
+---
+
+## 📂 Project Structure
+
+```text
+rabiora-ecommerce/
+├── client/                     # Frontend React application
+│   ├── public/                 # Static assets, branding, favicons
+│   ├── src/
+│   │   ├── components/         # Header, Footer, 3D Carousel, Search, Flash Sale, Mobile Nav
+│   │   ├── contexts/           # ThemeContext, LanguageContext
+│   │   ├── hooks/              # useRabioraCart, useRabioraWishlist
+│   │   ├── lib/                # tRPC client, query utils
+│   │   ├── pages/              # Home, ProductDetail, Cart, Wishlist, Checkout, Account, Admin
+│   │   ├── App.tsx             # Root router, providers, and global portals
+│   │   └── index.css           # Global stylesheet & design tokens
+├── server/                     # Backend Express & tRPC server
+│   ├── config/                 # Database connection (connectMongo)
+│   ├── models/                 # Mongoose models (Product, Order, Customer, FlashSale, etc.)
+│   ├── routers/                # tRPC route handlers (Admin, Customer, Order, Wishlist)
+│   ├── catalogue.ts            # Catalogue querying & search logic
+│   ├── flashSaleService.ts     # Flash sale management & active status
+│   ├── announcementService.ts  # Announcement banner engine
+│   ├── couponService.ts        # Promo code validation logic
+│   ├── routers.ts              # Root tRPC AppRouter
+│   └── app.ts                  # Server initialization & middleware
+├── uploads/                    # Local media storage for products and branding
+├── drizzle/                    # Legacy migration schema references
+├── package.json                # Dependencies and scripts
+└── README.md                   # Project documentation
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- **Node.js**: v20.x or v22.x
+- **pnpm**: v10.x (or npm / yarn)
+- **MongoDB**: Local MongoDB instance or MongoDB Atlas cluster connection URI
+
+### 1. Installation
+Clone the repository and install dependencies:
 ```bash
-git clone <your-repository-url> rabiora-ecommerce
+git clone https://github.com/fahad1420/rabiora-ecommerce.git
 cd rabiora-ecommerce
-pnpm install --frozen-lockfile
-# After GitHub export, create .env.example from ENVIRONMENT_TEMPLATE.md,
-# then copy .env.example .env
+pnpm install
 ```
 
-Set the values in `.env` for the services you retain. Do not commit `.env`, production environment files, database passwords, OAuth credentials, or JWT secrets.
+### 2. Environment Configuration
+Create a `.env` file in the root directory:
+```env
+NODE_ENV=development
+PORT=3000
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/rabiora?retryWrites=true&w=majority
+JWT_SECRET=your_super_secret_jwt_key_here
+```
 
-## Environment variables
-
-| Variable | Required | Purpose |
-|---|---:|---|
-| `NODE_ENV` | Yes | Use `development` locally and `production` in deployment. |
-| `DATABASE_URL` | Yes | MySQL/TiDB connection string consumed by Drizzle and the server. |
-| `JWT_SECRET` | Yes | Long random secret used to sign customer and session-bound guest-confirmation cookies. |
-| `VITE_APP_ID` | If retaining Manus OAuth | Manus OAuth application identifier. |
-| `OAUTH_SERVER_URL` | If retaining Manus OAuth | Manus OAuth server base URL. |
-| `VITE_OAUTH_PORTAL_URL` | If retaining Manus OAuth | Browser OAuth portal URL. |
-| `OWNER_OPEN_ID` and `OWNER_NAME` | If retaining Manus owner/admin integration | Owner identity used by the included OAuth/runtime integration. |
-| `UPLOADS_DIR` | Optional | Persistent local/server directory for product, payment, branding, and future administrator-uploaded images. Defaults to `./uploads/images`. |
-| `VITE_APP_TITLE` and `VITE_APP_LOGO` | Optional | Application metadata used by the existing runtime. |
-| `VITE_ANALYTICS_ENDPOINT` and `VITE_ANALYTICS_WEBSITE_ID` | Optional | Existing analytics placeholders in the client shell. |
-
-## Database setup and migrations
-
-1. Create an empty MySQL/TiDB database and set `DATABASE_URL`.
-2. Review the checked-in schema in `drizzle/schema.ts` and migrations in `drizzle/`.
-3. Apply the project migration workflow:
-
+### 3. Development Mode
+Start the development server with live reload:
 ```bash
-pnpm db:push
+pnpm dev
 ```
+The application will be accessible at `http://localhost:3000`.
 
-The existing script runs `drizzle-kit generate` followed by `drizzle-kit migrate`. For production changes, review generated SQL before applying it and take a database backup. Product catalogue and order data are not seeded by the application automatically; preserve the current database and do not run imports unless explicitly intended.
+---
 
-## Commands
+## 🔨 Available Scripts
 
 | Command | Purpose |
-|---|---|
-| `pnpm dev` | Start the Vite-backed Express development server. |
-| `pnpm check` | Run the TypeScript type check. |
-| `pnpm test` | Run the Vitest automated suite. |
-| `pnpm build` | Create the Vite client bundle and bundled server output in `dist/`. |
-| `pnpm start` | Run the built production server. |
-| `pnpm db:push` | Generate and apply Drizzle migrations. |
+| :--- | :--- |
+| `pnpm dev` | Starts Vite and Express in development mode with HMR |
+| `pnpm check` | Runs full TypeScript type verification (`tsc --noEmit`) |
+| `pnpm build` | Builds the client bundle into `dist/public` and bundles backend into `dist/index.js` |
+| `pnpm start` | Runs the compiled production server (`node dist/index.js`) |
+| `pnpm test` | Runs the test suite |
 
-## Deployment notes
+---
 
-Build with `pnpm build`, provide all production variables through the deployment platform’s secret manager, then run `pnpm start`. The server must be allowed to bind to the platform-provided port; do not hardcode a port. Configure HTTPS because production cookies are marked secure. Configure the canonical public URL and OAuth callback with the selected identity provider before enabling administrator sign-in.
+## 📦 Production Deployment
 
-The payment flow intentionally supports only **bKash**, **Nagad**, **Rocket**, and **Cash on Delivery**. Click-to-WhatsApp creates a prefilled `wa.me` handoff URL; it does not send messages or require WhatsApp Business Cloud API credentials.
+1. **Build Production Artifacts**:
+   ```bash
+   pnpm run check
+   pnpm run build
+   ```
+2. **Environment Variables**: Ensure `MONGODB_URI`, `JWT_SECRET`, `NODE_ENV=production`, and `PORT` are configured in your hosting platform.
+3. **Start Application**:
+   ```bash
+   pnpm start
+   ```
 
-Existing product galleries, payment images, and branding are physical project files under `uploads/images/` and are served at `/uploads/images/*`. The administrator upload flow accepts JPEG, PNG, and WebP files, writes them to `UPLOADS_DIR/products/<product-id>/`, and stores portable local paths. Mount `UPLOADS_DIR` as persistent writable storage in production so future administrator uploads survive restarts and redeployments.
+---
 
-## Manus-specific services to replace or configure on another host
+## 📄 License & Attribution
 
-| Current dependency | What the included code expects | External-host action |
-|---|---|---|
-| Manus OAuth/runtime | `server/_core` and `vite-plugin-manus-runtime` provide OAuth/session runtime behavior. | Retain and configure a compatible Manus OAuth environment, or replace the OAuth routes, context, and `useAuth` integration with your chosen identity provider. |
-| Product/payment/admin image storage | Physical image files live in `uploads/images/`; `server/localMedia.ts` serves existing files and writes future admin uploads locally. | Commit the existing image files and mount `UPLOADS_DIR` as persistent writable storage. No Manus Forge value is needed for images. |
-| Manus deployment configuration | The current managed environment injects several OAuth, owner, and database variables. | Add the needed values through the new host’s environment/secret manager. Never copy platform secrets into Git. |
-| Manus analytics placeholders | `client/index.html` has optional analytics variables. | Configure an equivalent analytics service or leave the optional analytics variables empty. |
-
-## GitHub handover checklist
-
-Before connecting a repository to a new host, create `.env.example` from `ENVIRONMENT_TEMPLATE.md` with placeholders only and confirm that `.env` remains ignored. Commit `package.json`, `pnpm-lock.yaml`, `drizzle/schema.ts`, all `drizzle` migrations, the environment template, and this README. Run the following from a clean checkout:
-
-```bash
-pnpm install --frozen-lockfile
-pnpm check
-pnpm test
-pnpm build
-```
-
-No production database records, customer credentials, payment evidence, or API secrets are included in this repository.
+- **Brand**: Rabiora Bangladesh
+- **Design & Development**: Developed by [FIAUS Tech](https://www.fiaus.com)
+- **Copyright**: © 2026 Rabiora. All rights reserved.
