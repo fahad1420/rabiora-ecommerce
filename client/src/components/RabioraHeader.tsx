@@ -19,7 +19,6 @@ const logoUrl = "/uploads/images/branding/rabiora-logo.jpeg";
 export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wishlistCount = 0 }: RabioraHeaderProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
-  const [announcementIdx, setAnnouncementIdx] = useState(0);
   const { theme, toggleTheme } = useTheme();
   const { t, toggleLanguage } = useLanguage();
   const customer = trpc.customer.me.useQuery();
@@ -45,34 +44,30 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
   ];
   const activeAnnouncements = announcements.length > 0 ? announcements : defaultAnnouncements;
 
-  // Auto-rotate announcement every 3.8s in a smooth infinite loop
-  useEffect(() => {
-    if (activeAnnouncements.length <= 1) return;
-    const timer = setInterval(() => {
-      setAnnouncementIdx((prev) => (prev + 1) % activeAnnouncements.length);
-    }, 3800);
-    return () => clearInterval(timer);
-  }, [activeAnnouncements.length]);
-
-  const currentItem = activeAnnouncements[announcementIdx % activeAnnouncements.length] || activeAnnouncements[0];
+  // Triplicate items for a completely seamless, continuous, right-to-left marquee loop
+  const marqueeItems = [...activeAnnouncements, ...activeAnnouncements, ...activeAnnouncements];
 
   return (
     <>
       <PromotionalCountdownBar />
 
-      <div className="announcement single-line-announcement" aria-live="polite">
-        <div className="container announcement-inner-single">
-          {currentItem && (
-            <div key={currentItem.id || announcementIdx} className="announcement-single-track">
-              {currentItem.link ? (
-                <a href={currentItem.link} className="announcement-copy announcement-link single-line-text">
-                  {currentItem.text}
-                </a>
-              ) : (
-                <span className="announcement-copy single-line-text">{currentItem.text}</span>
-              )}
-            </div>
-          )}
+      {/* Continuous Right-to-Left Announcement Marquee Bar */}
+      <div className="announcement single-line-announcement" aria-label="Announcements">
+        <div className="announcement-marquee-container">
+          <div className="announcement-marquee-track">
+            {marqueeItems.map((item, idx) => (
+              <span key={`${item.id || "ann"}-${idx}`} className="announcement-marquee-item">
+                {item.link ? (
+                  <a href={item.link} className="announcement-copy announcement-link">
+                    {item.text}
+                  </a>
+                ) : (
+                  <span className="announcement-copy">{item.text}</span>
+                )}
+                <span className="announcement-marquee-separator" aria-hidden="true">✦</span>
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -92,7 +87,8 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
           </nav>
 
           <div className="header-actions">
-            <label className="search-box" aria-label="Search products">
+            {/* Desktop Search Input Box */}
+            <label className="search-box desktop-only-action" aria-label="Search products">
               <input
                 value={searchValue}
                 onChange={(event) => onSearchChange?.(event.target.value)}
@@ -100,6 +96,16 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
               />
               <Search size={18} aria-hidden="true" />
             </label>
+
+            {/* Mobile Header Quick Search Icon Trigger */}
+            <button
+              type="button"
+              className="header-icon mobile-search-header-trigger"
+              aria-label="Open Search"
+              onClick={() => setIsSearchModalOpen(true)}
+            >
+              <Search size={20} />
+            </button>
 
             <button
               type="button"
@@ -163,7 +169,7 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
         </div>
       </header>
 
-      {/* Mobile Search Modal */}
+      {/* Mobile Instant Search Modal */}
       <MobileSearchModal
         isOpen={isSearchModalOpen}
         onClose={() => setIsSearchModalOpen(false)}
