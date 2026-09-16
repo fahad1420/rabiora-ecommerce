@@ -4130,10 +4130,13 @@ async function uploadAdminOfferImage(dataUri, fileName) {
 init_db();
 init_models();
 import { TRPCError as TRPCError17 } from "@trpc/server";
+import { Types as Types10 } from "mongoose";
 async function getPublicFlashSale() {
   await connectMongo();
   let flashSale = await FlashSaleModel.findOne({ key: "default" }).populate("productIds").lean();
   if (!flashSale) {
+    const sampleProducts = await ProductModel.find().limit(4).lean();
+    const defaultEndTime = new Date(Date.now() + 48 * 60 * 60 * 1e3);
     const defaultSale = await FlashSaleModel.create({
       key: "default",
       campaignName: "Rabiora Flash Sale",
@@ -4141,11 +4144,32 @@ async function getPublicFlashSale() {
       subtitle: "Limited time offer on handcrafted Pakistani Lawn & Silk Three-Piece sets",
       badgeText: "\u26A1 FLASH SALE DEAL",
       isActive: true,
+      endTime: defaultEndTime,
       ctaText: "Shop Flash Sale",
-      ctaLink: "/#products",
-      productIds: []
+      ctaLink: "/#flash-sale",
+      productIds: sampleProducts.map((p) => p._id)
     });
     flashSale = defaultSale.toObject();
+  } else {
+    if (!flashSale.productIds || flashSale.productIds.length === 0) {
+      const sampleProducts = await ProductModel.find().limit(4).lean();
+      if (sampleProducts.length > 0) {
+        await FlashSaleModel.findOneAndUpdate(
+          { key: "default" },
+          { $set: { productIds: sampleProducts.map((p) => p._id) } }
+        );
+        flashSale.productIds = sampleProducts;
+      }
+    }
+    const now2 = /* @__PURE__ */ new Date();
+    if (!flashSale.endTime || new Date(flashSale.endTime) < now2) {
+      const defaultEndTime = new Date(Date.now() + 48 * 60 * 60 * 1e3);
+      await FlashSaleModel.findOneAndUpdate(
+        { key: "default" },
+        { $set: { endTime: defaultEndTime } }
+      );
+      flashSale.endTime = defaultEndTime;
+    }
   }
   const now = /* @__PURE__ */ new Date();
   let isExpired = false;
@@ -4155,8 +4179,16 @@ async function getPublicFlashSale() {
   if (flashSale.startTime && new Date(flashSale.startTime) > now) {
     isExpired = true;
   }
-  const productsList = (flashSale.productIds || []).map((p) => {
-    if (!p || typeof p !== "object") return null;
+  let rawProductList = flashSale.productIds || [];
+  const needsManualQuery = rawProductList.some((p) => p && (typeof p === "string" || !p.name));
+  if (needsManualQuery && rawProductList.length > 0) {
+    const ids = rawProductList.map((p) => typeof p === "object" && p._id ? p._id : p);
+    const foundProducts = await ProductModel.find({ _id: { $in: ids } }).lean();
+    const productMap = new Map(foundProducts.map((p) => [p._id.toString(), p]));
+    rawProductList = ids.map((id) => productMap.get(id.toString())).filter(Boolean);
+  }
+  const productsList = rawProductList.map((p) => {
+    if (!p || typeof p !== "object" || !p.name) return null;
     const coverImage = (p.images || []).find((img) => img.isCover) || (p.images || [])[0];
     return {
       id: p._id.toString(),
@@ -4164,11 +4196,19 @@ async function getPublicFlashSale() {
       name: p.name,
       slug: p.slug,
       priceTaka: p.priceTaka,
-      oldPriceTaka: p.oldPriceTaka,
-      discountPercent: p.discountPercent,
+      oldPriceTaka: p.oldPriceTaka || Math.round(p.priceTaka * 1.2),
+      discountPercent: p.discountPercent || 15,
+      categoryName: p.categoryName || "Pakistani Three Piece",
+      details: p.details || "",
+      fabric: p.fabric || "",
       isInStock: p.isInStock !== false,
       stockQuantity: p.stockQuantity ?? 0,
-      imageUrl: coverImage ? coverImage.storageUrl : ""
+      imageUrl: coverImage ? coverImage.storageUrl : "",
+      images: (p.images || []).map((img) => ({
+        storageUrl: img.storageUrl,
+        altText: img.altText || p.name,
+        isCover: Boolean(img.isCover)
+      }))
     };
   }).filter(Boolean);
   return {
@@ -4180,9 +4220,9 @@ async function getPublicFlashSale() {
     isActive: flashSale.isActive && !isExpired,
     isScheduleActive: flashSale.isActive,
     startTime: flashSale.startTime ? new Date(flashSale.startTime).toISOString() : null,
-    endTime: flashSale.endTime ? new Date(flashSale.endTime).toISOString() : null,
+    endTime: flashSale.endTime ? new Date(flashSale.endTime).toISOString() : new Date(Date.now() + 48 * 60 * 60 * 1e3).toISOString(),
     ctaText: flashSale.ctaText || "Shop Flash Sale",
-    ctaLink: flashSale.ctaLink || "/#products",
+    ctaLink: flashSale.ctaLink || "/#flash-sale",
     products: productsList,
     productCount: productsList.length
   };
@@ -4191,6 +4231,8 @@ async function getAdminFlashSale() {
   await connectMongo();
   let flashSale = await FlashSaleModel.findOne({ key: "default" }).populate("productIds").lean();
   if (!flashSale) {
+    const sampleProducts = await ProductModel.find().limit(4).lean();
+    const defaultEndTime = new Date(Date.now() + 48 * 60 * 60 * 1e3);
     flashSale = await FlashSaleModel.create({
       key: "default",
       campaignName: "Rabiora Flash Sale",
@@ -4198,14 +4240,23 @@ async function getAdminFlashSale() {
       subtitle: "Limited time offer on handcrafted Pakistani Lawn & Silk Three-Piece sets",
       badgeText: "\u26A1 FLASH SALE DEAL",
       isActive: true,
+      endTime: defaultEndTime,
       ctaText: "Shop Flash Sale",
-      ctaLink: "/#products",
-      productIds: []
+      ctaLink: "/#flash-sale",
+      productIds: sampleProducts.map((p) => p._id)
     });
     flashSale = flashSale.toObject();
   }
-  const attachedProducts = (flashSale.productIds || []).map((p) => {
-    if (!p || typeof p !== "object") return null;
+  let rawProductList = flashSale.productIds || [];
+  const needsManualQuery = rawProductList.some((p) => p && (typeof p === "string" || !p.name));
+  if (needsManualQuery && rawProductList.length > 0) {
+    const ids = rawProductList.map((p) => typeof p === "object" && p._id ? p._id : p);
+    const foundProducts = await ProductModel.find({ _id: { $in: ids } }).lean();
+    const productMap = new Map(foundProducts.map((p) => [p._id.toString(), p]));
+    rawProductList = ids.map((id) => productMap.get(id.toString())).filter(Boolean);
+  }
+  const attachedProducts = rawProductList.map((p) => {
+    if (!p || typeof p !== "object" || !p.name) return null;
     const coverImage = (p.images || []).find((img) => img.isCover) || (p.images || [])[0];
     return {
       id: p._id.toString(),
@@ -4215,9 +4266,15 @@ async function getAdminFlashSale() {
       priceTaka: p.priceTaka,
       oldPriceTaka: p.oldPriceTaka,
       discountPercent: p.discountPercent,
+      categoryName: p.categoryName || "Pakistani Three Piece",
       isInStock: p.isInStock !== false,
       stockQuantity: p.stockQuantity ?? 0,
-      imageUrl: coverImage ? coverImage.storageUrl : ""
+      imageUrl: coverImage ? coverImage.storageUrl : "",
+      images: (p.images || []).map((img) => ({
+        storageUrl: img.storageUrl,
+        altText: img.altText || p.name,
+        isCover: Boolean(img.isCover)
+      }))
     };
   }).filter(Boolean);
   return {
@@ -4230,7 +4287,7 @@ async function getAdminFlashSale() {
     startTime: flashSale.startTime ? new Date(flashSale.startTime).toISOString() : "",
     endTime: flashSale.endTime ? new Date(flashSale.endTime).toISOString() : "",
     ctaText: flashSale.ctaText || "Shop Flash Sale",
-    ctaLink: flashSale.ctaLink || "/#products",
+    ctaLink: flashSale.ctaLink || "/#flash-sale",
     productIds: attachedProducts.map((p) => p.id),
     products: attachedProducts
   };
@@ -4252,13 +4309,14 @@ async function updateAdminFlashSale(input) {
   if (input.ctaText !== void 0) updateFields.ctaText = input.ctaText.trim();
   if (input.ctaLink !== void 0) updateFields.ctaLink = input.ctaLink.trim();
   if (input.productIds !== void 0) {
-    updateFields.productIds = input.productIds;
+    const validObjectIds = input.productIds.filter((id) => Types10.ObjectId.isValid(id)).map((id) => new Types10.ObjectId(id));
+    updateFields.productIds = validObjectIds;
   }
-  const updated = await FlashSaleModel.findOneAndUpdate(
+  await FlashSaleModel.findOneAndUpdate(
     { key: "default" },
     { $set: updateFields },
     { upsert: true, new: true }
-  ).populate("productIds").lean();
+  );
   return getAdminFlashSale();
 }
 async function addProductToFlashSale(productId) {
@@ -4277,17 +4335,11 @@ async function addProductToFlashSale(productId) {
 async function removeProductFromFlashSale(productId) {
   await connectMongo();
   const product = await ProductModel.findOne(findProductQuery(productId));
-  if (product) {
-    await FlashSaleModel.findOneAndUpdate(
-      { key: "default" },
-      { $pull: { productIds: product._id } }
-    );
-  } else {
-    await FlashSaleModel.findOneAndUpdate(
-      { key: "default" },
-      { $pull: { productIds: productId } }
-    );
-  }
+  const targetId = product ? product._id : Types10.ObjectId.isValid(productId) ? new Types10.ObjectId(productId) : productId;
+  await FlashSaleModel.findOneAndUpdate(
+    { key: "default" },
+    { $pull: { productIds: targetId } }
+  );
   return getAdminFlashSale();
 }
 

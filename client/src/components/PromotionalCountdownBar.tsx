@@ -1,9 +1,10 @@
 import { ArrowRight, Flame, Sparkles, Timer, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 
 export function PromotionalCountdownBar() {
+  const [, navigate] = useLocation();
   const settings = trpc.settings.get.useQuery();
   const [isDismissed, setIsDismissed] = useState(false);
   const [timeLeft, setTimeLeft] = useState<{
@@ -15,12 +16,12 @@ export function PromotionalCountdownBar() {
   } | null>(null);
 
   const promoActive = settings.data?.promoActive;
-  const promoText = settings.data?.promoText || "Special Discount on Authentic Pakistani Lawn & Silk!";
-  const promoDiscountText = settings.data?.promoDiscountText || "10% OFF";
+  const promoText = settings.data?.promoText || "Flash Sale — Special Discount on Pakistani Lawn & Silk!";
+  const promoDiscountText = settings.data?.promoDiscountText || "⚡ FLASH DEAL";
   const promoCountdownEnd = settings.data?.promoCountdownEnd;
   const promoCountdownActive = settings.data?.promoCountdownActive !== false;
-  const promoButtonText = settings.data?.promoButtonText || "Shop Sale";
-  const promoLink = settings.data?.promoLink || "/#products";
+  const promoButtonText = settings.data?.promoButtonText || "Shop Flash Sale";
+  const promoLink = settings.data?.promoLink || "/#flash-sale";
 
   useEffect(() => {
     if (sessionStorage.getItem("rabiora_promobar_dismissed") === "true") {
@@ -66,6 +67,36 @@ export function PromotionalCountdownBar() {
     setIsDismissed(true);
   };
 
+  const handleShopClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const isHomePage = window.location.pathname === "/" || window.location.pathname === "";
+    
+    if (isHomePage) {
+      const target = document.getElementById("flash-sale") || document.getElementById("products");
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        try {
+          window.history.replaceState(null, "", `#${target.id}`);
+        } catch {}
+        return;
+      }
+    }
+    
+    // If not on homepage or target not yet rendered, navigate to /#flash-sale
+    if (promoLink.startsWith("/")) {
+      navigate(promoLink);
+      // Give DOM time to update then scroll
+      setTimeout(() => {
+        const target = document.getElementById("flash-sale") || document.getElementById("products");
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 200);
+    } else {
+      window.location.href = promoLink;
+    }
+  };
+
   return (
     <aside
       className="promo-countdown-bar"
@@ -109,10 +140,15 @@ export function PromotionalCountdownBar() {
             </div>
           )}
 
-          <Link href={promoLink} className="promo-bar-btn">
+          <a
+            href={promoLink}
+            onClick={handleShopClick}
+            className="promo-bar-btn"
+            role="button"
+          >
             <span>{promoButtonText}</span>
             <ArrowRight size={13} />
-          </Link>
+          </a>
         </div>
 
         <button
@@ -127,4 +163,3 @@ export function PromotionalCountdownBar() {
     </aside>
   );
 }
-

@@ -33,12 +33,12 @@ export function FeaturedCarousel3D({ products }: FeaturedCarousel3DProps) {
     setActiveIndex((prev) => (prev - 1 + total) % total);
   }, [total]);
 
-  // Automatic continuous 4-second rotation loop
+  // Automatic continuous 2-second rotation loop
   useEffect(() => {
     if (total <= 1 || isPaused) return;
     const interval = setInterval(() => {
       nextSlide();
-    }, 4000);
+    }, 2000);
     return () => clearInterval(interval);
   }, [total, isPaused, nextSlide]);
 

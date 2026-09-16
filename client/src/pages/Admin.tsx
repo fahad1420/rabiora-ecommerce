@@ -2969,6 +2969,14 @@ function FlashSaleManager() {
   const [selectedToAdd, setSelectedToAdd] = useState<string[]>([]);
   const [isAddingBulk, setIsAddingBulk] = useState(false);
 
+  const toLocalInputValue = (iso: string | null | undefined) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
   useEffect(() => {
     if (flashSaleQuery.data) {
       const data = flashSaleQuery.data;
@@ -2977,8 +2985,8 @@ function FlashSaleManager() {
       setSubtitle(data.subtitle || "");
       setBadgeText(data.badgeText || "⚡ FLASH SALE DEAL");
       setIsActive(data.isActive ?? true);
-      setStartTime(data.startTime ? new Date(data.startTime).toISOString().slice(0, 16) : "");
-      setEndTime(data.endTime ? new Date(data.endTime).toISOString().slice(0, 16) : "");
+      setStartTime(toLocalInputValue(data.startTime));
+      setEndTime(toLocalInputValue(data.endTime));
       setCtaText(data.ctaText || "Shop Flash Sale");
       setCtaLink(data.ctaLink || "/#products");
     }
