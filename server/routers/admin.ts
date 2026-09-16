@@ -44,6 +44,13 @@ import {
 } from "../couponService";
 
 import {
+  getAdminFlashSale,
+  updateAdminFlashSale,
+  addProductToFlashSale,
+  removeProductFromFlashSale,
+} from "../flashSaleService";
+
+import {
   listAllAnnouncements,
   createAnnouncement,
   updateAnnouncement,
@@ -271,6 +278,14 @@ export const adminRouter = router({
           heroHeading: z.string().trim().optional(),
           heroTagline: z.string().trim().optional(),
           heroImageUrl: z.string().trim().optional(),
+          promoActive: z.boolean().optional(),
+          promoText: z.string().trim().optional(),
+          promoDiscountText: z.string().trim().optional(),
+          promoCountdownEnd: z.string().trim().optional(),
+          promoCountdownActive: z.boolean().optional(),
+          promoButtonText: z.string().trim().optional(),
+          promoLink: z.string().trim().optional(),
+          promoProductIds: z.array(z.string()).optional(),
         })
       )
       .mutation(({ input }) => updateAdminSiteSettings(input)),
@@ -391,5 +406,31 @@ export const adminRouter = router({
     delete: adminProcedure
       .input(z.object({ id: z.string() }))
       .mutation(({ input }) => deleteAnnouncement(input.id)),
+  }),
+
+  flashSale: router({
+    get: adminProcedure.query(() => getAdminFlashSale()),
+    update: adminProcedure
+      .input(
+        z.object({
+          campaignName: z.string().trim().optional(),
+          title: z.string().trim().optional(),
+          subtitle: z.string().trim().optional(),
+          badgeText: z.string().trim().optional(),
+          isActive: z.boolean().optional(),
+          startTime: z.string().nullable().optional(),
+          endTime: z.string().nullable().optional(),
+          ctaText: z.string().trim().optional(),
+          ctaLink: z.string().trim().optional(),
+          productIds: z.array(z.string()).optional(),
+        })
+      )
+      .mutation(({ input }) => updateAdminFlashSale(input)),
+    addProduct: adminProcedure
+      .input(z.object({ productId: z.string() }))
+      .mutation(({ input }) => addProductToFlashSale(input.productId)),
+    removeProduct: adminProcedure
+      .input(z.object({ productId: z.string() }))
+      .mutation(({ input }) => removeProductFromFlashSale(input.productId)),
   }),
 });

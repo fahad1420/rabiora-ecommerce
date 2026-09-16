@@ -12,5 +12,6 @@ export * from "./Subscriber";
 export * from "./OfferBanner";
 export * from "./Coupon";
 export * from "./Announcement";
+export * from "./FlashSale";
 export * from "./helpers";
 

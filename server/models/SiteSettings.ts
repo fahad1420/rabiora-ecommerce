@@ -15,6 +15,15 @@ export interface ISiteSettings extends Document {
   heroHeading?: string;
   heroTagline?: string;
   heroImageUrl?: string;
+  // Promotional Countdown Bar
+  promoActive?: boolean;
+  promoText?: string;
+  promoDiscountText?: string;
+  promoCountdownEnd?: string;
+  promoCountdownActive?: boolean;
+  promoButtonText?: string;
+  promoLink?: string;
+  promoProductIds?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,6 +44,15 @@ const SiteSettingsSchema = new Schema<ISiteSettings>(
     heroHeading: { type: String, default: "RABIORA" },
     heroTagline: { type: String, default: "Elegance • Comfort • Confidence" },
     heroImageUrl: { type: String, default: "" },
+    // Promotional Countdown Bar
+    promoActive: { type: Boolean, default: false },
+    promoText: { type: String, default: "Flash Sale — Special Discount on Pakistani Lawn & Silk" },
+    promoDiscountText: { type: String, default: "10% OFF" },
+    promoCountdownEnd: { type: String, default: "" },
+    promoCountdownActive: { type: Boolean, default: true },
+    promoButtonText: { type: String, default: "Shop Flash Sale" },
+    promoLink: { type: String, default: "/#products" },
+    promoProductIds: { type: [String], default: [] },
   },
   {
     timestamps: true,

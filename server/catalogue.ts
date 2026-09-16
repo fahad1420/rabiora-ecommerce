@@ -73,7 +73,13 @@ export async function listCatalogue(filters: CatalogueFilters = {}) {
 export async function getCatalogueProduct(slug: string) {
   await connectMongo();
 
-  const p = await ProductModel.findOne({ slug }).lean();
+  let p = await ProductModel.findOne({ slug }).lean();
+  if (!p && !isNaN(Number(slug))) {
+    p = await ProductModel.findOne({ legacyId: Number(slug) }).lean();
+  }
+  if (!p && slug && slug.match(/^[0-9a-fA-F]{24}$/)) {
+    p = await ProductModel.findById(slug).lean();
+  }
 
   if (!p) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Product not found." });

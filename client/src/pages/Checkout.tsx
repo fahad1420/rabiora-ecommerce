@@ -11,7 +11,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import {
   getDistricts,
   getUpazilasForDistrict,
-  getThanasForUpazila,
+  getAreasForUpazila,
   isLocationInsideDhaka,
 } from "@/data/bangladeshLocations";
 
@@ -45,10 +45,10 @@ export default function Checkout() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   
-  // Bangladesh Cascading Location State
+  // Bangladesh Cascading Location State (District -> Upazila -> Area)
   const [selectedDistrict, setSelectedDistrict] = useState("Dhaka");
   const [selectedUpazila, setSelectedUpazila] = useState("Dhaka North (City)");
-  const [selectedThana, setSelectedThana] = useState("Gulshan");
+  const [selectedArea, setSelectedArea] = useState("Gulshan");
   const [streetAddress, setStreetAddress] = useState("");
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash on Delivery");
@@ -75,7 +75,7 @@ export default function Checkout() {
 
   const allDistricts = useMemo(() => getDistricts(), []);
   const availableUpazilas = useMemo(() => getUpazilasForDistrict(selectedDistrict), [selectedDistrict]);
-  const availableThanas = useMemo(() => getThanasForUpazila(selectedDistrict, selectedUpazila), [selectedDistrict, selectedUpazila]);
+  const availableAreas = useMemo(() => getAreasForUpazila(selectedDistrict, selectedUpazila), [selectedDistrict, selectedUpazila]);
 
   useEffect(() => {
     if (availableUpazilas.length > 0 && !availableUpazilas.includes(selectedUpazila)) {
@@ -84,10 +84,14 @@ export default function Checkout() {
   }, [availableUpazilas, selectedUpazila]);
 
   useEffect(() => {
-    if (availableThanas.length > 0 && !availableThanas.includes(selectedThana)) {
-      setSelectedThana(availableThanas[0]);
+    if (availableAreas.length > 0) {
+      if (!availableAreas.includes(selectedArea)) {
+        setSelectedArea(availableAreas[0]);
+      }
+    } else {
+      setSelectedArea("");
     }
-  }, [availableThanas, selectedThana]);
+  }, [availableAreas, selectedArea]);
 
   useEffect(() => {
     if (customer.data) {
@@ -210,7 +214,8 @@ export default function Checkout() {
         customerPhone,
         districtArea: selectedDistrict,
         upazila: selectedUpazila,
-        thana: selectedThana,
+        thana: selectedArea || undefined,
+        area: selectedArea || undefined,
         fullAddress: streetAddress,
         paymentMethod,
         transactionId: manualWallet ? transactionId : undefined,
@@ -332,7 +337,7 @@ export default function Checkout() {
                     />
                   </label>
 
-                  {/* Cascading Bangladesh Location Selection */}
+                  {/* Cascading Bangladesh Location Selection: District -> Upazila -> Area */}
                   <div className="location-selector-grid">
                     <label>
                       District / Zilla
@@ -370,21 +375,23 @@ export default function Checkout() {
                       </select>
                     </label>
 
-                    <label>
-                      Thana / Area
-                      <select
-                        required
-                        value={selectedThana}
-                        onChange={(e) => setSelectedThana(e.target.value)}
-                        className="location-select"
-                      >
-                        {availableThanas.map((tItem) => (
-                          <option key={tItem} value={tItem}>
-                            {tItem}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    {availableAreas.length > 0 && (
+                      <label>
+                        Area / এলাকা
+                        <select
+                          required
+                          value={selectedArea}
+                          onChange={(e) => setSelectedArea(e.target.value)}
+                          className="location-select"
+                        >
+                          {availableAreas.map((aItem) => (
+                            <option key={aItem} value={aItem}>
+                              {aItem}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
                   </div>
 
                   <label>

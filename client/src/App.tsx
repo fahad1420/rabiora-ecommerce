@@ -9,6 +9,7 @@ import Home from "./pages/Home";
 import NotFound from "./pages/NotFound";
 import { MobileNavbar } from "./components/MobileNavbar";
 import { WhatsAppFloatingButton } from "./components/WhatsAppFloatingButton";
+import { NewCustomerDiscountModal } from "./components/NewCustomerDiscountModal";
 
 const ProductDetail = lazy(() => import("./pages/ProductDetail"));
 const Cart = lazy(() => import("./pages/Cart"));
@@ -111,6 +112,11 @@ function Router() {
         />
 
         <Route
+          path="/admin/flash-sale"
+          component={Admin}
+        />
+
+        <Route
           path="/admin/announcements"
           component={Admin}
         />
@@ -179,6 +185,7 @@ export default function App() {
           <TooltipProvider>
             <Router />
             <WhatsAppFloatingButton />
+            <NewCustomerDiscountModal />
             <MobileNavbar />
             <Toaster />
           </TooltipProvider>

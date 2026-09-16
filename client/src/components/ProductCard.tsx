@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Heart, ShoppingBag, ShoppingCart, Zap } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 export type CatalogueProductCard = {
@@ -27,33 +27,44 @@ export const ProductCard = memo(function ProductCard({
   wishlisted = false,
 }: {
   product: CatalogueProductCard;
-  onAddCart: (productId: any) => void;
+  onAddCart?: (productId: any) => void;
   onBuyNow?: (productId: any) => void;
   onToggleWishlist?: (productId: any) => void;
   wishlisted?: boolean;
 }) {
+  const [, navigate] = useLocation();
   const coverImage = product.images.find((image) => image.isCover) ?? product.images[0];
   const { t } = useLanguage();
+  const productUrl = `/products/${product.slug || product.id}`;
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest(".image-wishlist")) {
+      return;
+    }
+    navigate(productUrl);
+  };
 
   return (
-    <article className="product-card">
+    <article className="product-card" onClick={handleCardClick} style={{ cursor: "pointer" }}>
       <div className="product-image">
         {product.discountPercent > 0 && (
           <span className="discount">-{product.discountPercent}%</span>
         )}
         <button
-          className={wishlisted ? "image-wishlist active" : "image-wishlist"}
+          className={`image-wishlist ${wishlisted ? "active" : ""}`}
           type="button"
           aria-label={`${wishlisted ? t("removeWishlist") : t("addWishlist")}: ${product.name}`}
           onClick={(e) => {
+            e.preventDefault();
             e.stopPropagation();
             onToggleWishlist?.(product.id);
           }}
+          title={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
         >
-          <Heart size={15} fill={wishlisted ? "currentColor" : "none"} />
+          <Heart size={16} fill={wishlisted ? "currentColor" : "none"} strokeWidth={1.8} />
         </button>
 
-        <Link href={`/products/${product.slug}`} className="product-image-link" tabIndex={-1}>
+        <Link href={productUrl} className="product-image-link" tabIndex={-1}>
           {coverImage ? (
             <img
               src={coverImage.storageUrl}
@@ -68,9 +79,9 @@ export const ProductCard = memo(function ProductCard({
       </div>
 
       <div className="product-info">
-        <p className="category">{product.categoryName || "Three Piece"}</p>
+        <p className="category">{product.categoryName || "Pakistani Three Piece"}</p>
         <h3 title={product.name}>
-          <Link href={`/products/${product.slug}`}>{product.name}</Link>
+          <Link href={productUrl}>{product.name}</Link>
         </h3>
 
         <div className="price">
@@ -80,38 +91,16 @@ export const ProductCard = memo(function ProductCard({
           ) : null}
         </div>
 
-        {!product.isInStock ? (
-          <p className="stock-note">{t("outOfStock")}</p>
-        ) : (
-          <div className="product-action-split">
-            <button
-              className="action-btn add-cart-btn"
-              type="button"
-              disabled={!product.isInStock}
-              onClick={() => onAddCart(product.id)}
-              title={t("addToCart")}
-            >
-              <ShoppingCart size={14} aria-hidden="true" />
-              <span>{t("addToCart")}</span>
-            </button>
-
-            <button
-              className="action-btn buy-now-btn"
-              type="button"
-              disabled={!product.isInStock}
-              onClick={() => onBuyNow?.(product.id)}
-              title="Buy Now"
-            >
-              <Zap size={14} aria-hidden="true" />
-              <span>Buy Now</span>
-            </button>
-          </div>
-        )}
-
-        <div className="product-footer-link">
-          <Link href={`/products/${product.slug}`} className="details-link">
-            {t("viewDetails")} →
-          </Link>
+        <div className="stock-status-row">
+          {product.isInStock ? (
+            <span className="stock-indicator in-stock">
+              <span className="stock-dot" /> In Stock
+            </span>
+          ) : (
+            <span className="stock-indicator out-of-stock">
+              <span className="stock-dot" /> {t("outOfStock")}
+            </span>
+          )}
         </div>
       </div>
     </article>

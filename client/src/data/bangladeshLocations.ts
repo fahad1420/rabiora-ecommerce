@@ -4,7 +4,8 @@ export interface LocationHierarchy {
   division: string;
   upazilas: {
     name: string;
-    thanas: string[];
+    areas?: string[];
+    thanas?: string[]; // backwards compatibility
   }[];
 }
 
@@ -1012,7 +1013,7 @@ export function getUpazilasForDistrict(districtName: string): string[] {
   return match ? match.upazilas.map((u) => u.name) : [];
 }
 
-export function getThanasForUpazila(districtName: string, upazilaName: string): string[] {
+export function getAreasForUpazila(districtName: string, upazilaName: string): string[] {
   if (!districtName || !upazilaName) return [];
   const match = BANGLADESH_LOCATIONS.find(
     (l) => l.district.toLowerCase() === districtName.trim().toLowerCase()
@@ -1021,5 +1022,12 @@ export function getThanasForUpazila(districtName: string, upazilaName: string): 
   const upazila = match.upazilas.find(
     (u) => u.name.toLowerCase() === upazilaName.trim().toLowerCase()
   );
-  return upazila ? upazila.thanas : [];
+  if (!upazila) return [];
+  const list = (upazila.areas || upazila.thanas || []).filter(Boolean);
+  return list;
 }
+
+export function getThanasForUpazila(districtName: string, upazilaName: string): string[] {
+  return getAreasForUpazila(districtName, upazilaName);
+}
+

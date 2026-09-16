@@ -366,8 +366,11 @@ export function AuthPage({
 
               <label className="auth-field-label">
                 <span>{mode === "login" ? `${t("bangladeshPhone")} / Email` : t("bangladeshPhone")}</span>
-                <div className="auth-input-wrapper">
-                  <Phone size={16} className="auth-input-icon" />
+                <div className="auth-input-wrapper auth-phone-wrapper">
+                  <div className="auth-phone-prefix" title="Bangladesh Only (+880)">
+                    <span className="auth-flag">🇧🇩</span>
+                    <span className="auth-country-code">+880</span>
+                  </div>
                   <input
                     required
                     inputMode={mode === "login" ? "text" : "tel"}

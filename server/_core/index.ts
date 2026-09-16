@@ -1,7 +1,9 @@
 import "dotenv/config";
 import express from "express";
+import fs from "fs";
 import { createServer } from "http";
 import net from "net";
+import path from "path";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { applyCorsPolicy } from "./cors";
@@ -48,7 +50,8 @@ async function startServer() {
     })
   );
   // development mode uses Vite, production mode uses static files
-  if (process.env.NODE_ENV !== "production") {
+  const isProduction = process.env.NODE_ENV === "production" || import.meta.dirname.endsWith("dist") || !process.env.NODE_ENV && !fs.existsSync(path.resolve(process.cwd(), "client", "src", "main.tsx"));
+  if (process.env.NODE_ENV !== "production" && !import.meta.dirname.endsWith("dist")) {
     await setupVite(app, server);
   } else {
     serveStatic(app);
@@ -56,7 +59,7 @@ async function startServer() {
 
   const preferredPort = parseInt(process.env.PORT || "3000", 10);
   const host = process.env.HOST || "0.0.0.0";
-  const port = process.env.NODE_ENV === "production" ? preferredPort : await findAvailablePort(preferredPort);
+  const port = isProduction ? preferredPort : await findAvailablePort(preferredPort);
 
   if (port !== preferredPort) {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);

@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   CreditCard,
   LayoutDashboard,
@@ -28,13 +29,18 @@ import {
   MailCheck,
   Megaphone,
   MessageSquare,
+  Moon,
   Package,
   PanelLeft,
   ShoppingBag,
   Sparkles,
+  Store,
+  Sun,
   Tag,
   Tags,
   Users,
+  X,
+  Zap,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -51,6 +57,11 @@ const menuItems = [
     icon: Package,
     label: "Products",
     path: "/admin/products",
+  },
+  {
+    icon: Zap,
+    label: "Flash Sale",
+    path: "/admin/flash-sale",
   },
   {
     icon: Sparkles,
@@ -186,8 +197,9 @@ function DashboardLayoutContent({
   setSidebarWidth,
 }: DashboardLayoutContentProps) {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [location, setLocation] = useLocation();
-  const { state, toggleSidebar } = useSidebar();
+  const { state, toggleSidebar, openMobile, setOpenMobile } = useSidebar();
 
   const isCollapsed = state === "collapsed";
 
@@ -200,6 +212,12 @@ function DashboardLayoutContent({
   );
 
   const isMobile = useIsMobile();
+
+  useEffect(() => {
+    if (isMobile && openMobile) {
+      setOpenMobile(false);
+    }
+  }, [location, isMobile, setOpenMobile]);
 
   useEffect(() => {
     if (isCollapsed) {
@@ -271,22 +289,35 @@ function DashboardLayoutContent({
           disableTransition={isResizing}
         >
           <SidebarHeader className="h-16 justify-center">
-            <div className="flex w-full items-center gap-3 px-2 transition-all">
-              <button
-                onClick={toggleSidebar}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label="Toggle navigation"
-                type="button"
-              >
-                <PanelLeft className="h-4 w-4 text-muted-foreground" />
-              </button>
+            <div className="flex w-full items-center justify-between gap-3 px-2 transition-all">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={toggleSidebar}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label="Toggle navigation"
+                  type="button"
+                >
+                  <PanelLeft className="h-4 w-4 text-muted-foreground" />
+                </button>
 
-              {!isCollapsed && (
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="truncate font-semibold tracking-tight">
-                    Navigation
-                  </span>
-                </div>
+                {!isCollapsed && (
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="truncate font-semibold tracking-tight">
+                      Navigation
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {isMobile && (
+                <button
+                  onClick={() => setOpenMobile(false)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-accent focus:outline-none text-muted-foreground hover:text-foreground"
+                  aria-label="Close sidebar"
+                  type="button"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               )}
             </div>
           </SidebarHeader>
@@ -301,9 +332,12 @@ function DashboardLayoutContent({
                   <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton
                       isActive={isActive}
-                      onClick={() =>
-                        setLocation(item.path)
-                      }
+                      onClick={() => {
+                        setLocation(item.path);
+                        if (isMobile) {
+                          setOpenMobile(false);
+                        }
+                      }}
                       tooltip={item.label}
                       className="h-10 font-normal transition-all"
                     >
@@ -323,7 +357,38 @@ function DashboardLayoutContent({
             </SidebarMenu>
           </SidebarContent>
 
-          <SidebarFooter className="p-3">
+          <SidebarFooter className="p-3 flex flex-col gap-2">
+            <div className="flex items-center gap-1 group-data-[collapsible=icon]:flex-col">
+              <button
+                type="button"
+                onClick={() => setLocation("/")}
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-foreground transition-colors group-data-[collapsible=icon]:w-full"
+                title="View Customer Storefront"
+              >
+                <Store className="h-4 w-4 shrink-0 text-primary" />
+                <span className="group-data-[collapsible=icon]:hidden">Storefront</span>
+              </button>
+
+              {toggleTheme && (
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-foreground transition-colors group-data-[collapsible=icon]:w-full"
+                  title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                  aria-label="Toggle Color Theme"
+                >
+                  {theme === "dark" ? (
+                    <Sun className="h-4 w-4 shrink-0 text-amber-400" />
+                  ) : (
+                    <Moon className="h-4 w-4 shrink-0 text-primary" />
+                  )}
+                  <span className="group-data-[collapsible=icon]:hidden">
+                    {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                  </span>
+                </button>
+              )}
+            </div>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -379,22 +444,44 @@ function DashboardLayoutContent({
 
       <SidebarInset>
         {isMobile && (
-          <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur">
+          <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:backdrop-blur">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />
 
-              <div className="flex items-center gap-3">
-                <div className="flex flex-col gap-1">
-                  <span className="tracking-tight text-foreground">
-                    {activeMenuItem?.label ?? "Menu"}
-                  </span>
-                </div>
+              <div className="flex items-center gap-2">
+                <span className="tracking-tight font-semibold text-foreground text-sm">
+                  {activeMenuItem?.label ?? "Rabiora Admin"}
+                </span>
               </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {toggleTheme && (
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                  aria-label="Toggle theme"
+                  title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                >
+                  {theme === "dark" ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-primary" />}
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setLocation("/")}
+                className="flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                title="View Store"
+              >
+                <Store className="h-3.5 w-3.5 text-primary" />
+                <span>Store</span>
+              </button>
             </div>
           </div>
         )}
 
-        <main className="flex-1 p-4">
+        <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-x-hidden">
           {children}
         </main>
       </SidebarInset>

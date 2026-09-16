@@ -1,4 +1,5 @@
 import {
+  ArrowUpRight,
   Award,
   CheckCircle2,
   ChevronRight,
@@ -12,11 +13,13 @@ import {
   Truck,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { ProductCard } from "@/components/ProductCard";
 import { RabioraFooter } from "@/components/RabioraFooter";
 import { RabioraHeader } from "@/components/RabioraHeader";
 import { OfferBannerSlider } from "@/components/OfferBannerSlider";
+import { FeaturedCarousel3D } from "@/components/FeaturedCarousel3D";
+import { MiddleFlashSaleBar } from "@/components/MiddleFlashSaleBar";
 import { useRabioraCart } from "@/hooks/useRabioraCart";
 import { useRabioraWishlist } from "@/hooks/useRabioraWishlist";
 import { trpc } from "@/lib/trpc";
@@ -87,13 +90,6 @@ export default function Home() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  const carouselImages = useMemo(() => {
-    const images = (featuredQuery.data ?? []).flatMap((product) =>
-      product.images.slice(0, 2)
-    );
-    return [...images, ...images];
-  }, [featuredQuery.data]);
 
   const addCart = useCallback((productId: number | string) => {
     cart.add(productId);
@@ -215,30 +211,31 @@ export default function Home() {
           </section>
         )}
 
-        {/* Featured Collection Slider */}
-        <section className="featured-section">
+        {/* Featured Collection — 3D Horizontal Card Carousel */}
+        <section id="featured" className="featured-3d-showcase-section">
           <div className="container">
             <div className="section-title">
-              <span>{t("featuredCollection")}</span>
+              <span className="section-kicker">{t("featuredCollection")}</span>
               <h2>{t("featuredHeading")}</h2>
-              <p>{t("featuredCopy")}</p>
+              <p className="section-subtitle">{t("featuredCopy")}</p>
             </div>
 
-            <div className="featured-slider">
-              <div className="featured-track">
-                {carouselImages.map((image, index) => (
-                  <img
-                    src={image.storageUrl}
-                    alt={image.altText}
-                    key={`${image.storageUrl}-${index}`}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                ))}
+            {featuredQuery.isLoading ? (
+              <div className="catalogue-state">
+                {t("loadingCollection") || "Loading featured showcase..."}
               </div>
-            </div>
+            ) : featuredQuery.isError ? (
+              <div className="catalogue-state">
+                {t("collectionUnavailable") || "Featured showcase is currently unavailable."}
+              </div>
+            ) : featuredQuery.data && featuredQuery.data.length > 0 ? (
+              <FeaturedCarousel3D products={featuredQuery.data} />
+            ) : null}
           </div>
         </section>
+
+        {/* Middle Promotional / Flash Sale Bar (Between Featured Collection & Main Products) */}
+        <MiddleFlashSaleBar />
 
         {/* Products Grid Section */}
         <section id="products" className="products">

@@ -98,16 +98,12 @@ function ProductManager() {
         utils.admin.products.list.invalidate(),
     });
 
-  const [form, setForm] =
-    useState<ProductForm>(emptyProduct);
-
-  const [editingId, setEditingId] =
-    useState<number | string | null>(null);
-
+  const [form, setForm] = useState<ProductForm>(emptyProduct);
+  const [editingId, setEditingId] = useState<number | string | null>(null);
   const [error, setError] = useState("");
-  const [selectedImages, setSelectedImages] =
-    useState<File[]>([]);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [uploadProgressText, setUploadProgressText] = useState("");
 
   const updateField = (
     field: keyof ProductForm,
@@ -126,6 +122,7 @@ function ProductManager() {
     setEditingId(product.id);
     setSelectedImages([]);
     setError("");
+    setUploadProgressText("");
 
     setForm({
       categoryId: String(product.categoryId),
@@ -155,6 +152,7 @@ function ProductManager() {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
+    setUploadProgressText("");
 
     try {
       const product = editingId
@@ -169,29 +167,39 @@ function ProductManager() {
       if (selectedImages.length > 0) {
         setIsUploadingImages(true);
         const existingImageCount =
-          products.data?.find((item) => item.id === product.id)?.images.length ?? 0;
+          products.data?.find((item) => String(item.id) === String(product.id))?.images.length ?? 0;
 
-        const payloadImages = await Promise.all(
-          selectedImages.map(async (file, idx) => {
+        const failedUploads: string[] = [];
+
+        for (let idx = 0; idx < selectedImages.length; idx++) {
+          const file = selectedImages[idx];
+          setUploadProgressText(`Uploading image ${idx + 1} of ${selectedImages.length}: ${file.name}...`);
+          try {
             const dataUrl = await fileToDataUrl(file);
-            return {
+            await uploadImage.mutateAsync({
+              productId: product.id,
               dataUrl,
               fileName: file.name,
               altText: `${form.name} — Rabiora`,
               isCover: existingImageCount === 0 && idx === 0,
-            };
-          })
-        );
+            });
+          } catch (fileErr: any) {
+            console.error(`Failed to upload image ${file.name}:`, fileErr);
+            failedUploads.push(file.name);
+          }
+        }
 
-        await uploadMultipleImages.mutateAsync({
-          productId: product.id,
-          images: payloadImages,
-        });
+        await utils.admin.products.list.invalidate();
+
+        if (failedUploads.length > 0) {
+          setError(`Product saved, but ${failedUploads.length} image(s) failed: ${failedUploads.join(", ")}`);
+        }
       }
 
       setEditingId(null);
       setForm(emptyProduct);
       setSelectedImages([]);
+      setUploadProgressText("");
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -200,6 +208,7 @@ function ProductManager() {
       );
     } finally {
       setIsUploadingImages(false);
+      setUploadProgressText("");
     }
   };
 
@@ -434,6 +443,11 @@ function ProductManager() {
               <span className="selected-files-note" style={{ display: "block", marginTop: "4px", fontSize: "12px", color: "#16a34a" }}>
                 ✓ {selectedImages.length} image{selectedImages.length > 1 ? "s" : ""} selected for upload: {selectedImages.map((f) => f.name).join(", ")}
               </span>
+            )}
+            {isUploadingImages && (
+              <div className="upload-progress-banner" style={{ padding: "8px 12px", background: "rgba(24, 168, 158, 0.12)", border: "1px solid #18A89E", borderRadius: "8px", color: "#18A89E", fontSize: "13px", fontWeight: 600, marginTop: "8px" }}>
+                ⏳ {uploadProgressText || "Uploading images, please wait..."}
+              </div>
             )}
           </label>
 
@@ -1460,6 +1474,16 @@ function PaymentSettingsManager() {
   const [heroBadge, setHeroBadge] = useState("Premium Collection");
   const [heroHeading, setHeroHeading] = useState("RABIORA");
   const [heroTagline, setHeroTagline] = useState("Elegance • Comfort • Confidence");
+
+  // Promotional Discount & Countdown Bar State
+  const [promoActive, setPromoActive] = useState(false);
+  const [promoText, setPromoText] = useState("Flash Sale — Special Discount on Authentic Pakistani Lawn & Silk!");
+  const [promoDiscountText, setPromoDiscountText] = useState("10% OFF");
+  const [promoCountdownEnd, setPromoCountdownEnd] = useState("");
+  const [promoCountdownActive, setPromoCountdownActive] = useState(true);
+  const [promoButtonText, setPromoButtonText] = useState("Shop Sale");
+  const [promoLink, setPromoLink] = useState("/#products");
+
   const [savedStatus, setSavedStatus] = useState("");
 
   useEffect(() => {
@@ -1476,6 +1500,13 @@ function PaymentSettingsManager() {
       setHeroBadge(settings.data.heroBadge || "Premium Collection");
       setHeroHeading(settings.data.heroHeading || "RABIORA");
       setHeroTagline(settings.data.heroTagline || "Elegance • Comfort • Confidence");
+      setPromoActive(settings.data.promoActive ?? false);
+      setPromoText(settings.data.promoText || "Flash Sale — Special Discount on Authentic Pakistani Lawn & Silk!");
+      setPromoDiscountText(settings.data.promoDiscountText || "10% OFF");
+      setPromoCountdownEnd(settings.data.promoCountdownEnd || "");
+      setPromoCountdownActive(settings.data.promoCountdownActive ?? true);
+      setPromoButtonText(settings.data.promoButtonText || "Shop Sale");
+      setPromoLink(settings.data.promoLink || "/#products");
     }
   }, [settings.data]);
 
@@ -1494,6 +1525,13 @@ function PaymentSettingsManager() {
       heroBadge,
       heroHeading,
       heroTagline,
+      promoActive,
+      promoText,
+      promoDiscountText,
+      promoCountdownEnd,
+      promoCountdownActive,
+      promoButtonText,
+      promoLink,
     });
   };
 
@@ -1507,7 +1545,80 @@ function PaymentSettingsManager() {
       </section>
 
       <form className="admin-form" onSubmit={handleSubmit}>
-        <h2>Delivery Charges (৳ BDT)</h2>
+        {/* Promotional Discount & Countdown Bar Section */}
+        <h2>Promotional Discount + Countdown Bar</h2>
+        <p className="muted">Configure the top promotional banner with live countdown timer and discount highlights.</p>
+
+        <div className="admin-field-pair">
+          <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={promoActive}
+              onChange={(e) => setPromoActive(e.target.checked)}
+              style={{ width: "20px", height: "20px" }}
+            />
+            <strong>Enable Promotional Bar on Storefront</strong>
+          </label>
+
+          <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={promoCountdownActive}
+              onChange={(e) => setPromoCountdownActive(e.target.checked)}
+              style={{ width: "20px", height: "20px" }}
+            />
+            <strong>Enable Live Countdown Timer</strong>
+          </label>
+        </div>
+
+        <div className="admin-field-pair">
+          <label>
+            Promo Headline / Message
+            <input
+              value={promoText}
+              onChange={(e) => setPromoText(e.target.value)}
+              placeholder="e.g. Flash Sale — Special Discount on Pakistani Lawn & Silk!"
+            />
+          </label>
+
+          <label>
+            Discount Badge Text
+            <input
+              value={promoDiscountText}
+              onChange={(e) => setPromoDiscountText(e.target.value)}
+              placeholder="e.g. 10% OFF or Limited Deal"
+            />
+          </label>
+        </div>
+
+        <div className="admin-field-pair">
+          <label>
+            Countdown End Time (ISO / Date & Time)
+            <input
+              type="datetime-local"
+              value={promoCountdownEnd ? new Date(promoCountdownEnd).toISOString().slice(0, 16) : ""}
+              onChange={(e) => setPromoCountdownEnd(e.target.value ? new Date(e.target.value).toISOString() : "")}
+            />
+          </label>
+
+          <label>
+            Button Text & Link Destination
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+              <input
+                value={promoButtonText}
+                onChange={(e) => setPromoButtonText(e.target.value)}
+                placeholder="Shop Sale"
+              />
+              <input
+                value={promoLink}
+                onChange={(e) => setPromoLink(e.target.value)}
+                placeholder="/#products"
+              />
+            </div>
+          </label>
+        </div>
+
+        <h2 style={{ marginTop: "1.5rem" }}>Delivery Charges (৳ BDT)</h2>
         <p className="muted">These fees will automatically apply at checkout based on the customer's selected district.</p>
 
         <div className="admin-field-pair">
@@ -2816,6 +2927,411 @@ function AnnouncementsManager() {
   );
 }
 
+function FlashSaleManager() {
+  const utils = trpc.useUtils();
+  const flashSaleQuery = trpc.admin.flashSale.get.useQuery();
+  const allProductsQuery = trpc.admin.products.list.useQuery();
+
+  const updateMutation = trpc.admin.flashSale.update.useMutation({
+    onSuccess: () => {
+      utils.admin.flashSale.get.invalidate();
+      utils.flashSale.get.invalidate();
+      setSavedStatus("Flash Sale campaign settings updated successfully!");
+      setTimeout(() => setSavedStatus(""), 4000);
+    },
+  });
+
+  const addProductMutation = trpc.admin.flashSale.addProduct.useMutation({
+    onSuccess: () => {
+      utils.admin.flashSale.get.invalidate();
+      utils.flashSale.get.invalidate();
+    },
+  });
+
+  const removeProductMutation = trpc.admin.flashSale.removeProduct.useMutation({
+    onSuccess: () => {
+      utils.admin.flashSale.get.invalidate();
+      utils.flashSale.get.invalidate();
+    },
+  });
+
+  const [campaignName, setCampaignName] = useState("Rabiora Flash Sale");
+  const [title, setTitle] = useState("⚡ Exclusive Flash Sale — Up to 20% OFF on Selected Luxury Pieces");
+  const [subtitle, setSubtitle] = useState("Limited time offer on handcrafted Pakistani Lawn & Silk Three-Piece sets");
+  const [badgeText, setBadgeText] = useState("⚡ FLASH SALE DEAL");
+  const [isActive, setIsActive] = useState(true);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [ctaText, setCtaText] = useState("Shop Flash Sale");
+  const [ctaLink, setCtaLink] = useState("/#products");
+  const [savedStatus, setSavedStatus] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [selectedToAdd, setSelectedToAdd] = useState<string[]>([]);
+  const [isAddingBulk, setIsAddingBulk] = useState(false);
+
+  useEffect(() => {
+    if (flashSaleQuery.data) {
+      const data = flashSaleQuery.data;
+      setCampaignName(data.campaignName || "Rabiora Flash Sale");
+      setTitle(data.title || "⚡ Exclusive Flash Sale — Up to 20% OFF on Selected Luxury Pieces");
+      setSubtitle(data.subtitle || "");
+      setBadgeText(data.badgeText || "⚡ FLASH SALE DEAL");
+      setIsActive(data.isActive ?? true);
+      setStartTime(data.startTime ? new Date(data.startTime).toISOString().slice(0, 16) : "");
+      setEndTime(data.endTime ? new Date(data.endTime).toISOString().slice(0, 16) : "");
+      setCtaText(data.ctaText || "Shop Flash Sale");
+      setCtaLink(data.ctaLink || "/#products");
+    }
+  }, [flashSaleQuery.data]);
+
+  const handleSubmitSettings = (e: FormEvent) => {
+    e.preventDefault();
+    updateMutation.mutate({
+      campaignName,
+      title,
+      subtitle,
+      badgeText,
+      isActive,
+      startTime: startTime ? new Date(startTime).toISOString() : null,
+      endTime: endTime ? new Date(endTime).toISOString() : null,
+      ctaText,
+      ctaLink,
+    });
+  };
+
+  const handleAddProduct = async (productId: string) => {
+    await addProductMutation.mutateAsync({ productId });
+  };
+
+  const handleRemoveProduct = async (productId: string) => {
+    await removeProductMutation.mutateAsync({ productId });
+  };
+
+  const handleBulkAdd = async () => {
+    if (selectedToAdd.length === 0) return;
+    setIsAddingBulk(true);
+    try {
+      const currentIds = flashSaleQuery.data?.productIds || [];
+      const mergedIds = Array.from(new Set([...currentIds, ...selectedToAdd]));
+      await updateMutation.mutateAsync({ productIds: mergedIds });
+      setSelectedToAdd([]);
+    } finally {
+      setIsAddingBulk(false);
+    }
+  };
+
+  const attachedProducts = flashSaleQuery.data?.products || [];
+  const attachedIdSet = new Set((flashSaleQuery.data?.productIds || []).map(String));
+
+  const availableProducts = (allProductsQuery.data || []).filter((p: any) => {
+    const matchesSearch =
+      !productSearch.trim() ||
+      p.name?.toLowerCase().includes(productSearch.toLowerCase()) ||
+      (p.sku && p.sku.toLowerCase().includes(productSearch.toLowerCase())) ||
+      (p.categoryName && p.categoryName.toLowerCase().includes(productSearch.toLowerCase()));
+    return matchesSearch && !attachedIdSet.has(String(p.id)) && !attachedIdSet.has(String(p._id));
+  });
+
+  return (
+    <div className="admin-stack">
+      <section className="admin-heading">
+        <div>
+          <p>Promotions & Campaigns</p>
+          <h1>⚡ Flash Sale Manager</h1>
+        </div>
+      </section>
+
+      {/* 1. Campaign Settings Form */}
+      <form className="admin-form" onSubmit={handleSubmitSettings}>
+        <h2>Flash Sale Configuration</h2>
+        <p className="muted">
+          Controls the dedicated Promotional / Flash Sale bar placed between Featured Collection and the Main Products section on the homepage.
+        </p>
+
+        <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", margin: "10px 0" }}>
+          <input
+            type="checkbox"
+            checked={isActive}
+            onChange={(e) => setIsActive(e.target.checked)}
+            style={{ width: "20px", height: "20px" }}
+          />
+          <strong>Enable Flash Sale on Storefront (Live)</strong>
+        </label>
+
+        <div className="admin-field-pair">
+          <label>
+            Campaign Name (Admin Internal)
+            <input
+              required
+              value={campaignName}
+              onChange={(e) => setCampaignName(e.target.value)}
+              placeholder="e.g. Summer Luxury Drop Flash Sale"
+            />
+          </label>
+
+          <label>
+            Badge Text
+            <input
+              value={badgeText}
+              onChange={(e) => setBadgeText(e.target.value)}
+              placeholder="e.g. ⚡ FLASH SALE DEAL"
+            />
+          </label>
+        </div>
+
+        <label>
+          Storefront Headline / Title
+          <input
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. ⚡ Exclusive Flash Sale — Up to 20% OFF on Selected Luxury Pieces"
+          />
+        </label>
+
+        <label>
+          Subtitle / Promotional Details
+          <textarea
+            value={subtitle}
+            onChange={(e) => setSubtitle(e.target.value)}
+            placeholder="e.g. Limited time offer on handcrafted Pakistani Lawn & Silk Three-Piece sets"
+            rows={2}
+          />
+        </label>
+
+        <div className="admin-field-pair">
+          <label>
+            Start Time (Optional)
+            <input
+              type="datetime-local"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
+          </label>
+
+          <label>
+            Countdown End Time (Required for live timer)
+            <input
+              type="datetime-local"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+            />
+          </label>
+        </div>
+
+        <div className="admin-field-pair">
+          <label>
+            CTA Button Text
+            <input
+              value={ctaText}
+              onChange={(e) => setCtaText(e.target.value)}
+              placeholder="Shop Flash Sale"
+            />
+          </label>
+
+          <label>
+            CTA Button Destination Link
+            <input
+              value={ctaLink}
+              onChange={(e) => setCtaLink(e.target.value)}
+              placeholder="/#products"
+            />
+          </label>
+        </div>
+
+        {savedStatus && <p className="form-success" role="status">{savedStatus}</p>}
+
+        <button className="btn" disabled={updateMutation.isPending}>
+          {updateMutation.isPending ? "Saving Settings..." : "Save Flash Sale Settings"}
+        </button>
+      </form>
+
+      {/* 2. Attached Flash Sale Products Management */}
+      <section className="admin-list-card">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: "16px" }}>
+          <div>
+            <h2>Selected Flash Sale Products ({attachedProducts.length})</h2>
+            <p className="muted" style={{ margin: 0 }}>
+              These existing products are featured as part of the active Flash Sale. Zero duplicate products are created.
+            </p>
+          </div>
+
+          {attachedProducts.length > 0 && (
+            <button
+              type="button"
+              className="danger"
+              onClick={() => {
+                if (confirm("Remove all products from this Flash Sale?")) {
+                  updateMutation.mutate({ productIds: [] });
+                }
+              }}
+            >
+              Clear All Flash Sale Products
+            </button>
+          )}
+        </div>
+
+        {flashSaleQuery.isLoading ? (
+          <p>Loading Flash Sale products...</p>
+        ) : attachedProducts.length === 0 ? (
+          <div className="empty-state-box" style={{ padding: "30px", textAlign: "center", border: "1px dashed var(--border)", borderRadius: "12px" }}>
+            <p style={{ margin: "0 0 10px", color: "var(--muted-foreground)" }}>No products added to this Flash Sale yet.</p>
+            <p style={{ fontSize: "13px", margin: 0 }}>Select products below to include them in the Flash Sale.</p>
+          </div>
+        ) : (
+          <div className="admin-product-list">
+            {attachedProducts.map((p: any) => (
+              <article key={p.id} className="admin-product-row">
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0, flex: 1 }}>
+                  {p.imageUrl ? (
+                    <img
+                      src={p.imageUrl}
+                      alt={p.name}
+                      style={{ width: "48px", height: "58px", objectFit: "cover", borderRadius: "6px" }}
+                    />
+                  ) : (
+                    <div style={{ width: "48px", height: "58px", background: "var(--muted)", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>
+                      No img
+                    </div>
+                  )}
+
+                  <div style={{ minWidth: 0 }}>
+                    <strong style={{ display: "block", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                      {p.name}
+                    </strong>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", fontSize: "12px", marginTop: "4px" }}>
+                      <span style={{ color: "var(--primary)", fontWeight: 700 }}>৳{p.priceTaka?.toLocaleString("en-BD")}</span>
+                      {p.oldPriceTaka ? (
+                        <span style={{ color: "var(--muted-foreground)", textDecoration: "line-through" }}>
+                          ৳{p.oldPriceTaka.toLocaleString("en-BD")}
+                        </span>
+                      ) : null}
+                      <span className={`status-pill ${p.isInStock ? "status-confirmed" : "status-pending"}`}>
+                        {p.isInStock ? `In Stock (${p.stockQuantity})` : "Out of Stock"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="row-actions">
+                  <button
+                    type="button"
+                    className="danger"
+                    onClick={() => handleRemoveProduct(p.id)}
+                    disabled={removeProductMutation.isPending}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* 3. Add Existing Products to Flash Sale */}
+      <section className="admin-list-card">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "16px" }}>
+          <div>
+            <h2>Add Products to Flash Sale</h2>
+            <p className="muted" style={{ margin: 0 }}>
+              Search and select existing products from your store catalog to include in this Flash Sale.
+            </p>
+          </div>
+
+          {selectedToAdd.length > 0 && (
+            <button
+              type="button"
+              className="btn btn-luxury-primary"
+              onClick={handleBulkAdd}
+              disabled={isAddingBulk}
+            >
+              Add Selected ({selectedToAdd.length}) to Flash Sale
+            </button>
+          )}
+        </div>
+
+        <div style={{ marginBottom: "16px" }}>
+          <input
+            type="text"
+            placeholder="Search products by name, SKU or category..."
+            value={productSearch}
+            onChange={(e) => setProductSearch(e.target.value)}
+            style={{ width: "100%", padding: "10px 14px", borderRadius: "8px" }}
+          />
+        </div>
+
+        {allProductsQuery.isLoading ? (
+          <p>Loading catalogue products...</p>
+        ) : availableProducts.length === 0 ? (
+          <p style={{ color: "var(--muted-foreground)" }}>
+            {productSearch ? "No matching available products found." : "All catalog products are already in this Flash Sale."}
+          </p>
+        ) : (
+          <div className="admin-product-list" style={{ maxHeight: "450px", overflowY: "auto" }}>
+            {availableProducts.map((p: any) => {
+              const coverImg = p.images?.find((img: any) => img.isCover) ?? p.images?.[0];
+              const isChecked = selectedToAdd.includes(String(p.id));
+
+              return (
+                <article key={p.id} className="admin-product-row">
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0, flex: 1 }}>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedToAdd((prev) => [...prev, String(p.id)]);
+                        } else {
+                          setSelectedToAdd((prev) => prev.filter((id) => id !== String(p.id)));
+                        }
+                      }}
+                      style={{ width: "18px", height: "18px", cursor: "pointer" }}
+                    />
+
+                    {coverImg ? (
+                      <img
+                        src={coverImg.storageUrl}
+                        alt={p.name}
+                        style={{ width: "42px", height: "52px", objectFit: "cover", borderRadius: "6px" }}
+                      />
+                    ) : (
+                      <div style={{ width: "42px", height: "52px", background: "var(--muted)", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>
+                        No img
+                      </div>
+                    )}
+
+                    <div style={{ minWidth: 0 }}>
+                      <strong style={{ display: "block", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                        {p.name}
+                      </strong>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "12px", marginTop: "2px" }}>
+                        <span style={{ color: "var(--primary)", fontWeight: 700 }}>৳{p.priceTaka?.toLocaleString("en-BD")}</span>
+                        <span style={{ color: "var(--muted-foreground)" }}>{p.categoryName || "Pakistani Lawn"}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="row-actions">
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => handleAddProduct(p.id)}
+                      disabled={addProductMutation.isPending}
+                    >
+                      + Add to Flash Sale
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 export default function Admin() {
   const [location] = useLocation();
   const [matchCustomerDetail] = useRoute("/admin/customers/:id");
@@ -2856,6 +3372,8 @@ export default function Admin() {
     <CustomerDetailManager />
   ) : location === "/admin/products" ? (
     <ProductManager />
+  ) : location === "/admin/flash-sale" ? (
+    <FlashSaleManager />
   ) : location === "/admin/featured" ? (
     <FeaturedCollectionManager />
   ) : location === "/admin/announcements" ? (

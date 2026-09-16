@@ -40,6 +40,15 @@ export async function getPublicSiteSettings() {
     heroHeading: settings.heroHeading || "RABIORA",
     heroTagline: settings.heroTagline || "Elegance • Comfort • Confidence",
     heroImageUrl: settings.heroImageUrl || "",
+    // Promotional Countdown Bar
+    promoActive: settings.promoActive ?? false,
+    promoText: settings.promoText || "Flash Sale — Special Discount on Pakistani Lawn & Silk",
+    promoDiscountText: settings.promoDiscountText || "10% OFF",
+    promoCountdownEnd: settings.promoCountdownEnd || "",
+    promoCountdownActive: settings.promoCountdownActive ?? true,
+    promoButtonText: settings.promoButtonText || "Shop Flash Sale",
+    promoLink: settings.promoLink || "/#products",
+    promoProductIds: settings.promoProductIds || [],
   };
 }
 
@@ -57,6 +66,14 @@ export async function updateAdminSiteSettings(input: {
   heroHeading?: string;
   heroTagline?: string;
   heroImageUrl?: string;
+  promoActive?: boolean;
+  promoText?: string;
+  promoDiscountText?: string;
+  promoCountdownEnd?: string;
+  promoCountdownActive?: boolean;
+  promoButtonText?: string;
+  promoLink?: string;
+  promoProductIds?: string[];
 }) {
   await connectMongo();
   const updated = await SiteSettingsModel.findOneAndUpdate(
@@ -76,6 +93,14 @@ export async function updateAdminSiteSettings(input: {
         ...(input.heroHeading !== undefined && { heroHeading: input.heroHeading.trim() }),
         ...(input.heroTagline !== undefined && { heroTagline: input.heroTagline.trim() }),
         ...(input.heroImageUrl !== undefined && { heroImageUrl: input.heroImageUrl.trim() }),
+        ...(input.promoActive !== undefined && { promoActive: input.promoActive }),
+        ...(input.promoText !== undefined && { promoText: input.promoText.trim() }),
+        ...(input.promoDiscountText !== undefined && { promoDiscountText: input.promoDiscountText.trim() }),
+        ...(input.promoCountdownEnd !== undefined && { promoCountdownEnd: input.promoCountdownEnd.trim() }),
+        ...(input.promoCountdownActive !== undefined && { promoCountdownActive: input.promoCountdownActive }),
+        ...(input.promoButtonText !== undefined && { promoButtonText: input.promoButtonText.trim() }),
+        ...(input.promoLink !== undefined && { promoLink: input.promoLink.trim() }),
+        ...(input.promoProductIds !== undefined && { promoProductIds: input.promoProductIds }),
       },
     },
     { upsert: true, new: true }
@@ -95,6 +120,14 @@ export async function updateAdminSiteSettings(input: {
     heroHeading: updated.heroHeading,
     heroTagline: updated.heroTagline,
     heroImageUrl: updated.heroImageUrl,
+    promoActive: updated.promoActive ?? false,
+    promoText: updated.promoText || "Flash Sale — Special Discount on Pakistani Lawn & Silk",
+    promoDiscountText: updated.promoDiscountText || "10% OFF",
+    promoCountdownEnd: updated.promoCountdownEnd || "",
+    promoCountdownActive: updated.promoCountdownActive ?? true,
+    promoButtonText: updated.promoButtonText || "Shop Flash Sale",
+    promoLink: updated.promoLink || "/#products",
+    promoProductIds: updated.promoProductIds || [],
   };
 }
 

@@ -5,6 +5,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { trpc } from "@/lib/trpc";
 import { MobileSearchModal } from "./MobileSearchModal";
+import { PromotionalCountdownBar } from "./PromotionalCountdownBar";
 
 type RabioraHeaderProps = {
   searchValue?: string;
@@ -18,6 +19,7 @@ const logoUrl = "/uploads/images/branding/rabiora-logo.jpeg";
 export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wishlistCount = 0 }: RabioraHeaderProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const [announcementIdx, setAnnouncementIdx] = useState(0);
   const { theme, toggleTheme } = useTheme();
   const { t, toggleLanguage } = useLanguage();
   const customer = trpc.customer.me.useQuery();
@@ -35,32 +37,43 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
   const closeDrawer = () => setDrawerOpen(false);
 
   const announcementsQuery = trpc.announcements.list.useQuery();
+  const announcements = announcementsQuery.data || [];
+  const defaultAnnouncements = [
+    { id: "def-1", text: t("freeDelivery") || "Free Delivery Inside Dhaka City", link: "/#products" },
+    { id: "def-2", text: t("premiumCollection") || "100% Authentic Handcrafted Pakistani Three Piece", link: "/#products" },
+    { id: "def-3", text: t("codAvailable") || "Cash on Delivery Available Nationwide in Bangladesh", link: "/#products" },
+  ];
+  const activeAnnouncements = announcements.length > 0 ? announcements : defaultAnnouncements;
+
+  // Auto-rotate announcement every 3.8s in a smooth infinite loop
+  useEffect(() => {
+    if (activeAnnouncements.length <= 1) return;
+    const timer = setInterval(() => {
+      setAnnouncementIdx((prev) => (prev + 1) % activeAnnouncements.length);
+    }, 3800);
+    return () => clearInterval(timer);
+  }, [activeAnnouncements.length]);
+
+  const currentItem = activeAnnouncements[announcementIdx % activeAnnouncements.length] || activeAnnouncements[0];
 
   return (
     <>
-      <div className="announcement">
-        {announcementsQuery.data && announcementsQuery.data.length > 0 ? (
-          announcementsQuery.data.map((item, index) => (
-            <span key={item.id} className="announcement-item-wrap">
-              {index > 0 && <span aria-hidden="true" className="announcement-sep">|</span>}
-              {item.link ? (
-                <a href={item.link} className="announcement-copy announcement-link">
-                  {item.text}
+      <PromotionalCountdownBar />
+
+      <div className="announcement single-line-announcement" aria-live="polite">
+        <div className="container announcement-inner-single">
+          {currentItem && (
+            <div key={currentItem.id || announcementIdx} className="announcement-single-track">
+              {currentItem.link ? (
+                <a href={currentItem.link} className="announcement-copy announcement-link single-line-text">
+                  {currentItem.text}
                 </a>
               ) : (
-                <span className="announcement-copy">{item.text}</span>
+                <span className="announcement-copy single-line-text">{currentItem.text}</span>
               )}
-            </span>
-          ))
-        ) : (
-          <>
-            <span className="announcement-copy">{t("freeDelivery")}</span>
-            <span aria-hidden="true">|</span>
-            <span className="announcement-copy">{t("premiumCollection")}</span>
-            <span aria-hidden="true">|</span>
-            <span className="announcement-copy">{t("codAvailable")}</span>
-          </>
-        )}
+            </div>
+          )}
+        </div>
       </div>
 
       <header className="rabiora-header">

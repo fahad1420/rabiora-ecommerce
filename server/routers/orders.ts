@@ -16,6 +16,7 @@ export const orderRouter = router({
     districtArea: z.string().trim().min(2).max(180),
     upazila: z.string().trim().max(180).optional(),
     thana: z.string().trim().max(180).optional(),
+    area: z.string().trim().max(180).optional(),
     fullAddress: z.string().trim().min(5).max(1000),
     paymentMethod: z.enum(PAYMENT_METHODS),
     transactionId: z.string().trim().min(3).max(120).optional(),

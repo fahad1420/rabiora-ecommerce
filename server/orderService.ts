@@ -78,6 +78,7 @@ export async function createOrder(
     districtArea: string;
     upazila?: string;
     thana?: string;
+    area?: string;
     fullAddress: string;
     paymentMethod: PaymentMethod;
     transactionId?: string;
@@ -212,7 +213,8 @@ export async function createOrder(
     customerPhone: input.customerPhone,
     districtArea: input.districtArea,
     upazila: input.upazila,
-    thana: input.thana,
+    thana: input.thana || input.area,
+    area: input.area || input.thana,
     fullAddress: input.fullAddress,
     subtotalTaka: finalSubtotalTaka,
     deliveryChargeTaka,

@@ -331,6 +331,7 @@ var init_Order = __esm({
         districtArea: { type: String, required: true },
         upazila: { type: String, trim: true },
         thana: { type: String, trim: true },
+        area: { type: String, trim: true },
         fullAddress: { type: String, required: true },
         subtotalTaka: { type: Number, required: true },
         deliveryChargeTaka: { type: Number, required: true },
@@ -467,7 +468,16 @@ var init_SiteSettings = __esm({
         heroBadge: { type: String, default: "Premium Collection" },
         heroHeading: { type: String, default: "RABIORA" },
         heroTagline: { type: String, default: "Elegance \u2022 Comfort \u2022 Confidence" },
-        heroImageUrl: { type: String, default: "" }
+        heroImageUrl: { type: String, default: "" },
+        // Promotional Countdown Bar
+        promoActive: { type: Boolean, default: false },
+        promoText: { type: String, default: "Flash Sale \u2014 Special Discount on Pakistani Lawn & Silk" },
+        promoDiscountText: { type: String, default: "10% OFF" },
+        promoCountdownEnd: { type: String, default: "" },
+        promoCountdownActive: { type: Boolean, default: true },
+        promoButtonText: { type: String, default: "Shop Flash Sale" },
+        promoLink: { type: String, default: "/#products" },
+        promoProductIds: { type: [String], default: [] }
       },
       {
         timestamps: true
@@ -588,14 +598,42 @@ var init_Announcement = __esm({
   }
 });
 
+// server/models/FlashSale.ts
+import mongoose16, { Schema as Schema15 } from "mongoose";
+var FlashSaleSchema, FlashSaleModel;
+var init_FlashSale = __esm({
+  "server/models/FlashSale.ts"() {
+    "use strict";
+    FlashSaleSchema = new Schema15(
+      {
+        key: { type: String, required: true, unique: true, default: "default" },
+        campaignName: { type: String, default: "Rabiora Flash Sale" },
+        title: { type: String, default: "\u26A1 Exclusive Flash Sale \u2014 Up to 20% OFF on Selected Luxury Pieces" },
+        subtitle: { type: String, default: "Limited time offer on handcrafted Pakistani Lawn & Silk Three-Piece sets" },
+        badgeText: { type: String, default: "\u26A1 FLASH SALE DEAL" },
+        isActive: { type: Boolean, default: true },
+        startTime: { type: Date },
+        endTime: { type: Date },
+        ctaText: { type: String, default: "Shop Flash Sale" },
+        ctaLink: { type: String, default: "/#products" },
+        productIds: [{ type: Schema15.Types.ObjectId, ref: "Product" }]
+      },
+      {
+        timestamps: true
+      }
+    );
+    FlashSaleModel = mongoose16.models.FlashSale || mongoose16.model("FlashSale", FlashSaleSchema);
+  }
+});
+
 // server/models/helpers.ts
-import mongoose16, { Types as Types8 } from "mongoose";
+import mongoose17, { Types as Types9 } from "mongoose";
 function toObjectId(id) {
   if (typeof id !== "string") return id;
-  return Types8.ObjectId.isValid(id) ? Types8.ObjectId.createFromHexString(id) : new Types8.ObjectId(id);
+  return Types9.ObjectId.isValid(id) ? Types9.ObjectId.createFromHexString(id) : new Types9.ObjectId(id);
 }
 function isValidObjectId(id) {
-  return typeof id === "string" && mongoose16.isValidObjectId(id);
+  return typeof id === "string" && mongoose17.isValidObjectId(id);
 }
 function findProductQuery(idOrLegacy) {
   const conditions = [];
@@ -603,8 +641,8 @@ function findProductQuery(idOrLegacy) {
   if (!isNaN(num) && num > 0) {
     conditions.push({ legacyId: num });
   }
-  if (typeof idOrLegacy === "string" && mongoose16.isValidObjectId(idOrLegacy)) {
-    conditions.push({ _id: Types8.ObjectId.createFromHexString(idOrLegacy) });
+  if (typeof idOrLegacy === "string" && mongoose17.isValidObjectId(idOrLegacy)) {
+    conditions.push({ _id: Types9.ObjectId.createFromHexString(idOrLegacy) });
   }
   if (conditions.length === 0) {
     conditions.push({ slug: String(idOrLegacy) });
@@ -613,15 +651,15 @@ function findProductQuery(idOrLegacy) {
 }
 function findUserQuery(idOrOpenId) {
   const conditions = [{ openId: String(idOrOpenId) }];
-  if (typeof idOrOpenId === "string" && mongoose16.isValidObjectId(idOrOpenId)) {
-    conditions.push({ _id: Types8.ObjectId.createFromHexString(idOrOpenId) });
+  if (typeof idOrOpenId === "string" && mongoose17.isValidObjectId(idOrOpenId)) {
+    conditions.push({ _id: Types9.ObjectId.createFromHexString(idOrOpenId) });
   }
   return conditions.length === 1 ? conditions[0] : { $or: conditions };
 }
 function findOrderQuery(orderIdOrNumber) {
   const conditions = [{ orderNumber: String(orderIdOrNumber) }];
-  if (typeof orderIdOrNumber === "string" && mongoose16.isValidObjectId(orderIdOrNumber)) {
-    conditions.push({ _id: Types8.ObjectId.createFromHexString(orderIdOrNumber) });
+  if (typeof orderIdOrNumber === "string" && mongoose17.isValidObjectId(orderIdOrNumber)) {
+    conditions.push({ _id: Types9.ObjectId.createFromHexString(orderIdOrNumber) });
   }
   return conditions.length === 1 ? conditions[0] : { $or: conditions };
 }
@@ -649,6 +687,7 @@ var init_models = __esm({
     init_OfferBanner();
     init_Coupon();
     init_Announcement();
+    init_FlashSale();
     init_helpers();
   }
 });
@@ -1835,7 +1874,13 @@ async function listCatalogue(filters = {}) {
 }
 async function getCatalogueProduct(slug) {
   await connectMongo();
-  const p = await ProductModel.findOne({ slug }).lean();
+  let p = await ProductModel.findOne({ slug }).lean();
+  if (!p && !isNaN(Number(slug))) {
+    p = await ProductModel.findOne({ legacyId: Number(slug) }).lean();
+  }
+  if (!p && slug && slug.match(/^[0-9a-fA-F]{24}$/)) {
+    p = await ProductModel.findById(slug).lean();
+  }
   if (!p) {
     throw new TRPCError2({ code: "NOT_FOUND", message: "Product not found." });
   }
@@ -2826,7 +2871,8 @@ async function createOrder(identity, input) {
     customerPhone: input.customerPhone,
     districtArea: input.districtArea,
     upazila: input.upazila,
-    thana: input.thana,
+    thana: input.thana || input.area,
+    area: input.area || input.thana,
     fullAddress: input.fullAddress,
     subtotalTaka: finalSubtotalTaka,
     deliveryChargeTaka,
@@ -3061,6 +3107,7 @@ var orderRouter = router({
     districtArea: z3.string().trim().min(2).max(180),
     upazila: z3.string().trim().max(180).optional(),
     thana: z3.string().trim().max(180).optional(),
+    area: z3.string().trim().max(180).optional(),
     fullAddress: z3.string().trim().min(5).max(1e3),
     paymentMethod: z3.enum(PAYMENT_METHODS2),
     transactionId: z3.string().trim().min(3).max(120).optional(),
@@ -3803,7 +3850,16 @@ async function getPublicSiteSettings() {
     heroBadge: settings.heroBadge || "Premium Collection",
     heroHeading: settings.heroHeading || "RABIORA",
     heroTagline: settings.heroTagline || "Elegance \u2022 Comfort \u2022 Confidence",
-    heroImageUrl: settings.heroImageUrl || ""
+    heroImageUrl: settings.heroImageUrl || "",
+    // Promotional Countdown Bar
+    promoActive: settings.promoActive ?? false,
+    promoText: settings.promoText || "Flash Sale \u2014 Special Discount on Pakistani Lawn & Silk",
+    promoDiscountText: settings.promoDiscountText || "10% OFF",
+    promoCountdownEnd: settings.promoCountdownEnd || "",
+    promoCountdownActive: settings.promoCountdownActive ?? true,
+    promoButtonText: settings.promoButtonText || "Shop Flash Sale",
+    promoLink: settings.promoLink || "/#products",
+    promoProductIds: settings.promoProductIds || []
   };
 }
 async function updateAdminSiteSettings(input) {
@@ -3824,7 +3880,15 @@ async function updateAdminSiteSettings(input) {
         ...input.heroBadge !== void 0 && { heroBadge: input.heroBadge.trim() },
         ...input.heroHeading !== void 0 && { heroHeading: input.heroHeading.trim() },
         ...input.heroTagline !== void 0 && { heroTagline: input.heroTagline.trim() },
-        ...input.heroImageUrl !== void 0 && { heroImageUrl: input.heroImageUrl.trim() }
+        ...input.heroImageUrl !== void 0 && { heroImageUrl: input.heroImageUrl.trim() },
+        ...input.promoActive !== void 0 && { promoActive: input.promoActive },
+        ...input.promoText !== void 0 && { promoText: input.promoText.trim() },
+        ...input.promoDiscountText !== void 0 && { promoDiscountText: input.promoDiscountText.trim() },
+        ...input.promoCountdownEnd !== void 0 && { promoCountdownEnd: input.promoCountdownEnd.trim() },
+        ...input.promoCountdownActive !== void 0 && { promoCountdownActive: input.promoCountdownActive },
+        ...input.promoButtonText !== void 0 && { promoButtonText: input.promoButtonText.trim() },
+        ...input.promoLink !== void 0 && { promoLink: input.promoLink.trim() },
+        ...input.promoProductIds !== void 0 && { promoProductIds: input.promoProductIds }
       }
     },
     { upsert: true, new: true }
@@ -3842,7 +3906,15 @@ async function updateAdminSiteSettings(input) {
     heroBadge: updated.heroBadge,
     heroHeading: updated.heroHeading,
     heroTagline: updated.heroTagline,
-    heroImageUrl: updated.heroImageUrl
+    heroImageUrl: updated.heroImageUrl,
+    promoActive: updated.promoActive ?? false,
+    promoText: updated.promoText || "Flash Sale \u2014 Special Discount on Pakistani Lawn & Silk",
+    promoDiscountText: updated.promoDiscountText || "10% OFF",
+    promoCountdownEnd: updated.promoCountdownEnd || "",
+    promoCountdownActive: updated.promoCountdownActive ?? true,
+    promoButtonText: updated.promoButtonText || "Shop Flash Sale",
+    promoLink: updated.promoLink || "/#products",
+    promoProductIds: updated.promoProductIds || []
   };
 }
 async function subscribeCustomer(input) {
@@ -4052,6 +4124,171 @@ async function uploadAdminOfferImage(dataUri, fileName) {
   const buffer = Buffer.from(match[2], "base64");
   const upload = await saveProductImage("offers", buffer, mimeType, fileName || "offer-banner.jpg");
   return { storageUrl: upload.url, storageKey: upload.key };
+}
+
+// server/flashSaleService.ts
+init_db();
+init_models();
+import { TRPCError as TRPCError17 } from "@trpc/server";
+async function getPublicFlashSale() {
+  await connectMongo();
+  let flashSale = await FlashSaleModel.findOne({ key: "default" }).populate("productIds").lean();
+  if (!flashSale) {
+    const defaultSale = await FlashSaleModel.create({
+      key: "default",
+      campaignName: "Rabiora Flash Sale",
+      title: "\u26A1 Exclusive Flash Sale \u2014 Up to 20% OFF on Selected Luxury Pieces",
+      subtitle: "Limited time offer on handcrafted Pakistani Lawn & Silk Three-Piece sets",
+      badgeText: "\u26A1 FLASH SALE DEAL",
+      isActive: true,
+      ctaText: "Shop Flash Sale",
+      ctaLink: "/#products",
+      productIds: []
+    });
+    flashSale = defaultSale.toObject();
+  }
+  const now = /* @__PURE__ */ new Date();
+  let isExpired = false;
+  if (flashSale.endTime && new Date(flashSale.endTime) < now) {
+    isExpired = true;
+  }
+  if (flashSale.startTime && new Date(flashSale.startTime) > now) {
+    isExpired = true;
+  }
+  const productsList = (flashSale.productIds || []).map((p) => {
+    if (!p || typeof p !== "object") return null;
+    const coverImage = (p.images || []).find((img) => img.isCover) || (p.images || [])[0];
+    return {
+      id: p._id.toString(),
+      legacyId: p.legacyId,
+      name: p.name,
+      slug: p.slug,
+      priceTaka: p.priceTaka,
+      oldPriceTaka: p.oldPriceTaka,
+      discountPercent: p.discountPercent,
+      isInStock: p.isInStock !== false,
+      stockQuantity: p.stockQuantity ?? 0,
+      imageUrl: coverImage ? coverImage.storageUrl : ""
+    };
+  }).filter(Boolean);
+  return {
+    id: flashSale._id.toString(),
+    campaignName: flashSale.campaignName,
+    title: flashSale.title,
+    subtitle: flashSale.subtitle || "",
+    badgeText: flashSale.badgeText || "\u26A1 FLASH SALE DEAL",
+    isActive: flashSale.isActive && !isExpired,
+    isScheduleActive: flashSale.isActive,
+    startTime: flashSale.startTime ? new Date(flashSale.startTime).toISOString() : null,
+    endTime: flashSale.endTime ? new Date(flashSale.endTime).toISOString() : null,
+    ctaText: flashSale.ctaText || "Shop Flash Sale",
+    ctaLink: flashSale.ctaLink || "/#products",
+    products: productsList,
+    productCount: productsList.length
+  };
+}
+async function getAdminFlashSale() {
+  await connectMongo();
+  let flashSale = await FlashSaleModel.findOne({ key: "default" }).populate("productIds").lean();
+  if (!flashSale) {
+    flashSale = await FlashSaleModel.create({
+      key: "default",
+      campaignName: "Rabiora Flash Sale",
+      title: "\u26A1 Exclusive Flash Sale \u2014 Up to 20% OFF on Selected Luxury Pieces",
+      subtitle: "Limited time offer on handcrafted Pakistani Lawn & Silk Three-Piece sets",
+      badgeText: "\u26A1 FLASH SALE DEAL",
+      isActive: true,
+      ctaText: "Shop Flash Sale",
+      ctaLink: "/#products",
+      productIds: []
+    });
+    flashSale = flashSale.toObject();
+  }
+  const attachedProducts = (flashSale.productIds || []).map((p) => {
+    if (!p || typeof p !== "object") return null;
+    const coverImage = (p.images || []).find((img) => img.isCover) || (p.images || [])[0];
+    return {
+      id: p._id.toString(),
+      legacyId: p.legacyId,
+      name: p.name,
+      slug: p.slug,
+      priceTaka: p.priceTaka,
+      oldPriceTaka: p.oldPriceTaka,
+      discountPercent: p.discountPercent,
+      isInStock: p.isInStock !== false,
+      stockQuantity: p.stockQuantity ?? 0,
+      imageUrl: coverImage ? coverImage.storageUrl : ""
+    };
+  }).filter(Boolean);
+  return {
+    id: flashSale._id.toString(),
+    campaignName: flashSale.campaignName,
+    title: flashSale.title,
+    subtitle: flashSale.subtitle || "",
+    badgeText: flashSale.badgeText || "\u26A1 FLASH SALE DEAL",
+    isActive: flashSale.isActive,
+    startTime: flashSale.startTime ? new Date(flashSale.startTime).toISOString() : "",
+    endTime: flashSale.endTime ? new Date(flashSale.endTime).toISOString() : "",
+    ctaText: flashSale.ctaText || "Shop Flash Sale",
+    ctaLink: flashSale.ctaLink || "/#products",
+    productIds: attachedProducts.map((p) => p.id),
+    products: attachedProducts
+  };
+}
+async function updateAdminFlashSale(input) {
+  await connectMongo();
+  const updateFields = {};
+  if (input.campaignName !== void 0) updateFields.campaignName = input.campaignName.trim();
+  if (input.title !== void 0) updateFields.title = input.title.trim();
+  if (input.subtitle !== void 0) updateFields.subtitle = input.subtitle.trim();
+  if (input.badgeText !== void 0) updateFields.badgeText = input.badgeText.trim();
+  if (input.isActive !== void 0) updateFields.isActive = input.isActive;
+  if (input.startTime !== void 0) {
+    updateFields.startTime = input.startTime ? new Date(input.startTime) : null;
+  }
+  if (input.endTime !== void 0) {
+    updateFields.endTime = input.endTime ? new Date(input.endTime) : null;
+  }
+  if (input.ctaText !== void 0) updateFields.ctaText = input.ctaText.trim();
+  if (input.ctaLink !== void 0) updateFields.ctaLink = input.ctaLink.trim();
+  if (input.productIds !== void 0) {
+    updateFields.productIds = input.productIds;
+  }
+  const updated = await FlashSaleModel.findOneAndUpdate(
+    { key: "default" },
+    { $set: updateFields },
+    { upsert: true, new: true }
+  ).populate("productIds").lean();
+  return getAdminFlashSale();
+}
+async function addProductToFlashSale(productId) {
+  await connectMongo();
+  const product = await ProductModel.findOne(findProductQuery(productId));
+  if (!product) {
+    throw new TRPCError17({ code: "NOT_FOUND", message: "Product not found." });
+  }
+  await FlashSaleModel.findOneAndUpdate(
+    { key: "default" },
+    { $addToSet: { productIds: product._id } },
+    { upsert: true }
+  );
+  return getAdminFlashSale();
+}
+async function removeProductFromFlashSale(productId) {
+  await connectMongo();
+  const product = await ProductModel.findOne(findProductQuery(productId));
+  if (product) {
+    await FlashSaleModel.findOneAndUpdate(
+      { key: "default" },
+      { $pull: { productIds: product._id } }
+    );
+  } else {
+    await FlashSaleModel.findOneAndUpdate(
+      { key: "default" },
+      { $pull: { productIds: productId } }
+    );
+  }
+  return getAdminFlashSale();
 }
 
 // server/announcementService.ts
@@ -4326,7 +4563,15 @@ var adminRouter = router({
         heroBadge: z4.string().trim().optional(),
         heroHeading: z4.string().trim().optional(),
         heroTagline: z4.string().trim().optional(),
-        heroImageUrl: z4.string().trim().optional()
+        heroImageUrl: z4.string().trim().optional(),
+        promoActive: z4.boolean().optional(),
+        promoText: z4.string().trim().optional(),
+        promoDiscountText: z4.string().trim().optional(),
+        promoCountdownEnd: z4.string().trim().optional(),
+        promoCountdownActive: z4.boolean().optional(),
+        promoButtonText: z4.string().trim().optional(),
+        promoLink: z4.string().trim().optional(),
+        promoProductIds: z4.array(z4.string()).optional()
       })
     ).mutation(({ input }) => updateAdminSiteSettings(input))
   }),
@@ -4420,6 +4665,25 @@ var adminRouter = router({
       })
     ).mutation(({ input }) => updateAnnouncement(input.id, input)),
     delete: adminProcedure.input(z4.object({ id: z4.string() })).mutation(({ input }) => deleteAnnouncement(input.id))
+  }),
+  flashSale: router({
+    get: adminProcedure.query(() => getAdminFlashSale()),
+    update: adminProcedure.input(
+      z4.object({
+        campaignName: z4.string().trim().optional(),
+        title: z4.string().trim().optional(),
+        subtitle: z4.string().trim().optional(),
+        badgeText: z4.string().trim().optional(),
+        isActive: z4.boolean().optional(),
+        startTime: z4.string().nullable().optional(),
+        endTime: z4.string().nullable().optional(),
+        ctaText: z4.string().trim().optional(),
+        ctaLink: z4.string().trim().optional(),
+        productIds: z4.array(z4.string()).optional()
+      })
+    ).mutation(({ input }) => updateAdminFlashSale(input)),
+    addProduct: adminProcedure.input(z4.object({ productId: z4.string() })).mutation(({ input }) => addProductToFlashSale(input.productId)),
+    removeProduct: adminProcedure.input(z4.object({ productId: z4.string() })).mutation(({ input }) => removeProductFromFlashSale(input.productId))
   })
 });
 
@@ -4427,7 +4691,7 @@ var adminRouter = router({
 import { z as z5 } from "zod";
 
 // server/_core/notification.ts
-import { TRPCError as TRPCError17 } from "@trpc/server";
+import { TRPCError as TRPCError18 } from "@trpc/server";
 var TITLE_MAX_LENGTH = 1200;
 var CONTENT_MAX_LENGTH = 2e4;
 var trimValue = (value) => value.trim();
@@ -4441,13 +4705,13 @@ var buildEndpointUrl = (baseUrl) => {
 };
 var validatePayload = (input) => {
   if (!isNonEmptyString2(input.title)) {
-    throw new TRPCError17({
+    throw new TRPCError18({
       code: "BAD_REQUEST",
       message: "Notification title is required."
     });
   }
   if (!isNonEmptyString2(input.content)) {
-    throw new TRPCError17({
+    throw new TRPCError18({
       code: "BAD_REQUEST",
       message: "Notification content is required."
     });
@@ -4455,13 +4719,13 @@ var validatePayload = (input) => {
   const title = trimValue(input.title);
   const content = trimValue(input.content);
   if (title.length > TITLE_MAX_LENGTH) {
-    throw new TRPCError17({
+    throw new TRPCError18({
       code: "BAD_REQUEST",
       message: `Notification title must be at most ${TITLE_MAX_LENGTH} characters.`
     });
   }
   if (content.length > CONTENT_MAX_LENGTH) {
-    throw new TRPCError17({
+    throw new TRPCError18({
       code: "BAD_REQUEST",
       message: `Notification content must be at most ${CONTENT_MAX_LENGTH} characters.`
     });
@@ -4471,13 +4735,13 @@ var validatePayload = (input) => {
 async function notifyOwner(payload) {
   const { title, content } = validatePayload(payload);
   if (!ENV.forgeApiUrl) {
-    throw new TRPCError17({
+    throw new TRPCError18({
       code: "INTERNAL_SERVER_ERROR",
       message: "Notification service URL is not configured."
     });
   }
   if (!ENV.forgeApiKey) {
-    throw new TRPCError17({
+    throw new TRPCError18({
       code: "INTERNAL_SERVER_ERROR",
       message: "Notification service API key is not configured."
     });
@@ -4535,6 +4799,9 @@ var appRouter = router({
   system: systemRouter,
   settings: router({
     get: publicProcedure.query(() => getPublicSiteSettings())
+  }),
+  flashSale: router({
+    get: publicProcedure.query(() => getPublicFlashSale())
   }),
   announcements: router({
     list: publicProcedure.query(() => listActiveAnnouncements())

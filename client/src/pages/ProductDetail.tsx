@@ -33,38 +33,38 @@ export default function ProductDetail() {
 
   const product = productQuery.data;
 
-  const [selectedImage, setSelectedImage] =
-    useState(0);
+  const [selectedImage, setSelectedImage] = useState(0);
+  const [quantity, setQuantity] = useState(1);
+  const [activeTab, setActiveTab] = useState<string>("description");
 
-  const reviewsQuery =
-    trpc.customer.productReviews.useQuery(
-      { productId: product?.id ?? 0 },
-      {
-        enabled: Boolean(product?.id),
-      },
-    );
+  const reviewsQuery = trpc.customer.productReviews.useQuery(
+    { productId: product?.id ?? 0 },
+    { enabled: Boolean(product?.id) },
+  );
 
   useEffect(() => {
     setSelectedImage(0);
+    setQuantity(1);
   }, [product?.id]);
 
   const relatedProducts = useMemo(
     () =>
       (allProductsQuery.data ?? [])
-        .filter(
-          (item) => item.id !== product?.id,
-        )
+        .filter((item) => item.id !== product?.id)
         .slice(0, 4),
     [allProductsQuery.data, product?.id],
   );
 
-  const addCart = (productId: number | string) =>
-    cart.add(productId);
+  const addCart = (productId: number | string) => {
+    for (let i = 0; i < quantity; i++) {
+      cart.add(productId);
+    }
+  };
 
   const handleBuyNow = (productId?: number | string) => {
     const id = productId ?? product?.id;
     if (!id) return;
-    const targetUrl = `/checkout?buyNowProductId=${id}&qty=1`;
+    const targetUrl = `/checkout?buyNowProductId=${id}&qty=${quantity}`;
     if (!customer.data) {
       navigate(`/login?redirect=${encodeURIComponent(targetUrl)}`);
     } else {
@@ -76,280 +76,255 @@ export default function ProductDetail() {
 
   const averageRating =
     reviews.length > 0
-      ? reviews.reduce(
-          (sum, review) =>
-            sum + review.rating,
-          0,
-        ) / reviews.length
+      ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
       : 0;
 
   if (productQuery.isLoading) {
     return (
       <div className="page-shell">
-        <RabioraHeader
-          cartCount={cart.count}
-          wishlistCount={wishlist.count}
-        />
-
-        <main className="catalogue-state">
-          {t("loadingProduct")}
-        </main>
-      </div>
-    );
-  }
-
-  if (
-    productQuery.isError ||
-    !product
-  ) {
-    return (
-      <div className="page-shell">
-        <RabioraHeader
-          cartCount={cart.count}
-          wishlistCount={wishlist.count}
-        />
-
-        <main className="catalogue-state">
-          {t("productUnavailable")}
-        </main>
-
+        <RabioraHeader cartCount={cart.count} wishlistCount={wishlist.count} />
+        <main className="catalogue-state">{t("loadingProduct")}</main>
         <RabioraFooter />
       </div>
     );
   }
 
-  const mainImage =
-    product.images[selectedImage] ??
-    product.images[0];
+  if (productQuery.isError || !product) {
+    return (
+      <div className="page-shell">
+        <RabioraHeader cartCount={cart.count} wishlistCount={wishlist.count} />
+        <main className="catalogue-state">{t("productUnavailable")}</main>
+        <RabioraFooter />
+      </div>
+    );
+  }
+
+  const mainImage = product.images[selectedImage] ?? product.images[0];
+  const whatsAppOrderUrl = `https://wa.me/8801349529274?text=${encodeURIComponent(
+    `Hello Rabiora, I want to order:\n• Product: ${product.name}\n• Price: ৳${product.priceTaka.toLocaleString("en-BD")}\n• Quantity: ${quantity}\n• URL: https://www.rabiora.com/products/${product.slug}`
+  )}`;
 
   return (
     <div className="page-shell">
-      <RabioraHeader
-        cartCount={cart.count}
-        wishlistCount={wishlist.count}
-      />
+      <RabioraHeader cartCount={cart.count} wishlistCount={wishlist.count} />
 
       <main>
+        {/* Breadcrumb Navigation */}
+        <div className="container product-breadcrumb-row">
+          <a href="/">Home</a>
+          <span>/</span>
+          <a href="/#products">{product.categoryName || "Pakistani Three Piece"}</a>
+          <span>/</span>
+          <span className="current-breadcrumb">{product.name}</span>
+        </div>
+
         <section className="product-details-section">
           <div className="container details-wrapper">
+            {/* Gallery Column */}
             <div className="details-gallery">
-              {mainImage ? (
-                <img
-                  className="main-image"
-                  src={mainImage.storageUrl}
-                  alt={mainImage.altText}
-                  decoding="async"
-                />
-              ) : (
-                <div className="image-fallback detail-fallback">
-                  {t("imageUnavailable")}
-                </div>
-              )}
-
-              <div
-                className="gallery"
-                aria-label={t("imageGallery")}
-              >
-                {product.images.map(
-                  (image, index) => (
-                    <button
-                      aria-label={t(
-                        "viewImage",
-                        {
-                          index: index + 1,
-                          name: product.name,
-                        },
-                      )}
-                      className={
-                        index === selectedImage
-                          ? "thumb active"
-                          : "thumb"
-                      }
-                      key={image.storageUrl}
-                      type="button"
-                      onClick={() =>
-                        setSelectedImage(
-                          index,
-                        )
-                      }
-                    >
-                      <img
-                        src={image.storageUrl}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </button>
-                  ),
+              <div className="main-image-container">
+                {product.discountPercent > 0 && (
+                  <span className="discount-badge-large">-{product.discountPercent}% OFF</span>
+                )}
+                {mainImage ? (
+                  <img
+                    className="main-image"
+                    src={mainImage.storageUrl}
+                    alt={mainImage.altText || product.name}
+                    decoding="async"
+                  />
+                ) : (
+                  <div className="image-fallback detail-fallback">
+                    {t("imageUnavailable")}
+                  </div>
                 )}
               </div>
+
+              {product.images.length > 1 && (
+                <div className="gallery" aria-label={t("imageGallery")}>
+                  {product.images.map((image, index) => (
+                    <button
+                      aria-label={t("viewImage", { index: index + 1, name: product.name })}
+                      className={index === selectedImage ? "thumb active" : "thumb"}
+                      key={`${image.storageUrl}-${index}`}
+                      type="button"
+                      onClick={() => setSelectedImage(index)}
+                    >
+                      <img src={image.storageUrl} alt="" loading="lazy" decoding="async" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
+            {/* Product Overview & Action Column */}
             <div className="details-content">
-              <span className="badge">
-                {t("premium")}
-              </span>
+              <div className="product-category-brand-tag">
+                {product.categoryName || "Pakistani Three Piece"} {product.sku ? `• SKU: ${product.sku}` : ""}
+              </div>
 
-              <h1>{product.name}</h1>
+              <h1 className="product-title-heading">{product.name}</h1>
 
               {reviews.length > 0 && (
                 <div className="product-rating-summary">
                   <div className="product-rating-stars">
-                    {Array.from({
-                      length: 5,
-                    }).map((_, index) => (
+                    {Array.from({ length: 5 }).map((_, index) => (
                       <Star
                         key={index}
-                        size={18}
-                        fill={
-                          index <
-                          Math.round(
-                            averageRating,
-                          )
-                            ? "currentColor"
-                            : "none"
-                        }
+                        size={16}
+                        fill={index < Math.round(averageRating) ? "currentColor" : "none"}
                       />
                     ))}
                   </div>
-
-                  <strong>
-                    {averageRating.toFixed(
-                      1,
-                    )}
-                  </strong>
-
-                  <span>
-                    ({reviews.length}{" "}
-                    {reviews.length === 1
-                      ? "review"
-                      : "reviews"}
-                    )
-                  </span>
+                  <strong>{averageRating.toFixed(1)}</strong>
+                  <span>({reviews.length} {reviews.length === 1 ? "review" : "reviews"})</span>
                 </div>
               )}
 
-              <div className="price">
-                <span className="new-price">
-                  {taka(product.priceTaka)}
-                </span>
+              <div className="price-display-block">
+                <span className="price-current">{taka(product.priceTaka)}</span>
+                {product.oldPriceTaka ? (
+                  <span className="price-original">{taka(product.oldPriceTaka)}</span>
+                ) : null}
+              </div>
 
-                {product.oldPriceTaka && (
-                  <span className="old-price">
-                    {taka(
-                      product.oldPriceTaka,
-                    )}
+              {/* Stock Status Indicator */}
+              <div className="product-stock-badge-wrap">
+                {product.isInStock ? (
+                  <span className="stock-pill in-stock">
+                    <span className="stock-dot" /> In Stock • Ready for Immediate Delivery
+                  </span>
+                ) : (
+                  <span className="stock-pill out-of-stock">
+                    <span className="stock-dot" /> {t("outOfStock")}
                   </span>
                 )}
               </div>
 
-              <p>
-                <strong>
-                  {t("category")}:
-                </strong>{" "}
-                {product.categoryName}
-              </p>
+              {/* Quantity Stepper & Actions */}
+              {product.isInStock && (
+                <div className="product-purchase-action-group">
+                  <div className="quantity-control-wrap">
+                    <span className="quantity-label">Quantity</span>
+                    <div className="quantity-stepper">
+                      <button
+                        type="button"
+                        onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                        disabled={quantity <= 1}
+                        aria-label="Decrease quantity"
+                      >
+                        -
+                      </button>
+                      <span className="quantity-val">{quantity}</span>
+                      <button
+                        type="button"
+                        onClick={() => setQuantity((q) => Math.min(product.stockQuantity || 10, q + 1))}
+                        disabled={quantity >= (product.stockQuantity || 10)}
+                        aria-label="Increase quantity"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
 
-              <p>
-                <strong>
-                  {t("fabric")}:
-                </strong>{" "}
-                {product.fabric}
-              </p>
+                  <div className="product-buttons detail-buttons">
+                    <button
+                      className="btn detail-add-bag-btn"
+                      type="button"
+                      onClick={() => addCart(product.id)}
+                    >
+                      <ShoppingCart size={18} aria-hidden="true" />
+                      <span>{t("addToCart")}</span>
+                    </button>
 
-              <p>
-                <strong>
-                  {t("color")}:
-                </strong>{" "}
-                {product.color}
-              </p>
+                    <button
+                      className="btn detail-buy-now-btn"
+                      type="button"
+                      onClick={() => handleBuyNow()}
+                    >
+                      <span>{t("buyNow")}</span>
+                    </button>
+                  </div>
 
-              <p>
-                <strong>
-                  {t("availability")}:
-                </strong>{" "}
-                <span
-                  className={
-                    product.isInStock
-                      ? "in-stock"
-                      : "stock-note"
-                  }
-                >
-                  {product.isInStock
-                    ? t("inStock")
-                    : t("outOfStock")}
-                </span>
-              </p>
+                  <div className="secondary-action-row">
+                    <a
+                      href={whatsAppOrderUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="whatsapp-order-btn"
+                      title="Order directly on WhatsApp"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.634.077-1.803-.409-1.503-.625-2.435-2.148-2.51-2.247-.075-.1-.605-.805-.605-1.537s.38-1.09.516-1.238c.135-.148.293-.185.39-.185.099 0 .198.002.284.006.091.004.212-.034.331.253.123.298.423 1.03.46 1.104.037.074.062.161.012.26-.049.099-.074.16-.148.247-.074.086-.156.193-.223.26-.075.074-.153.155-.066.304.087.149.387.638.831 1.032.572.508 1.054.665 1.203.74.149.074.236.062.323-.037.087-.1.371-.433.47-.582.099-.148.198-.124.333-.074.136.049.864.407 1.012.481.149.074.248.112.284.173.037.062.037.359-.107.764z"/>
+                      </svg>
+                      <span>Order on WhatsApp</span>
+                    </a>
 
-              <hr />
+                    <button
+                      className={`wishlist-toggle-pill ${wishlist.ids.includes(product.id) ? "active" : ""}`}
+                      type="button"
+                      aria-pressed={wishlist.ids.includes(product.id)}
+                      onClick={() => wishlist.toggle(product.id)}
+                    >
+                      <Heart
+                        size={17}
+                        aria-hidden="true"
+                        fill={wishlist.ids.includes(product.id) ? "currentColor" : "none"}
+                      />
+                      <span>{wishlist.ids.includes(product.id) ? "Saved in Wishlist" : "Add to Wishlist"}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
-              <h3>
-                {t("description")}
-              </h3>
+              {/* Collapsible Accordion Tabs */}
+              <div className="product-accordions-group">
+                {/* 1. Description */}
+                <details className="product-accordion-item" open>
+                  <summary className="product-accordion-summary">
+                    <span>Product Description & Fabric</span>
+                  </summary>
+                  <div className="product-accordion-body">
+                    <p>{product.details || "Authentic handcrafted luxury Pakistani Three-Piece collection with intricate embroidery and premium finish."}</p>
+                    {product.fabric && (
+                      <p className="meta-line"><strong>Fabric:</strong> {product.fabric}</p>
+                    )}
+                    {product.color && (
+                      <p className="meta-line"><strong>Color:</strong> {product.color}</p>
+                    )}
+                  </div>
+                </details>
 
-              <p>{product.details}</p>
+                {/* 2. Fabric Care */}
+                <details className="product-accordion-item">
+                  <summary className="product-accordion-summary">
+                    <span>Fabric Care Instructions</span>
+                  </summary>
+                  <div className="product-accordion-body">
+                    <ul>
+                      <li>Dry clean recommended for heavy embroidered pieces.</li>
+                      <li>Gentle hand wash in cold water with mild detergent for lawn fabrics.</li>
+                      <li>Do not bleach or tumble dry. Dry in shade to maintain color brilliance.</li>
+                      <li>Iron at medium temperature on reverse side of embroidery.</li>
+                    </ul>
+                  </div>
+                </details>
 
-              <div className="product-buttons detail-buttons">
-                <button
-                  className="cart-btn"
-                  type="button"
-                  disabled={
-                    !product.isInStock
-                  }
-                  onClick={() =>
-                    addCart(product.id)
-                  }
-                >
-                  <ShoppingCart
-                    size={18}
-                    aria-hidden="true"
-                  />
-
-                  {t("addToCart")}
-                </button>
-
-                <button
-                  className="btn buy-now"
-                  type="button"
-                  disabled={
-                    !product.isInStock
-                  }
-                  onClick={() =>
-                    handleBuyNow()
-                  }
-                >
-                  {t("buyNow")}
-                </button>
+                {/* 3. Delivery & Returns */}
+                <details className="product-accordion-item">
+                  <summary className="product-accordion-summary">
+                    <span>Delivery & 48-Hour Exchange Policy</span>
+                  </summary>
+                  <div className="product-accordion-body">
+                    <ul>
+                      <li><strong>Dhaka City:</strong> Free delivery within 24-48 hours.</li>
+                      <li><strong>Outside Dhaka:</strong> ৳120 standard courier delivery within 2-3 business days.</li>
+                      <li><strong>Cash on Delivery & Mobile Wallet:</strong> bKash, Nagad, Rocket, and COD accepted.</li>
+                      <li><strong>48-Hour Exchange:</strong> Hassle-free exchange policy if you find any sizing or defect issue.</li>
+                    </ul>
+                  </div>
+                </details>
               </div>
-
-              <button
-                className="wishlist-btn"
-                type="button"
-                aria-pressed={wishlist.ids.includes(
-                  product.id,
-                )}
-                onClick={() =>
-                  wishlist.toggle(product.id)
-                }
-              >
-                <Heart
-                  size={17}
-                  aria-hidden="true"
-                  fill={
-                    wishlist.ids.includes(
-                      product.id,
-                    )
-                      ? "currentColor"
-                      : "none"
-                  }
-                />
-
-                {wishlist.ids.includes(
-                  product.id,
-                )
-                  ? t("savedWishlist")
-                  : t("addToWishlist")}
-              </button>
             </div>
           </div>
         </section>
