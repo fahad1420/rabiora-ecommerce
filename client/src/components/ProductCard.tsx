@@ -50,6 +50,9 @@ export const ProductCard = memo(function ProductCard({
     if ((e.target as HTMLElement).closest(".image-wishlist")) {
       return;
     }
+    if ((e.target as HTMLElement).closest("a")) {
+      return;
+    }
     navigate(productUrl);
   };
 

@@ -1,5 +1,6 @@
 import { Heart, LogIn, Menu, Moon, Search, ShieldCheck, ShoppingCart, Sun, User, UserCheck, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "wouter";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -28,9 +29,14 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
 
   useEffect(() => {
     if (!drawerOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && setDrawerOpen(false);
     window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
   }, [drawerOpen]);
 
   const closeDrawer = () => setDrawerOpen(false);
@@ -83,7 +89,7 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
             <a href="/#products">{t("products")}</a>
             <a href="/#reviews">{t("reviews")}</a>
             <a href="/#about">{t("about")}</a>
-            <a href="/#contact">{t("contact")}</a>
+            <Link href="/customer-service/contact">{t("contact")}</Link>
           </nav>
 
           <div className="header-actions">
@@ -175,8 +181,8 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
         onClose={() => setIsSearchModalOpen(false)}
       />
 
-      {drawerOpen && (
-        <>
+      {drawerOpen && typeof document !== "undefined" && createPortal(
+        <div className="mobile-drawer-portal-container">
           <button className="drawer-overlay" onClick={closeDrawer} aria-label={t("closeNavigation")} />
           <aside className="mobile-drawer" aria-label="Mobile navigation">
             <button className="drawer-close" onClick={closeDrawer} aria-label={t("closeNavigation")}>
@@ -187,7 +193,7 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
               <a href="/#products" onClick={closeDrawer}>{t("products")}</a>
               <a href="/#reviews" onClick={closeDrawer}>{t("reviews")}</a>
               <a href="/#about" onClick={closeDrawer}>{t("about")}</a>
-              <a href="/#contact" onClick={closeDrawer}>{t("contact")}</a>
+              <Link href="/customer-service/contact" onClick={closeDrawer}>{t("contact")}</Link>
               <Link href={isLoggedIn ? "/account" : "/login"} onClick={closeDrawer} className="mobile-account-link">
                 {isLoggedIn ? <UserCheck size={18} aria-hidden="true" /> : <User size={18} aria-hidden="true" />}
                 <span>{isLoggedIn ? (customer.data?.name?.trim() || "My Account") : "Sign In"}</span>
@@ -204,7 +210,8 @@ export function RabioraHeader({ searchValue = "", onSearchChange, cartCount, wis
               <button type="button" onClick={toggleTheme}>{theme === "dark" ? t("lightMode") : t("darkMode")}</button>
             </div>
           </aside>
-        </>
+        </div>,
+        document.body
       )}
     </>
   );

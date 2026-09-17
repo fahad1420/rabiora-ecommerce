@@ -25,7 +25,7 @@ let isPopNavigation = false;
 let currentKey = "";
 
 if (typeof window !== "undefined") {
-  // Prevent browser's default erratic scroll jumps in SPAs
+  // Prevent browser default jump
   if ("scrollRestoration" in window.history) {
     window.history.scrollRestoration = "manual";
   }
@@ -44,14 +44,29 @@ if (typeof window !== "undefined") {
   // Intercept pushState (forward navigation)
   const originalPushState = window.history.pushState;
   window.history.pushState = function (state, unused, url) {
-    // 1. Save scroll position of outgoing page under current history key & path
+    // 1. Prevent duplicate pushes for identical target URL
+    const targetUrlStr = url ? String(url) : "";
+    const currentPath = window.location.pathname + window.location.search;
+    const currentFull = currentPath + window.location.hash;
+
+    if (
+      targetUrlStr &&
+      (targetUrlStr === currentFull ||
+        targetUrlStr === currentPath ||
+        targetUrlStr === window.location.href)
+    ) {
+      // Duplicate push to same route -> do not push duplicate entry
+      return;
+    }
+
+    // 2. Save scroll position of outgoing page under current history key & path
     if (currentKey) {
       saveStoredPosition(currentKey, window.scrollX, window.scrollY);
     }
-    const currentPathKey = "path_" + window.location.pathname + window.location.search;
+    const currentPathKey = "path_" + currentPath;
     saveStoredPosition(currentPathKey, window.scrollX, window.scrollY);
 
-    // 2. Generate new key for incoming page
+    // 3. Generate new unique key for incoming page
     const newKey = "rk_" + Math.random().toString(36).substring(2, 9) + "_" + Date.now();
     currentKey = newKey;
     isPopNavigation = false;
@@ -68,7 +83,7 @@ if (typeof window !== "undefined") {
     const keyToKeep = window.history.state?.__rk || currentKey || ("rk_" + Date.now());
     currentKey = keyToKeep;
     const nextState =
-      typeof state === "object" && state !== null ? { __rk: keyToKeep, ...state } : { __rk: keyToKeep };
+      typeof state === "object" && state !== null ? { ...state, __rk: keyToKeep } : { __rk: keyToKeep };
     return originalReplaceState.call(this, nextState, unused, url);
   };
 
@@ -83,7 +98,6 @@ if (typeof window !== "undefined") {
   });
 
   // Continuously record scroll coordinates as the user browses
-  let scrollTimeout: any = null;
   window.addEventListener(
     "scroll",
     () => {
@@ -130,7 +144,7 @@ export function ScrollRestoration() {
         };
 
         restore();
-        // Multiple animation frames guarantee restoration after dynamic DOM layout renders
+        // Multiple animation frames guarantee restoration after dynamic layout paints
         requestAnimationFrame(() => {
           restore();
           requestAnimationFrame(restore);
@@ -148,4 +162,3 @@ export function ScrollRestoration() {
 
   return null;
 }
-

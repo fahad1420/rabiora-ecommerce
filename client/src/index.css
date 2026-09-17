@@ -408,8 +408,34 @@ img { display: block; max-width: 100%; }
 .rabiora-footer .developer-links a { display: inline-grid; width: 26px; height: 26px; place-items: center; border: 1px solid rgba(255, 255, 255, .18); border-radius: 50%; color: rgba(255, 255, 255, .72); text-decoration: none; transition: color .18s ease, background-color .18s ease, border-color .18s ease, transform .18s ease; }
 .rabiora-footer .developer-links a:hover, .rabiora-footer .developer-links a:focus-visible { color: #fff; background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .48); transform: translateY(-1px); }
 .back-to-top { position: fixed; z-index: 20; right: 25px; bottom: 25px; display: grid; width: 55px; height: 55px; place-items: center; border: 0; border-radius: 50%; background: var(--primary); color: #fff; cursor: pointer; box-shadow: var(--shadow); }
-.drawer-overlay { position: fixed; z-index: 39; inset: 0; border: 0; background: rgba(0, 0, 0, .35); }
-.mobile-drawer { position: fixed; z-index: 40; top: 0; right: 0; display: flex; width: min(320px, 85vw); min-height: 100vh; flex-direction: column; gap: 16px; padding: 22px 18px; background: var(--surface); box-shadow: -12px 0 24px rgba(0, 0, 0, .08); }
+.drawer-overlay {
+  position: fixed !important;
+  z-index: 99990 !important;
+  inset: 0 !important;
+  border: 0;
+  background: rgba(0, 0, 0, 0.6) !important;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.mobile-drawer {
+  position: fixed !important;
+  z-index: 99995 !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  display: flex;
+  width: min(320px, 85vw);
+  height: 100% !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  flex-direction: column;
+  gap: 16px;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 18px calc(20px + env(safe-area-inset-bottom, 0px)) 18px !important;
+  background: var(--surface);
+  box-shadow: -12px 0 24px rgba(0, 0, 0, 0.2);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .drawer-close { align-self: flex-end; border: 0; background: transparent; color: var(--dark); cursor: pointer; }
 .mobile-drawer nav { display: grid; gap: 10px; }
 .mobile-drawer nav a { border-radius: 8px; padding: 12px 8px; color: var(--dark); font-size: 18px; }
@@ -8344,7 +8370,7 @@ img, video, canvas, svg {
   padding: 8px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.15);
   position: relative;
-  z-index: 100;
+  z-index: 50;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
