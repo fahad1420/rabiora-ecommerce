@@ -29,23 +29,7 @@ const Admin = lazy(() => import("./pages/Admin"));
 const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const CustomerService = lazy(() => import("./pages/CustomerService"));
-
-function ScrollToTop() {
-  const [location] = useLocation();
-
-  useEffect(() => {
-    // If navigating with a hash (e.g., #products or #flash-sale), allow hash scroll handler
-    if (window.location.hash) {
-      return;
-    }
-    // Instantly reset scroll to top of viewport
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
-  }, [location]);
-
-  return null;
-}
+import { ScrollRestoration } from "./components/ScrollRestoration";
 
 function Router() {
   return (
@@ -200,7 +184,7 @@ export default function App() {
       >
         <LanguageProvider>
           <TooltipProvider>
-            <ScrollToTop />
+            <ScrollRestoration />
             <Router />
             <WhatsAppFloatingButton />
             <NewCustomerDiscountModal />
