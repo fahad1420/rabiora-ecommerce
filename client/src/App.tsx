@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Route, Switch } from "wouter";
-import { lazy, Suspense } from "react";
+import { Route, Switch, useLocation } from "wouter";
+import { lazy, Suspense, useEffect } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
@@ -29,6 +29,23 @@ const Admin = lazy(() => import("./pages/Admin"));
 const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const CustomerService = lazy(() => import("./pages/CustomerService"));
+
+function ScrollToTop() {
+  const [location] = useLocation();
+
+  useEffect(() => {
+    // If navigating with a hash (e.g., #products or #flash-sale), allow hash scroll handler
+    if (window.location.hash) {
+      return;
+    }
+    // Instantly reset scroll to top of viewport
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [location]);
+
+  return null;
+}
 
 function Router() {
   return (
@@ -183,6 +200,7 @@ export default function App() {
       >
         <LanguageProvider>
           <TooltipProvider>
+            <ScrollToTop />
             <Router />
             <WhatsAppFloatingButton />
             <NewCustomerDiscountModal />

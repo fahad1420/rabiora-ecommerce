@@ -63,6 +63,12 @@ export default function ProductDetail() {
   );
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [slug]);
+
+  useEffect(() => {
     setSelectedImage(0);
     setQuantity(1);
   }, [product?.id]);
